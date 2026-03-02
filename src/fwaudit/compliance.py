@@ -65,3 +65,105 @@ def check_nist_compliance(parse):
         findings.append("[NIST-HIGH] NIST SC-7: No boundary protection deny-all rule found")
 
     return findings
+
+
+def check_cis_compliance_pa(rules):
+    findings = []
+
+    # CIS 1 - No any/any permit
+    for rule in rules:
+        name = rule.get("name", "unnamed")
+        src = [s.text for s in rule.findall(".//source/member")]
+        dst = [d.text for d in rule.findall(".//destination/member")]
+        action = rule.findtext(".//action")
+        if action == "allow" and "any" in src and "any" in dst:
+            findings.append(f"[CIS-HIGH] CIS Control: Rule '{name}' violates least privilege - any/any permit")
+
+    # CIS 2 - All permit rules must log
+    for rule in rules:
+        name = rule.get("name", "unnamed")
+        action = rule.findtext(".//action")
+        log_end = rule.findtext(".//log-end")
+        log_start = rule.findtext(".//log-start")
+        if action == "allow" and log_end != "yes" and log_start != "yes":
+            findings.append(f"[CIS-MEDIUM] CIS Control: Rule '{name}' missing logging")
+
+    # CIS 3 - Deny all must exist
+    has_deny_all = any(
+        rule.findtext(".//action") == "deny" and
+        "any" in [s.text for s in rule.findall(".//source/member")] and
+        "any" in [d.text for d in rule.findall(".//destination/member")]
+        for rule in rules
+    )
+    if not has_deny_all:
+        findings.append("[CIS-HIGH] CIS Control: No default deny-all rule found")
+
+    return findings
+
+
+def check_pci_compliance_pa(rules):
+    findings = []
+
+    # PCI Req 1.3 - No any/any
+    for rule in rules:
+        name = rule.get("name", "unnamed")
+        src = [s.text for s in rule.findall(".//source/member")]
+        dst = [d.text for d in rule.findall(".//destination/member")]
+        action = rule.findtext(".//action")
+        if action == "allow" and "any" in src and "any" in dst:
+            findings.append(f"[PCI-HIGH] PCI Req 1.3: Rule '{name}' - direct routes to cardholder data prohibited")
+
+    # PCI Req 10.2 - Logging required
+    for rule in rules:
+        name = rule.get("name", "unnamed")
+        action = rule.findtext(".//action")
+        log_end = rule.findtext(".//log-end")
+        log_start = rule.findtext(".//log-start")
+        if action == "allow" and log_end != "yes" and log_start != "yes":
+            findings.append(f"[PCI-MEDIUM] PCI Req 10.2: Rule '{name}' missing audit logging")
+
+    # PCI Req 1.2 - Explicit deny all
+    has_deny_all = any(
+        rule.findtext(".//action") == "deny" and
+        "any" in [s.text for s in rule.findall(".//source/member")] and
+        "any" in [d.text for d in rule.findall(".//destination/member")]
+        for rule in rules
+    )
+    if not has_deny_all:
+        findings.append("[PCI-HIGH] PCI Req 1.2: No explicit deny-all rule found")
+
+    return findings
+
+
+def check_nist_compliance_pa(rules):
+    findings = []
+
+    # NIST AC-6 - Least privilege
+    for rule in rules:
+        name = rule.get("name", "unnamed")
+        src = [s.text for s in rule.findall(".//source/member")]
+        dst = [d.text for d in rule.findall(".//destination/member")]
+        action = rule.findtext(".//action")
+        if action == "allow" and "any" in src and "any" in dst:
+            findings.append(f"[NIST-HIGH] NIST AC-6: Rule '{name}' violates least privilege principle")
+
+    # NIST AU-2 - Audit logging
+    for rule in rules:
+        name = rule.get("name", "unnamed")
+        action = rule.findtext(".//action")
+        log_end = rule.findtext(".//log-end")
+        log_start = rule.findtext(".//log-start")
+        if action == "allow" and log_end != "yes" and log_start != "yes":
+            findings.append(f"[NIST-MEDIUM] NIST AU-2: Rule '{name}' missing audit logging")
+
+    # NIST SC-7 - Boundary protection
+    has_deny_all = any(
+        rule.findtext(".//action") == "deny" and
+        "any" in [s.text for s in rule.findall(".//source/member")] and
+        "any" in [d.text for d in rule.findall(".//destination/member")]
+        for rule in rules
+    )
+    if not has_deny_all:
+        findings.append("[NIST-HIGH] NIST SC-7: No boundary protection deny-all rule found")
+
+    return findings

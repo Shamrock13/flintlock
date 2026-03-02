@@ -130,19 +130,48 @@ def audit(
 
         if compliance:
             typer.echo(f"\n--- {compliance.upper()} Compliance Checks ---")
-            from ciscoconfparse import CiscoConfParse
-            # Compliance checks for PA use same logic, different parser
+            from paloalto import parse_paloalto
+            from compliance import check_cis_compliance_pa, check_pci_compliance_pa, check_nist_compliance_pa
+            rules, _ = parse_paloalto(file)
             if compliance == "cis":
-                cf = []  # PA CIS checks coming in next step
+                cf = check_cis_compliance_pa(rules)
             elif compliance == "pci":
-                cf = []
+                cf = check_pci_compliance_pa(rules)
             elif compliance == "nist":
-                cf = []
+                cf = check_nist_compliance_pa(rules)
             else:
                 cf = []
+                typer.echo(f"Unknown framework: {compliance}. Use cis, pci, or nist")
             for f in cf:
                 typer.echo(f)
             findings += cf
+            if report:
+                output = generate_report(findings, file, vendor, compliance)
+                typer.echo(f"\n📄 Report saved to: {output}")
+
+            high = [f for f in findings if "[HIGH]" in f and not any(x in f for x in ["PCI-", "CIS-", "NIST-"])]
+            medium = [f for f in findings if "[MEDIUM]" in f and not any(x in f for x in ["PCI-", "CIS-", "NIST-"])]
+            pci_high = [f for f in findings if "PCI-HIGH" in f]
+            pci_medium = [f for f in findings if "PCI-MEDIUM" in f]
+            cis_high = [f for f in findings if "CIS-HIGH" in f]
+            cis_medium = [f for f in findings if "CIS-MEDIUM" in f]
+            nist_high = [f for f in findings if "NIST-HIGH" in f]
+            nist_medium = [f for f in findings if "NIST-MEDIUM" in f]
+
+            typer.echo(f"\n--- Audit Summary ---")
+            typer.echo(f"High Severity:         {len(high)}")
+            typer.echo(f"Medium Severity:       {len(medium)}")
+            if pci_high or pci_medium:
+                typer.echo(f"PCI Compliance High:   {len(pci_high)}")
+                typer.echo(f"PCI Compliance Medium: {len(pci_medium)}")
+            if cis_high or cis_medium:
+                typer.echo(f"CIS Compliance High:   {len(cis_high)}")
+                typer.echo(f"CIS Compliance Medium: {len(cis_medium)}")
+            if nist_high or nist_medium:
+                typer.echo(f"NIST Compliance High:  {len(nist_high)}")
+                typer.echo(f"NIST Compliance Medium:{len(nist_medium)}")
+            typer.echo(f"Total Issues:          {len(findings)}")
+            typer.echo(f"---------------------")
 
 if __name__ == "__main__":
     app()
