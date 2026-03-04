@@ -32,7 +32,7 @@
 - PDF report export with grouped findings
 - Specific control references (e.g. PCI Req 1.3, NIST AC-6)
 
-> 💳 **Purchase a license at INSERT GUMROAD**
+> 💳 **Purchase a license at [Gumroad](https://saffronanthers.gumroad.com/l/flintlock)**
 
 ---
 
