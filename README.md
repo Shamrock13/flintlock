@@ -96,7 +96,7 @@ To deactivate:
 
 ## Example Output
 
-    Flintlock v0.1 — Starting audit of firewall.xml (paloalto)
+    Flintlock v1.0 — Starting audit of firewall.xml (paloalto)
 
     [HIGH] Overly permissive rule 'Allow-Any-Any': source=any destination=any
     [MEDIUM] Permit rule 'Allow-Any-Any' missing logging

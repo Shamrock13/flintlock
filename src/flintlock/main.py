@@ -69,11 +69,11 @@ def audit(
         raise typer.Exit()
     
     if not file or not vendor:
-        typer.echo("Flintlock v0.1")
+        typer.echo("Flintlock v1.0")
         typer.echo("Usage: python3 src/flintlock/main.py --file config.txt --vendor asa")
         raise typer.Exit()
 
-    typer.echo(f"\nFlintlock v0.1 — Starting audit of {file} ({vendor})\n")
+    typer.echo(f"\nFlintlock v1.0 — Starting audit of {file} ({vendor})\n")
 
     if vendor == "asa":
         parse = CiscoConfParse(file, ignore_blank_lines=False)
