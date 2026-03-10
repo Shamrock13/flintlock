@@ -1,10 +1,17 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" data-theme="light">
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Flintlock &mdash; Firewall Audit</title>
   <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}" />
+  <script>
+    // Apply saved theme before paint to avoid flash
+    (function () {
+      const t = localStorage.getItem("flintlock-theme") || "light";
+      document.documentElement.setAttribute("data-theme", t);
+    })();
+  </script>
 </head>
 <body>
   <!-- Header -->
@@ -15,15 +22,51 @@
         <span class="logo-text">Flintlock</span>
         <span class="logo-sub">Firewall Security Auditor</span>
       </div>
-      <div class="license-badge" id="licenseBadge">
-        {% if licensed %}
-          <span class="badge badge-active">&#10003; Licensed</span>
-        {% else %}
-          <span class="badge badge-unlicensed">&#9888; Unlicensed</span>
-        {% endif %}
+      <div class="header-actions">
+        <button class="theme-toggle" id="themeToggle" title="Toggle light / dark mode" aria-label="Toggle theme">
+          <span id="themeIcon">&#9788;</span>
+        </button>
+        <button class="badge-btn" id="licenseBadgeBtn" title="Manage license">
+          {% if licensed %}
+            <span class="badge badge-active" id="licenseBadge">&#10003; Licensed</span>
+          {% else %}
+            <span class="badge badge-unlicensed" id="licenseBadge">&#9888; Unlicensed</span>
+          {% endif %}
+        </button>
       </div>
     </div>
   </header>
+
+  <!-- License Modal -->
+  <div class="modal-overlay hidden" id="licenseModal" role="dialog" aria-modal="true" aria-label="License Management">
+    <div class="modal-box">
+      <div class="modal-header">
+        <h3 class="modal-title">License Management</h3>
+        <button class="modal-close" id="modalClose" aria-label="Close">&times;</button>
+      </div>
+      <div class="modal-body">
+        <div id="licenseStatus" class="license-status">
+          {% if licensed %}
+            <p class="status-ok">&#10003; Active license: <code>{{ license_info }}</code></p>
+          {% else %}
+            <p class="status-warn">No active license. Compliance checks require a valid key.</p>
+          {% endif %}
+        </div>
+
+        <p class="modal-label">Activate a license key</p>
+        <form id="activateForm" class="modal-form">
+          <input type="text" id="licenseKey" name="key" placeholder="XXXX-XXXX-XXXX-XXXX" maxlength="19" autocomplete="off" />
+          <button type="submit" class="btn-secondary">Activate</button>
+        </form>
+
+        <form id="deactivateForm" class="modal-form mt-sm">
+          <button type="submit" class="btn-danger">Deactivate License</button>
+        </form>
+
+        <div id="licenseMsg" class="license-msg hidden"></div>
+      </div>
+    </div>
+  </div>
 
   <main class="main">
     <!-- Audit Form -->
@@ -41,8 +84,8 @@
 
           <div class="form-group">
             <label for="vendor">Vendor</label>
-            <select id="vendor" name="vendor" required>
-              <option value="">Select vendor&hellip;</option>
+            <select id="vendor" name="vendor">
+              <option value="auto" selected>Auto-detect (recommended)</option>
               <option value="asa">Cisco ASA</option>
               <option value="paloalto">Palo Alto</option>
               <option value="fortinet">Fortinet FortiGate</option>
@@ -77,7 +120,10 @@
 
     <!-- Results -->
     <section class="card hidden" id="resultsSection">
-      <h2 class="card-title">Results</h2>
+      <div class="results-header">
+        <h2 class="card-title" style="margin-bottom:0">Results</h2>
+        <span class="detected-vendor hidden" id="detectedVendorTag"></span>
+      </div>
 
       <!-- License warning -->
       <div class="alert alert-warning hidden" id="licenseWarning"></div>
@@ -93,33 +139,6 @@
         <a id="pdfLink" class="btn-download" href="#" download>&#8681; Download PDF Report</a>
       </div>
     </section>
-
-    <!-- License Management -->
-    <section class="card collapsible" id="licenseSection">
-      <button class="collapsible-toggle" id="licenseToggle" aria-expanded="false">
-        License Management <span class="chevron">&#9660;</span>
-      </button>
-      <div class="collapsible-body hidden" id="licenseBody">
-        <div id="licenseStatus" class="license-status">
-          {% if licensed %}
-            <p class="status-ok">&#10003; Active license: <code>{{ license_info }}</code></p>
-          {% else %}
-            <p class="status-warn">No active license. Compliance checks require a valid key.</p>
-          {% endif %}
-        </div>
-
-        <form id="activateForm" class="inline-form">
-          <input type="text" id="licenseKey" name="key" placeholder="XXXX-XXXX-XXXX-XXXX" maxlength="19" />
-          <button type="submit" class="btn-secondary">Activate</button>
-        </form>
-
-        <form id="deactivateForm" class="inline-form mt-sm">
-          <button type="submit" class="btn-danger">Deactivate License</button>
-        </form>
-
-        <div id="licenseMsg" class="license-msg hidden"></div>
-      </div>
-    </section>
   </main>
 
   <footer class="footer">
@@ -127,21 +146,54 @@
   </footer>
 
   <script>
-    // File input label
+    // ── Theme toggle ──────────────────────────────────────────────
+    const html = document.documentElement;
+    const themeIcon = document.getElementById("themeIcon");
+
+    function applyTheme(theme) {
+      html.setAttribute("data-theme", theme);
+      themeIcon.innerHTML = theme === "dark" ? "&#9790;" : "&#9788;";
+      localStorage.setItem("flintlock-theme", theme);
+    }
+
+    // Set icon on load to match stored preference
+    applyTheme(html.getAttribute("data-theme") || "light");
+
+    document.getElementById("themeToggle").addEventListener("click", function () {
+      const next = html.getAttribute("data-theme") === "dark" ? "light" : "dark";
+      applyTheme(next);
+    });
+
+    // ── License modal ─────────────────────────────────────────────
+    const modal = document.getElementById("licenseModal");
+
+    function openModal() {
+      modal.classList.remove("hidden");
+      document.body.style.overflow = "hidden";
+      document.getElementById("licenseKey").focus();
+    }
+
+    function closeModal() {
+      modal.classList.add("hidden");
+      document.body.style.overflow = "";
+    }
+
+    document.getElementById("licenseBadgeBtn").addEventListener("click", openModal);
+    document.getElementById("modalClose").addEventListener("click", closeModal);
+    modal.addEventListener("click", function (e) {
+      if (e.target === modal) closeModal();
+    });
+    document.addEventListener("keydown", function (e) {
+      if (e.key === "Escape") closeModal();
+    });
+
+    // ── File input label ──────────────────────────────────────────
     document.getElementById("config").addEventListener("change", function () {
-      const label = document.getElementById("fileLabel");
-      label.textContent = this.files.length ? this.files[0].name : "Choose a file\u2026";
+      document.getElementById("fileLabel").textContent =
+        this.files.length ? this.files[0].name : "Choose a file\u2026";
     });
 
-    // Collapsible license section
-    document.getElementById("licenseToggle").addEventListener("click", function () {
-      const body = document.getElementById("licenseBody");
-      const expanded = this.getAttribute("aria-expanded") === "true";
-      this.setAttribute("aria-expanded", String(!expanded));
-      body.classList.toggle("hidden", expanded);
-    });
-
-    // Audit form submission
+    // ── Audit form ────────────────────────────────────────────────
     document.getElementById("auditForm").addEventListener("submit", async function (e) {
       e.preventDefault();
       const btn = document.getElementById("submitBtn");
@@ -151,17 +203,10 @@
       text.textContent = "Running\u2026";
       spinner.classList.remove("hidden");
 
-      const formData = new FormData(this);
-
       try {
-        const res = await fetch("/audit", { method: "POST", body: formData });
+        const res = await fetch("/audit", { method: "POST", body: new FormData(this) });
         const data = await res.json();
-
-        if (data.error) {
-          showError(data.error);
-          return;
-        }
-
+        if (data.error) { showError(data.error); return; }
         renderResults(data);
       } catch (err) {
         showError("Unexpected error: " + err.message);
@@ -180,12 +225,26 @@
       document.getElementById("summaryGrid").innerHTML = "";
       document.getElementById("pdfRow").classList.add("hidden");
       document.getElementById("licenseWarning").classList.add("hidden");
+      document.getElementById("detectedVendorTag").classList.add("hidden");
     }
+
+    const VENDOR_LABELS = {
+      asa: "Cisco ASA", paloalto: "Palo Alto", fortinet: "Fortinet", pfsense: "pfSense"
+    };
 
     function renderResults(data) {
       const section = document.getElementById("resultsSection");
       section.classList.remove("hidden");
       section.scrollIntoView({ behavior: "smooth" });
+
+      // Detected vendor tag
+      const tag = document.getElementById("detectedVendorTag");
+      if (data.detected_vendor) {
+        tag.textContent = "Detected: " + (VENDOR_LABELS[data.detected_vendor] || data.detected_vendor);
+        tag.classList.remove("hidden");
+      } else {
+        tag.classList.add("hidden");
+      }
 
       // License warning
       const warn = document.getElementById("licenseWarning");
@@ -196,39 +255,34 @@
         warn.classList.add("hidden");
       }
 
-      // Summary
+      // Summary boxes
       const s = data.summary;
-      const grid = document.getElementById("summaryGrid");
       const summaryItems = [
-        { label: "High", value: s.high, cls: "sev-high" },
+        { label: "High",   value: s.high,   cls: "sev-high" },
         { label: "Medium", value: s.medium, cls: "sev-medium" },
-        { label: "Total", value: s.total, cls: "sev-total" },
+        { label: "Total",  value: s.total,  cls: "sev-total" },
       ];
       if (s.pci_high || s.pci_medium) {
-        summaryItems.push({ label: "PCI High", value: s.pci_high, cls: "sev-compliance" });
+        summaryItems.push({ label: "PCI High",   value: s.pci_high,   cls: "sev-compliance" });
         summaryItems.push({ label: "PCI Medium", value: s.pci_medium, cls: "sev-compliance" });
       }
       if (s.cis_high || s.cis_medium) {
-        summaryItems.push({ label: "CIS High", value: s.cis_high, cls: "sev-compliance" });
+        summaryItems.push({ label: "CIS High",   value: s.cis_high,   cls: "sev-compliance" });
         summaryItems.push({ label: "CIS Medium", value: s.cis_medium, cls: "sev-compliance" });
       }
       if (s.nist_high || s.nist_medium) {
-        summaryItems.push({ label: "NIST High", value: s.nist_high, cls: "sev-compliance" });
+        summaryItems.push({ label: "NIST High",   value: s.nist_high,   cls: "sev-compliance" });
         summaryItems.push({ label: "NIST Medium", value: s.nist_medium, cls: "sev-compliance" });
       }
-      grid.innerHTML = summaryItems
+      document.getElementById("summaryGrid").innerHTML = summaryItems
         .map(i => `<div class="summary-box ${i.cls}"><span class="summary-val">${i.value}</span><span class="summary-lbl">${i.label}</span></div>`)
         .join("");
 
       // Findings
       const list = document.getElementById("findingsList");
-      if (!data.findings.length) {
-        list.innerHTML = `<div class="finding finding-pass">[PASS] No issues found</div>`;
-      } else {
-        list.innerHTML = data.findings
-          .map(f => `<div class="finding ${findingClass(f)}">${escHtml(f)}</div>`)
-          .join("");
-      }
+      list.innerHTML = data.findings.length
+        ? data.findings.map(f => `<div class="finding ${findingClass(f)}">${escHtml(f)}</div>`).join("")
+        : `<div class="finding finding-pass">[PASS] No issues found</div>`;
 
       // PDF download
       const pdfRow = document.getElementById("pdfRow");
@@ -241,10 +295,10 @@
     }
 
     function findingClass(f) {
-      if (f.includes("[HIGH]") && !f.match(/PCI-|CIS-|NIST-/)) return "finding-high";
+      if (f.includes("[HIGH]")   && !f.match(/PCI-|CIS-|NIST-/)) return "finding-high";
       if (f.includes("[MEDIUM]") && !f.match(/PCI-|CIS-|NIST-/)) return "finding-medium";
-      if (f.match(/PCI-HIGH|CIS-HIGH|NIST-HIGH/)) return "finding-compliance-high";
-      if (f.match(/PCI-MEDIUM|CIS-MEDIUM|NIST-MEDIUM/)) return "finding-compliance-medium";
+      if (f.match(/PCI-HIGH|CIS-HIGH|NIST-HIGH/))                 return "finding-compliance-high";
+      if (f.match(/PCI-MEDIUM|CIS-MEDIUM|NIST-MEDIUM/))           return "finding-compliance-medium";
       return "finding-info";
     }
 
@@ -252,20 +306,19 @@
       return s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
     }
 
-    // License activate
+    // ── License activate ──────────────────────────────────────────
     document.getElementById("activateForm").addEventListener("submit", async function (e) {
       e.preventDefault();
       const key = document.getElementById("licenseKey").value.trim();
       const res = await fetch("/license/activate", {
-        method: "POST",
-        body: new URLSearchParams({ key }),
+        method: "POST", body: new URLSearchParams({ key }),
       });
       const data = await res.json();
       showLicenseMsg(data.message, data.success ? "ok" : "error");
       if (data.success) refreshLicenseBadge(true, key.toUpperCase());
     });
 
-    // License deactivate
+    // ── License deactivate ────────────────────────────────────────
     document.getElementById("deactivateForm").addEventListener("submit", async function (e) {
       e.preventDefault();
       const res = await fetch("/license/deactivate", { method: "POST" });
@@ -285,10 +338,12 @@
       const badge = document.getElementById("licenseBadge");
       const status = document.getElementById("licenseStatus");
       if (licensed) {
-        badge.innerHTML = `<span class="badge badge-active">&#10003; Licensed</span>`;
+        badge.className = "badge badge-active";
+        badge.innerHTML = "&#10003; Licensed";
         status.innerHTML = `<p class="status-ok">&#10003; Active license: <code>${escHtml(key)}</code></p>`;
       } else {
-        badge.innerHTML = `<span class="badge badge-unlicensed">&#9888; Unlicensed</span>`;
+        badge.className = "badge badge-unlicensed";
+        badge.innerHTML = "&#9888; Unlicensed";
         status.innerHTML = `<p class="status-warn">No active license. Compliance checks require a valid key.</p>`;
       }
     }

@@ -26,6 +26,34 @@ app = Flask(__name__, template_folder="templates", static_folder="static")
 app.config["MAX_CONTENT_LENGTH"] = 10 * 1024 * 1024  # 10 MB upload limit
 
 
+# --- Vendor auto-detection ---
+
+def detect_vendor(content: str, filename: str) -> str | None:
+    """Infer firewall vendor from file content and filename."""
+    filename_lower = filename.lower()
+    content_lower = content.lower()
+    stripped = content.strip()
+
+    # XML-based: pfSense or Palo Alto
+    if stripped.startswith("<") or filename_lower.endswith(".xml"):
+        if "<pfsense>" in content_lower or ("<filter>" in content_lower and "<rule>" in content_lower):
+            return "pfsense"
+        if any(k in content_lower for k in ("<devices>", "<vsys>", "<security>", "<rulebase>")):
+            return "paloalto"
+
+    # Text-based: Fortinet
+    if "config firewall policy" in content_lower or (
+        "set srcintf" in content_lower and "set dstintf" in content_lower
+    ):
+        return "fortinet"
+
+    # Text-based: Cisco ASA
+    if "access-list" in content_lower and any(k in content_lower for k in ("permit", "deny")):
+        return "asa"
+
+    return None
+
+
 # --- ASA audit helpers (mirrors main.py logic) ---
 
 def _check_any_any(parse):
@@ -107,19 +135,30 @@ def run_audit():
     if "config" not in request.files or request.files["config"].filename == "":
         return jsonify({"error": "No config file uploaded"}), 400
 
-    vendor = request.form.get("vendor", "").strip().lower()
+    vendor = request.form.get("vendor", "auto").strip().lower()
     compliance = request.form.get("compliance", "").strip().lower() or None
     generate_pdf = request.form.get("report") == "1"
 
-    if vendor not in ("asa", "paloalto", "fortinet", "pfsense"):
-        return jsonify({"error": f"Unknown vendor: {vendor}"}), 400
-
-    # Save upload to temp file
+    # Save upload to temp file first (needed for detection)
     upload = request.files["config"]
     suffix = Path(upload.filename).suffix or ".txt"
     temp_name = f"{uuid.uuid4()}{suffix}"
     temp_path = os.path.join(UPLOAD_FOLDER, temp_name)
     upload.save(temp_path)
+
+    # Auto-detect vendor from file contents
+    if vendor == "auto":
+        try:
+            with open(temp_path, "r", errors="ignore") as f:
+                sample = f.read(16384)
+            vendor = detect_vendor(sample, upload.filename) or ""
+        except Exception:
+            vendor = ""
+
+    if vendor not in ("asa", "paloalto", "fortinet", "pfsense"):
+        if os.path.exists(temp_path):
+            os.remove(temp_path)
+        return jsonify({"error": "Could not determine vendor. Please select one manually."}), 400
 
     try:
         # Run audit
@@ -181,6 +220,7 @@ def run_audit():
             "summary": summary,
             "report": report_filename,
             "license_warning": license_warning,
+            "detected_vendor": vendor,
         })
 
     except Exception as e:
