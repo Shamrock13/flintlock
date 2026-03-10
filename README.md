@@ -1,6 +1,6 @@
-# 🔒 Flintlock
+# 🔥 Flintlock
 
-**Flintlock** is an open-source CLI tool for auditing firewall configurations across multiple vendors. It detects common security misconfigurations, generates scored reports, and optionally checks against compliance frameworks like CIS, PCI-DSS, and NIST.
+**Flintlock** is a firewall configuration auditing tool with both a web UI and CLI. It detects common security misconfigurations, generates scored severity reports, and optionally checks against compliance frameworks like CIS, PCI-DSS, and NIST. Deployable in minutes via Docker Compose.
 
 ---
 
@@ -8,9 +8,9 @@
 
 | Vendor | Config Format | Status |
 |---|---|---|
-| Cisco ASA | Text | ✅ Supported |
-| Palo Alto | XML | ✅ Supported |
-| Fortinet FortiGate | Text | ✅ Supported |
+| Cisco | Text | ✅ Supported |
+| Palo Alto Networks | XML | ✅ Supported |
+| Fortinet | Text | ✅ Supported |
 | pfSense | XML | ✅ Supported |
 
 ---
@@ -18,18 +18,22 @@
 ## Features
 
 ### Free (Open Source)
+- **Web UI** — browser-based interface, no terminal required
+- **Auto-detect vendor** — upload a config and Flintlock identifies the vendor automatically
 - Detect overly permissive any/any rules
 - Detect permit rules missing logging
 - Detect missing deny-all rule
 - Detect redundant/shadowed rules
 - Severity scoring (HIGH / MEDIUM)
+- Results sorted high → medium, with clickable filters per severity
+- Light and dark mode (preference saved automatically)
 - CLI output with audit summary
 
 ### Paid (License Required)
 - CIS Benchmark compliance checks
 - PCI-DSS compliance checks
 - NIST SP 800-41 compliance checks
-- PDF report export with grouped findings
+- PDF report export with grouped, color-coded findings
 - Specific control references (e.g. PCI Req 1.3, NIST AC-6)
 
 > 💳 **Purchase a license at [Gumroad](https://shamrock13.gumroad.com/l/flintlock)**
@@ -38,85 +42,157 @@
 
 ## Installation
 
-### Requirements
-- Python 3.8+
-- pip
+### Option 1 — Docker Compose (Recommended)
 
-### Install dependencies
+The fastest way to get Flintlock running. No Python environment setup required.
 
-    pip3 install typer ciscoconfparse fpdf2
+**Requirements:** Docker Desktop or OrbStack
 
-### Clone the repo
+```bash
+git clone https://github.com/Shamrock13/flintlock.git
+cd flintlock
+docker compose up --build
+```
 
-    git clone https://github.com/Shamrock13/flintlock.git
-    cd flintlock
+Open **http://localhost:8080** in your browser.
+
+Uploaded reports and your license key are persisted in a Docker volume across restarts. To set a custom license secret, create a `.env` file in the project root:
+
+```
+FWAUDIT_SECRET=your-secret-here
+```
+
+To stop:
+```bash
+docker compose down
+```
 
 ---
 
-## Usage
+### Option 2 — Local Python
+
+**Requirements:** Python 3.8+
+
+```bash
+git clone https://github.com/Shamrock13/flintlock.git
+cd flintlock
+pip install -r requirements.txt
+```
+
+**Run the web UI:**
+```bash
+PYTHONPATH=src python -m flask --app src/flintlock/web.py run
+```
+Open **http://localhost:5000**
+
+**Run the CLI:**
+```bash
+PYTHONPATH=src python -m flintlock.main --file config.txt --vendor asa
+```
+
+---
+
+## Web UI
+
+The web interface provides the full feature set without needing a terminal.
+
+### Running an audit
+1. Open **http://localhost:8080** (Docker) or **http://localhost:5000** (local)
+2. Upload a firewall config file
+3. Select a vendor or leave on **Auto-detect** — Flintlock will identify it from the file content
+4. Optionally select a compliance framework (license required)
+5. Check **Generate PDF Report** if you want a downloadable report
+6. Click **Run Audit**
+
+### Results
+- Findings are displayed inline, sorted from highest to lowest severity
+- Click the **High**, **Medium**, or **Total** summary boxes to filter the results list
+- Click an active filter again to clear it
+- If a PDF was generated, a download link appears below the findings
+
+### License management
+- The **Licensed / Unlicensed** badge in the top-right corner opens the license modal
+- Enter your license key to activate; click Deactivate to remove it
+
+### Light / Dark mode
+- Click the ☀ / 🌙 button in the header to toggle — preference is saved automatically
+
+---
+
+## CLI Usage
 
 ### Basic audit (free)
 
-    python3 src/flintlock/main.py --file config.txt --vendor asa
+```bash
+PYTHONPATH=src python -m flintlock.main --file config.txt --vendor asa
+```
 
 ### With compliance checks (license required)
 
-    python3 src/flintlock/main.py --file config.txt --vendor asa --compliance pci
+```bash
+PYTHONPATH=src python -m flintlock.main --file config.txt --vendor asa --compliance pci
+```
 
 ### Export PDF report
 
-    python3 src/flintlock/main.py --file config.txt --vendor asa --compliance pci --report
+```bash
+PYTHONPATH=src python -m flintlock.main --file config.txt --vendor asa --compliance pci --report
+```
 
 ### Supported vendors
 
-    --vendor asa
-    --vendor paloalto
-    --vendor fortinet
-    --vendor pfsense
+```
+--vendor asa
+--vendor paloalto
+--vendor fortinet
+--vendor pfsense
+```
 
 ### Supported compliance frameworks
 
-    --compliance cis
-    --compliance pci
-    --compliance nist
+```
+--compliance cis
+--compliance pci
+--compliance nist
+```
+
+### License activation (CLI)
+
+```bash
+# Activate
+PYTHONPATH=src python -m flintlock.main --activate YOUR-LICENSE-KEY
+
+# Deactivate
+PYTHONPATH=src python -m flintlock.main --deactivate
+```
 
 ---
 
-## License Activation
+## Example CLI Output
 
-After purchasing a license, activate it with:
+```
+Flintlock v1.0 — Starting audit of firewall.xml (paloalto)
 
-    python3 src/flintlock/main.py --activate YOUR-LICENSE-KEY
+[HIGH] Overly permissive rule 'Allow-Any-Any': source=any destination=any
+[HIGH] No explicit deny-all rule found
+[MEDIUM] Permit rule 'Allow-Any-Any' missing logging
+[MEDIUM] Redundant rule detected: 'Allow-Web-Duplicate'
 
-To deactivate:
+--- PCI Compliance Checks ---
+[PCI-HIGH] PCI Req 1.3: Rule 'Allow-Any-Any' - direct routes to cardholder data prohibited
+[PCI-HIGH] PCI Req 1.2: No explicit deny-all rule found
+[PCI-MEDIUM] PCI Req 10.2: Rule 'Allow-Any-Any' missing audit logging
 
-    python3 src/flintlock/main.py --deactivate
+--- Audit Summary ---
+High Severity:         2
+Medium Severity:       2
+PCI Compliance High:   2
+PCI Compliance Medium: 1
+Total Issues:          7
+---------------------
 
----
-
-## Example Output
-
-    Flintlock v1.0 — Starting audit of firewall.xml (paloalto)
-
-    [HIGH] Overly permissive rule 'Allow-Any-Any': source=any destination=any
-    [MEDIUM] Permit rule 'Allow-Any-Any' missing logging
-    [HIGH] No explicit deny-all rule found
-    [MEDIUM] Redundant rule detected: 'Allow-Web-Duplicate'
-
-    --- PCI Compliance Checks ---
-    [PCI-HIGH] PCI Req 1.3: Rule 'Allow-Any-Any' - direct routes to cardholder data prohibited
-    [PCI-MEDIUM] PCI Req 10.2: Rule 'Allow-Any-Any' missing audit logging
-    [PCI-HIGH] PCI Req 1.2: No explicit deny-all rule found
-
-    --- Audit Summary ---
-    High Severity:         2
-    Medium Severity:       2
-    PCI Compliance High:   2
-    PCI Compliance Medium: 1
-    Total Issues:          7
-    ---------------------
-
-    📄 Report saved to: report.pdf
+📄 Report saved to: report.pdf
+```
 
 ---
 
@@ -125,8 +201,8 @@ To deactivate:
 | Check | Severity | Tier |
 |---|---|---|
 | Any/any permit rules | HIGH | Free |
-| Permit rules missing logging | MEDIUM | Free |
 | Missing deny-all rule | HIGH | Free |
+| Permit rules missing logging | MEDIUM | Free |
 | Redundant/shadowed rules | MEDIUM | Free |
 | CIS Benchmark controls | HIGH/MEDIUM | Paid |
 | PCI-DSS requirements | HIGH/MEDIUM | Paid |
@@ -136,6 +212,12 @@ To deactivate:
 
 ## Roadmap
 
+- [x] Web UI with file upload and inline results
+- [x] Docker Compose deployment
+- [x] Auto vendor detection
+- [x] Clickable severity filters
+- [x] Light / dark mode
+- [x] PDF report redesign
 - [ ] Live SSH/API connection mode
 - [ ] Fortinet v2 checks
 - [ ] AWS Security Group support
