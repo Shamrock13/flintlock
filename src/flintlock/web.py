@@ -245,7 +245,11 @@ def run_audit():
         if compliance:
             licensed, lic_msg = check_license()
             if not licensed:
-                license_warning = f"Compliance checks require a valid license. {lic_msg}"
+                license_warning = (
+                    "Compliance checks require a valid license. "
+                    'Purchase one at <a href="https://shamrock13.gumroad.com/l/flintlock" target="_blank" rel="noopener">shamrock13.gumroad.com/l/flintlock</a>. '
+                    "Once purchased, enter your key using the Licensed/Unlicensed badge in the top-right corner of the app."
+                )
             else:
                 if vendor == "asa":
                     fn_map = {"cis": check_cis_compliance, "pci": check_pci_compliance, "nist": check_nist_compliance}

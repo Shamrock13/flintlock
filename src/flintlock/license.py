@@ -49,7 +49,7 @@ def activate_license(key: str) -> tuple:
 def check_license() -> tuple:
     """Check if a valid license is activated"""
     if not os.path.exists(LICENSE_FILE):
-        return False, "No license found. Purchase a license at gumroad.com/yourpage and activate with --activate YOUR-KEY"
+        return False, "No license found."
 
     try:
         with open(LICENSE_FILE, 'r') as f:
@@ -58,7 +58,7 @@ def check_license() -> tuple:
         if validate_key(key):
             return True, key
         else:
-            return False, "Invalid license key stored. Please reactivate with --activate YOUR-KEY"
+            return False, "Invalid license key. Please re-enter your key to reactivate."
     except Exception as e:
         return False, f"License check failed: {e}"
 

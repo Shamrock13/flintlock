@@ -63,6 +63,9 @@ html { overflow-y: scroll; }
 
 /* ===== Dark Mode ===== */
 [data-theme="dark"] {
+  --header-bg:     #0A1628;
+  --header-border: #152238;
+
   --bg:          #0D0D1A;
   --card-bg:     #12122A;
   --border:      #2A2A4A;
@@ -582,6 +585,8 @@ select:focus, input[type="text"]:focus {
 }
 
 .alert-warning { background: var(--alert-warn-bg); border: 1px solid var(--alert-warn-border); color: var(--alert-warn-text); }
+.alert-warning a { color: var(--alert-warn-text); font-weight: 600; }
+.alert-warning a:hover { opacity: 0.8; }
 .alert-error   { background: var(--alert-err-bg);  border: 1px solid var(--alert-err-border);  color: var(--alert-err-text); }
 
 /* ===== License modal internals ===== */

@@ -26,6 +26,7 @@
 - Detect redundant/shadowed rules
 - Severity scoring (HIGH / MEDIUM)
 - Results sorted high → medium, with clickable filters per severity
+- **PDF report export** — download a color-coded findings report at any time
 - Light and dark mode (preference saved automatically)
 - CLI output with audit summary
 
@@ -33,7 +34,6 @@
 - CIS Benchmark compliance checks
 - PCI-DSS compliance checks
 - NIST SP 800-41 compliance checks
-- PDF report export with grouped, color-coded findings
 - Specific control references (e.g. PCI Req 1.3, NIST AC-6)
 
 > 💳 **Purchase a license at [Gumroad](https://shamrock13.gumroad.com/l/flintlock)**
@@ -133,7 +133,13 @@ PYTHONPATH=src python -m flintlock.main --file config.txt --vendor asa
 PYTHONPATH=src python -m flintlock.main --file config.txt --vendor asa --compliance pci
 ```
 
-### Export PDF report
+### Export PDF report (free — no license required)
+
+```bash
+PYTHONPATH=src python -m flintlock.main --file config.txt --vendor asa --report
+```
+
+### Export PDF report with compliance checks (license required)
 
 ```bash
 PYTHONPATH=src python -m flintlock.main --file config.txt --vendor asa --compliance pci --report
@@ -204,6 +210,7 @@ Total Issues:          7
 | Missing deny-all rule | HIGH | Free |
 | Permit rules missing logging | MEDIUM | Free |
 | Redundant/shadowed rules | MEDIUM | Free |
+| PDF report export | — | Free |
 | CIS Benchmark controls | HIGH/MEDIUM | Paid |
 | PCI-DSS requirements | HIGH/MEDIUM | Paid |
 | NIST SP 800-41 controls | HIGH/MEDIUM | Paid |
