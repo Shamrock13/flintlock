@@ -27,4 +27,4 @@ build/
 *.egg-info/
 
 # Private tools
-keygen.py
+keygen.py.claude/
