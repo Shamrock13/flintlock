@@ -39,7 +39,7 @@
 - NIST SP 800-41 compliance checks (AC-6, AU-2, SC-7)
 - Specific control references per finding
 
-> 💳 **[Purchase a license at flintlock.sham.cloud](https://flintlock.sham.cloud)**
+> 💳 **[Purchase a license on Gumroad](https://shamrock13.gumroad.com/l/flintlock)**
 
 ---
 
@@ -242,11 +242,10 @@ Total Issues:          7
 
 ## License
 
-The core tool is open source under the MIT License. The compliance module requires a paid license key available at [flintlock.sham.cloud](https://flintlock.sham.cloud).
+The core tool is open source under the MIT License. The compliance module requires a paid license key — available on [Gumroad](https://shamrock13.gumroad.com/l/flintlock).
 
 ---
 
 ## Author
 
-Built by a network security engineer for network security engineers.  
-**[flintlock.sham.cloud](https://flintlock.sham.cloud)**
+Built by a network security engineer for network security engineers.
