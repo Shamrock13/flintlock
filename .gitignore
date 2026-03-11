@@ -30,3 +30,4 @@ build/
 keygen.py.claude/
 CNAME
 .claude/
+.wrangler/
