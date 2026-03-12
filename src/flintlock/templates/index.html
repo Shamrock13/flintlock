@@ -6,7 +6,6 @@
   <title>Flintlock &mdash; Firewall Audit</title>
   <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}" />
   <script>
-    // Apply saved theme before paint to avoid flash
     (function () {
       const t = localStorage.getItem("flintlock-theme") || "light";
       document.documentElement.setAttribute("data-theme", t);
@@ -14,6 +13,7 @@
   </script>
 </head>
 <body>
+
   <!-- Header -->
   <header class="header">
     <div class="header-inner">
@@ -52,343 +52,846 @@
             <p class="status-warn">No active license. Compliance checks require a valid key.</p>
           {% endif %}
         </div>
-
         <p class="modal-label">Activate a license key</p>
         <form id="activateForm" class="modal-form">
           <input type="text" id="licenseKey" name="key" placeholder="XXXX-XXXX-XXXX-XXXX" maxlength="19" autocomplete="off" />
           <button type="submit" class="btn-secondary">Activate</button>
         </form>
-
         <form id="deactivateForm" class="modal-form mt-sm">
           <button type="submit" class="btn-danger">Deactivate License</button>
         </form>
-
         <div id="licenseMsg" class="license-msg hidden"></div>
       </div>
     </div>
   </div>
 
   <main class="main">
-    <!-- Audit Form -->
-    <section class="card">
-      <h2 class="card-title">Run Audit</h2>
-      <form id="auditForm" enctype="multipart/form-data">
-        <div class="form-grid">
-          <div class="form-group">
-            <label for="config">Config File</label>
-            <div class="file-input-wrapper">
-              <input type="file" id="config" name="config" required />
-              <span class="file-label" id="fileLabel">Choose a file&hellip;</span>
+
+    <!-- Tab nav -->
+    <nav class="tab-nav" role="tablist">
+      <button class="tab-btn tab-active" data-tab="audit"    role="tab">&#128196; File Audit</button>
+      <button class="tab-btn"            data-tab="diff"     role="tab">&#8646; Compare Configs</button>
+      <button class="tab-btn"            data-tab="connect"  role="tab">&#128246; Live Connect</button>
+      <button class="tab-btn"            data-tab="history"  role="tab">&#128337; Audit History</button>
+      <button class="tab-btn"            data-tab="activity" role="tab">&#128203; Activity Log</button>
+    </nav>
+
+    <!-- ══════════════════════════════════════════════ FILE AUDIT ══ -->
+    <section class="tab-panel" id="tab-audit">
+      <div class="card">
+        <h2 class="card-title">Run Audit</h2>
+        <form id="auditForm" enctype="multipart/form-data">
+          <div class="form-grid">
+            <div class="form-group">
+              <label for="config">Config File</label>
+              <div class="file-input-wrapper">
+                <input type="file" id="config" name="config" required />
+                <span class="file-label" id="fileLabel">Choose a file&hellip;</span>
+              </div>
+            </div>
+            <div class="form-group">
+              <label for="vendor">Vendor</label>
+              <select id="vendor" name="vendor">
+                <option value="auto" selected>Auto-detect (recommended)</option>
+                <option value="asa">Cisco</option>
+                <option value="paloalto">Palo Alto Networks</option>
+                <option value="fortinet">Fortinet</option>
+                <option value="pfsense">pfSense</option>
+                <option value="aws">AWS Security Group</option>
+                <option value="azure">Azure NSG</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label for="compliance">Compliance Framework <span class="optional">(licensed)</span></label>
+              <select id="compliance" name="compliance">
+                <option value="">None</option>
+                <option value="cis">CIS Benchmark</option>
+                <option value="pci">PCI-DSS</option>
+                <option value="nist">NIST SP 800-41</option>
+              </select>
+            </div>
+            <div class="form-group form-group-check">
+              <label class="checkbox-label">
+                <input type="checkbox" id="report" name="report" value="1" />
+                <span>Generate PDF Report</span>
+              </label>
+              <label class="checkbox-label mt-xs">
+                <input type="checkbox" id="archive" name="archive" value="1" />
+                <span>Save to Audit History</span>
+              </label>
             </div>
           </div>
+          <button type="submit" class="btn-primary" id="submitBtn">
+            <span id="submitText">Run Audit</span>
+            <span id="submitSpinner" class="spinner hidden"></span>
+          </button>
+        </form>
+      </div>
 
-          <div class="form-group">
-            <label for="vendor">Vendor</label>
-            <select id="vendor" name="vendor">
-              <option value="auto" selected>Auto-detect (recommended)</option>
+      <!-- Audit Results -->
+      <div class="card hidden" id="resultsSection">
+        <div class="results-header">
+          <h2 class="card-title" style="margin-bottom:0">Results</h2>
+          <span class="detected-vendor hidden" id="detectedVendorTag"></span>
+        </div>
+        <div class="alert alert-warning hidden" id="licenseWarning"></div>
+        <div class="summary-grid" id="summaryGrid"></div>
+        <div id="findingsList"></div>
+        <div class="pdf-row hidden" id="pdfRow">
+          <a id="pdfLink" class="btn-download" href="#" download>&#8681; Download PDF Report</a>
+        </div>
+        <div class="archive-row hidden" id="archiveRow">
+          <span class="archive-saved-msg">&#10003; Saved to Audit History &mdash;
+            <button class="link-btn" id="viewHistoryBtn">View History</button>
+          </span>
+        </div>
+      </div>
+    </section>
+
+    <!-- ═════════════════════════════════════════ COMPARE CONFIGS ══ -->
+    <section class="tab-panel hidden" id="tab-diff">
+      <div class="card">
+        <h2 class="card-title">Compare Configs</h2>
+        <p class="card-desc">Upload two firewall configs of the same vendor to see added, removed, and unchanged rules.</p>
+        <form id="diffForm" enctype="multipart/form-data">
+          <div class="form-grid">
+            <div class="form-group">
+              <label for="config_a">Baseline Config <span class="optional">(older)</span></label>
+              <div class="file-input-wrapper">
+                <input type="file" id="config_a" name="config_a" required />
+                <span class="file-label" id="fileLabelA">Choose a file&hellip;</span>
+              </div>
+            </div>
+            <div class="form-group">
+              <label for="config_b">New Config <span class="optional">(current)</span></label>
+              <div class="file-input-wrapper">
+                <input type="file" id="config_b" name="config_b" required />
+                <span class="file-label" id="fileLabelB">Choose a file&hellip;</span>
+              </div>
+            </div>
+            <div class="form-group">
+              <label for="diffVendor">Vendor</label>
+              <select id="diffVendor" name="vendor">
+                <option value="auto" selected>Auto-detect (recommended)</option>
+                <option value="asa">Cisco</option>
+                <option value="paloalto">Palo Alto Networks</option>
+                <option value="fortinet">Fortinet</option>
+                <option value="pfsense">pfSense</option>
+              </select>
+            </div>
+          </div>
+          <button type="submit" class="btn-primary" id="diffBtn">
+            <span id="diffText">Compare</span>
+            <span id="diffSpinner" class="spinner hidden"></span>
+          </button>
+        </form>
+      </div>
+
+      <div class="card hidden" id="diffResults">
+        <div class="results-header">
+          <h2 class="card-title" style="margin-bottom:0">Diff Results</h2>
+          <span class="detected-vendor hidden" id="diffVendorTag"></span>
+        </div>
+        <div id="diffSummary"></div>
+        <div id="diffAdded"></div>
+        <div id="diffRemoved"></div>
+        <div id="diffUnchanged"></div>
+      </div>
+    </section>
+
+    <!-- ══════════════════════════════════════════ LIVE CONNECT ══════ -->
+    <section class="tab-panel hidden" id="tab-connect">
+      <div class="card">
+        <h2 class="card-title">Live SSH Connection</h2>
+        <p class="card-desc">Connect directly to a device to pull its running configuration and audit it in real time.</p>
+        <div class="alert alert-info">
+          Supported: <strong>Cisco ASA</strong>, <strong>Fortinet</strong>, <strong>Palo Alto Networks</strong> (SSH).
+          Credentials are used only for the single connection and are never stored.
+        </div>
+        <form id="connectForm">
+          <div class="form-grid connect-grid">
+            <div class="form-group">
+              <label for="connVendor">Vendor</label>
+              <select id="connVendor" name="vendor">
+                <option value="asa">Cisco ASA</option>
+                <option value="fortinet">Fortinet</option>
+                <option value="paloalto">Palo Alto Networks</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label for="connHost">Host / IP</label>
+              <input type="text" id="connHost" name="host" placeholder="192.168.1.1" autocomplete="off" />
+            </div>
+            <div class="form-group">
+              <label for="connPort">SSH Port</label>
+              <input type="text" id="connPort" name="port" value="22" placeholder="22" autocomplete="off" />
+            </div>
+            <div class="form-group">
+              <label for="connUser">Username</label>
+              <input type="text" id="connUser" name="username" placeholder="admin" autocomplete="off" />
+            </div>
+            <div class="form-group">
+              <label for="connPass">Password</label>
+              <input type="password" id="connPass" name="password" placeholder="&bull;&bull;&bull;&bull;&bull;&bull;&bull;&bull;" autocomplete="current-password" />
+            </div>
+            <div class="form-group">
+              <label for="connCompliance">Compliance <span class="optional">(licensed)</span></label>
+              <select id="connCompliance" name="compliance">
+                <option value="">None</option>
+                <option value="cis">CIS Benchmark</option>
+                <option value="pci">PCI-DSS</option>
+                <option value="nist">NIST SP 800-41</option>
+              </select>
+            </div>
+          </div>
+          <button type="submit" class="btn-primary" id="connectBtn">
+            <span id="connectText">Connect &amp; Audit</span>
+            <span id="connectSpinner" class="spinner hidden"></span>
+          </button>
+        </form>
+      </div>
+
+      <div class="card hidden" id="connectResults">
+        <div class="results-header">
+          <h2 class="card-title" style="margin-bottom:0">Live Audit Results</h2>
+          <span class="detected-vendor hidden" id="connVendorTag"></span>
+        </div>
+        <div class="summary-grid" id="connSummaryGrid"></div>
+        <div id="connFindingsList"></div>
+        <div class="archive-row hidden" id="connArchiveRow">
+          <span class="archive-saved-msg">&#10003; Result saved to Audit History &mdash;
+            <button class="link-btn" id="connViewHistoryBtn">View History</button>
+          </span>
+        </div>
+      </div>
+    </section>
+
+    <!-- ═════════════════════════════════════════ AUDIT HISTORY ══════ -->
+    <section class="tab-panel hidden" id="tab-history">
+      <div class="card">
+        <div class="results-header">
+          <h2 class="card-title" style="margin-bottom:0">Audit History</h2>
+          <button class="btn-secondary" id="refreshHistoryBtn" style="font-size:0.8rem;padding:0.3rem 0.75rem">&#8635; Refresh</button>
+        </div>
+        <p class="card-desc">Saved audits. Select two entries and click Compare.</p>
+        <!-- Filters -->
+        <div class="history-filters">
+          <div class="history-filter-group">
+            <label class="filter-label">Vendor</label>
+            <select id="historyVendorFilter">
+              <option value="">All vendors</option>
               <option value="asa">Cisco</option>
               <option value="paloalto">Palo Alto Networks</option>
               <option value="fortinet">Fortinet</option>
               <option value="pfsense">pfSense</option>
+              <option value="aws">AWS Security Group</option>
+              <option value="azure">Azure NSG</option>
             </select>
           </div>
-
-          <div class="form-group">
-            <label for="compliance">Compliance Framework <span class="optional">(licensed)</span></label>
-            <select id="compliance" name="compliance">
-              <option value="">None</option>
-              <option value="cis">CIS Benchmark</option>
-              <option value="pci">PCI-DSS</option>
-              <option value="nist">NIST SP 800-41</option>
+          <div class="history-filter-group">
+            <label class="filter-label">Sort by</label>
+            <select id="historySort">
+              <option value="newest">Newest first</option>
+              <option value="oldest">Oldest first</option>
+              <option value="most">Most issues</option>
+              <option value="least">Least issues</option>
             </select>
           </div>
-
-          <div class="form-group form-group-check">
-            <label class="checkbox-label">
-              <input type="checkbox" id="report" name="report" value="1" />
-              <span>Generate PDF Report</span>
-            </label>
+          <div class="history-filter-group">
+            <label class="filter-label">Search</label>
+            <input type="text" id="historySearch" placeholder="Filter by filename&hellip;" style="padding:0.3rem 0.6rem;font-size:0.85rem;" />
           </div>
         </div>
-
-        <button type="submit" class="btn-primary" id="submitBtn">
-          <span id="submitText">Run Audit</span>
-          <span id="submitSpinner" class="spinner hidden"></span>
-        </button>
-      </form>
-    </section>
-
-    <!-- Results -->
-    <section class="card hidden" id="resultsSection">
-      <div class="results-header">
-        <h2 class="card-title" style="margin-bottom:0">Results</h2>
-        <span class="detected-vendor hidden" id="detectedVendorTag"></span>
+        <div id="historyList" class="history-list">
+          <p class="text-muted">Loading&hellip;</p>
+        </div>
       </div>
 
-      <!-- License warning -->
-      <div class="alert alert-warning hidden" id="licenseWarning"></div>
-
-      <!-- Summary counters -->
-      <div class="summary-grid" id="summaryGrid"></div>
-
-      <!-- Findings list -->
-      <div id="findingsList"></div>
-
-      <!-- PDF download -->
-      <div class="pdf-row hidden" id="pdfRow">
-        <a id="pdfLink" class="btn-download" href="#" download>&#8681; Download PDF Report</a>
+      <!-- Comparison result -->
+      <div class="card hidden" id="compareResults">
+        <h2 class="card-title">Comparison</h2>
+        <div id="compareContent"></div>
       </div>
     </section>
+
+    <!-- ══════════════════════════════════════════ ACTIVITY LOG ══════ -->
+    <section class="tab-panel hidden" id="tab-activity">
+      <div class="card">
+        <div class="results-header">
+          <h2 class="card-title" style="margin-bottom:0">Activity Log</h2>
+          <div style="display:flex;gap:0.5rem;align-items:center;">
+            <button class="btn-secondary" id="refreshActivityBtn" style="font-size:0.8rem;padding:0.3rem 0.75rem">&#8635; Refresh</button>
+            <button class="btn-danger"    id="clearActivityBtn"   style="font-size:0.8rem;padding:0.3rem 0.75rem">&#128465; Clear All</button>
+          </div>
+        </div>
+        <p class="card-desc">All application activity — audits, SSH connections, and config diffs — including failures.</p>
+        <div id="activityList" class="history-list">
+          <p class="text-muted">Loading&hellip;</p>
+        </div>
+      </div>
+    </section>
+
   </main>
 
   <footer class="footer">
-    <p>Flintlock v1.0 &mdash; Firewall Security Auditor</p>
+    <p>Flintlock v1.1 &mdash; Firewall Security Auditor</p>
   </footer>
 
   <script>
-    // ── Theme toggle ──────────────────────────────────────────────
-    const html = document.documentElement;
-    const themeIcon = document.getElementById("themeIcon");
+  // ═══════════════════════════════════════════════════════════════ THEME ══
+  const html = document.documentElement;
+  const themeIcon = document.getElementById("themeIcon");
+  function applyTheme(theme) {
+    html.setAttribute("data-theme", theme);
+    themeIcon.innerHTML = theme === "dark" ? "&#9790;" : "&#9788;";
+    localStorage.setItem("flintlock-theme", theme);
+  }
+  applyTheme(html.getAttribute("data-theme") || "light");
+  document.getElementById("themeToggle").addEventListener("click", () =>
+    applyTheme(html.getAttribute("data-theme") === "dark" ? "light" : "dark")
+  );
 
-    function applyTheme(theme) {
-      html.setAttribute("data-theme", theme);
-      themeIcon.innerHTML = theme === "dark" ? "&#9790;" : "&#9788;";
-      localStorage.setItem("flintlock-theme", theme);
+  // ═══════════════════════════════════════════════════════ LICENSE MODAL ══
+  const modal = document.getElementById("licenseModal");
+  const openModal  = () => { modal.classList.remove("hidden"); document.body.style.overflow = "hidden"; document.getElementById("licenseKey").focus(); };
+  const closeModal = () => { modal.classList.add("hidden");    document.body.style.overflow = ""; };
+  document.getElementById("licenseBadgeBtn").addEventListener("click", openModal);
+  document.getElementById("modalClose").addEventListener("click", closeModal);
+  modal.addEventListener("click", e => { if (e.target === modal) closeModal(); });
+  document.addEventListener("keydown", e => { if (e.key === "Escape") closeModal(); });
+
+  document.getElementById("activateForm").addEventListener("submit", async function (e) {
+    e.preventDefault();
+    const key  = document.getElementById("licenseKey").value.trim();
+    const res  = await fetch("/license/activate", { method: "POST", body: new URLSearchParams({ key }) });
+    const data = await res.json();
+    showLicenseMsg(data.message, data.success ? "ok" : "error");
+    if (data.success) refreshLicenseBadge(true, key.toUpperCase());
+  });
+  document.getElementById("deactivateForm").addEventListener("submit", async function (e) {
+    e.preventDefault();
+    const res  = await fetch("/license/deactivate", { method: "POST" });
+    const data = await res.json();
+    showLicenseMsg(data.message, data.success ? "ok" : "error");
+    if (data.success) refreshLicenseBadge(false, null);
+  });
+  function showLicenseMsg(msg, type) {
+    const el = document.getElementById("licenseMsg");
+    el.textContent = msg;
+    el.className = "license-msg " + (type === "ok" ? "msg-ok" : "msg-error");
+    el.classList.remove("hidden");
+  }
+  function refreshLicenseBadge(licensed, key) {
+    const badge = document.getElementById("licenseBadge");
+    const status = document.getElementById("licenseStatus");
+    if (licensed) {
+      badge.className = "badge badge-active";
+      badge.innerHTML = "&#10003; Licensed";
+      status.innerHTML = `<p class="status-ok">&#10003; Active license: <code>${escHtml(key)}</code></p>`;
+    } else {
+      badge.className = "badge badge-unlicensed";
+      badge.innerHTML = "&#9888; Unlicensed";
+      status.innerHTML = `<p class="status-warn">No active license. Compliance checks require a valid key.</p>`;
     }
+  }
 
-    // Set icon on load to match stored preference
-    applyTheme(html.getAttribute("data-theme") || "light");
+  // ═══════════════════════════════════════════════════════════════ TABS ══
+  const tabBtns   = document.querySelectorAll(".tab-btn");
+  const tabPanels = document.querySelectorAll(".tab-panel");
+  function switchTab(tabId) {
+    tabBtns.forEach(b => b.classList.toggle("tab-active", b.dataset.tab === tabId));
+    tabPanels.forEach(p => p.classList.toggle("hidden", p.id !== "tab-" + tabId));
+    if (tabId === "history")  loadHistory();
+    if (tabId === "activity") loadActivity();
+  }
+  tabBtns.forEach(btn => btn.addEventListener("click", () => switchTab(btn.dataset.tab)));
 
-    document.getElementById("themeToggle").addEventListener("click", function () {
-      const next = html.getAttribute("data-theme") === "dark" ? "light" : "dark";
-      applyTheme(next);
-    });
+  // ═════════════════════════════════════════════════════ FILE AUDIT ══════
+  const VENDOR_LABELS = {
+    asa: "Cisco", paloalto: "Palo Alto Networks", fortinet: "Fortinet",
+    pfsense: "pfSense", aws: "AWS Security Group", azure: "Azure NSG"
+  };
 
-    // ── License modal ─────────────────────────────────────────────
-    const modal = document.getElementById("licenseModal");
+  document.getElementById("config").addEventListener("change", function () {
+    document.getElementById("fileLabel").textContent =
+      this.files.length ? this.files[0].name : "Choose a file\u2026";
+  });
 
-    function openModal() {
-      modal.classList.remove("hidden");
-      document.body.style.overflow = "hidden";
-      document.getElementById("licenseKey").focus();
+  // Filter state for audit results
+  let activeFilter = null;
+  document.getElementById("summaryGrid").addEventListener("click", function (e) {
+    const box = e.target.closest(".summary-box[data-filter]");
+    if (!box) return;
+    const filter = box.dataset.filter;
+    if (activeFilter === filter && filter !== "all") {
+      activeFilter = null; applyFindingFilter(null);
+      document.querySelectorAll("#summaryGrid .summary-box").forEach(b => b.classList.remove("filter-active"));
+    } else {
+      activeFilter = filter === "all" ? null : filter;
+      applyFindingFilter(activeFilter);
+      document.querySelectorAll("#summaryGrid .summary-box").forEach(b =>
+        b.classList.toggle("filter-active", b === box)
+      );
     }
+  });
 
-    function closeModal() {
-      modal.classList.add("hidden");
-      document.body.style.overflow = "";
+  function applyFindingFilter(filter) {
+    document.querySelectorAll("#findingsList .finding").forEach(f => {
+      if (!filter) { f.style.display = ""; return; }
+      const show =
+        filter === "high"       ? f.classList.contains("finding-high") :
+        filter === "medium"     ? f.classList.contains("finding-medium") :
+        filter === "compliance" ? (f.classList.contains("finding-compliance-high") || f.classList.contains("finding-compliance-medium")) :
+        true;
+      f.style.display = show ? "" : "none";
+    });
+  }
+
+  document.getElementById("auditForm").addEventListener("submit", async function (e) {
+    e.preventDefault();
+    setLoading("submitBtn", "submitText", "submitSpinner", "Running\u2026", true);
+    try {
+      const res  = await fetch("/audit", { method: "POST", body: new FormData(this) });
+      const data = await res.json();
+      if (data.error) { showAuditError(data.error); return; }
+      renderResults(data);
+    } catch (err) {
+      showAuditError("Unexpected error: " + err.message);
+    } finally {
+      setLoading("submitBtn", "submitText", "submitSpinner", "Run Audit", false);
     }
+  });
 
-    document.getElementById("licenseBadgeBtn").addEventListener("click", openModal);
-    document.getElementById("modalClose").addEventListener("click", closeModal);
-    modal.addEventListener("click", function (e) {
-      if (e.target === modal) closeModal();
-    });
-    document.addEventListener("keydown", function (e) {
-      if (e.key === "Escape") closeModal();
-    });
+  function showAuditError(msg) {
+    const section = document.getElementById("resultsSection");
+    section.classList.remove("hidden");
+    ["summaryGrid"].forEach(id => document.getElementById(id).innerHTML = "");
+    document.getElementById("findingsList").innerHTML = `<div class="alert alert-error">${escHtml(msg)}</div>`;
+    ["pdfRow","archiveRow","licenseWarning"].forEach(id => document.getElementById(id).classList.add("hidden"));
+    document.getElementById("detectedVendorTag").classList.add("hidden");
+  }
 
-    // ── File input label ──────────────────────────────────────────
-    document.getElementById("config").addEventListener("change", function () {
-      document.getElementById("fileLabel").textContent =
-        this.files.length ? this.files[0].name : "Choose a file\u2026";
-    });
+  function renderResults(data) {
+    document.getElementById("resultsSection").classList.remove("hidden");
+    document.getElementById("resultsSection").scrollIntoView({ behavior: "smooth" });
 
-    // ── Audit form ────────────────────────────────────────────────
-    document.getElementById("auditForm").addEventListener("submit", async function (e) {
-      e.preventDefault();
-      const btn = document.getElementById("submitBtn");
-      const text = document.getElementById("submitText");
-      const spinner = document.getElementById("submitSpinner");
-      btn.disabled = true;
-      text.textContent = "Running\u2026";
-      spinner.classList.remove("hidden");
+    const tag = document.getElementById("detectedVendorTag");
+    if (data.detected_vendor) {
+      tag.textContent = "Detected: " + (VENDOR_LABELS[data.detected_vendor] || data.detected_vendor);
+      tag.classList.remove("hidden");
+    } else { tag.classList.add("hidden"); }
 
-      try {
-        const res = await fetch("/audit", { method: "POST", body: new FormData(this) });
-        const data = await res.json();
-        if (data.error) { showError(data.error); return; }
-        renderResults(data);
-      } catch (err) {
-        showError("Unexpected error: " + err.message);
-      } finally {
-        btn.disabled = false;
-        text.textContent = "Run Audit";
-        spinner.classList.add("hidden");
+    const warn = document.getElementById("licenseWarning");
+    if (data.license_warning) { warn.innerHTML = data.license_warning; warn.classList.remove("hidden"); }
+    else { warn.classList.add("hidden"); }
+
+    activeFilter = null; applyFindingFilter(null);
+    document.getElementById("summaryGrid").innerHTML = buildSummaryHTML(data.summary);
+
+    document.getElementById("findingsList").innerHTML = data.findings.length
+      ? data.findings.map(f => `<div class="finding ${findingClass(f)}">${escHtml(f)}</div>`).join("")
+      : `<div class="finding finding-pass">[PASS] No issues found</div>`;
+
+    const pdfRow = document.getElementById("pdfRow");
+    if (data.report) { document.getElementById("pdfLink").href = "/reports/" + data.report; pdfRow.classList.remove("hidden"); }
+    else { pdfRow.classList.add("hidden"); }
+
+    if (data.archive_id) { document.getElementById("archiveRow").classList.remove("hidden"); }
+    else { document.getElementById("archiveRow").classList.add("hidden"); }
+  }
+
+  document.getElementById("viewHistoryBtn").addEventListener("click", () => switchTab("history"));
+
+  // ══════════════════════════════════════════════════ COMPARE CONFIGS ══
+  document.getElementById("config_a").addEventListener("change", function () {
+    document.getElementById("fileLabelA").textContent = this.files.length ? this.files[0].name : "Choose a file\u2026";
+  });
+  document.getElementById("config_b").addEventListener("change", function () {
+    document.getElementById("fileLabelB").textContent = this.files.length ? this.files[0].name : "Choose a file\u2026";
+  });
+
+  document.getElementById("diffForm").addEventListener("submit", async function (e) {
+    e.preventDefault();
+    setLoading("diffBtn", "diffText", "diffSpinner", "Comparing\u2026", true);
+    try {
+      const res  = await fetch("/diff", { method: "POST", body: new FormData(this) });
+      const data = await res.json();
+      if (data.error) {
+        document.getElementById("diffResults").classList.remove("hidden");
+        document.getElementById("diffSummary").innerHTML = `<div class="alert alert-error">${escHtml(data.error)}</div>`;
+        ["diffAdded","diffRemoved","diffUnchanged"].forEach(id => document.getElementById(id).innerHTML = "");
+        return;
       }
-    });
-
-    function showError(msg) {
-      const section = document.getElementById("resultsSection");
-      section.classList.remove("hidden");
-      document.getElementById("findingsList").innerHTML =
-        `<div class="alert alert-error">${escHtml(msg)}</div>`;
-      document.getElementById("summaryGrid").innerHTML = "";
-      document.getElementById("pdfRow").classList.add("hidden");
-      document.getElementById("licenseWarning").classList.add("hidden");
-      document.getElementById("detectedVendorTag").classList.add("hidden");
+      renderDiff(data);
+    } catch (err) {
+      document.getElementById("diffResults").classList.remove("hidden");
+      document.getElementById("diffSummary").innerHTML = `<div class="alert alert-error">Unexpected error: ${escHtml(err.message)}</div>`;
+    } finally {
+      setLoading("diffBtn", "diffText", "diffSpinner", "Compare", false);
     }
+  });
 
-    const VENDOR_LABELS = {
-      asa: "Cisco", paloalto: "Palo Alto Networks", fortinet: "Fortinet", pfsense: "pfSense"
+  function renderDiff(data) {
+    document.getElementById("diffResults").classList.remove("hidden");
+    document.getElementById("diffResults").scrollIntoView({ behavior: "smooth" });
+
+    const tag = document.getElementById("diffVendorTag");
+    tag.textContent = "Vendor: " + (VENDOR_LABELS[data.vendor] || data.vendor);
+    tag.classList.remove("hidden");
+
+    const added     = data.added     || [];
+    const removed   = data.removed   || [];
+    const unchanged = data.unchanged || [];
+
+    document.getElementById("diffSummary").innerHTML = `
+      <div class="diff-stat-row">
+        <span class="diff-stat diff-stat-added">+${added.length} added</span>
+        <span class="diff-stat diff-stat-removed">&#8722;${removed.length} removed</span>
+        <span class="diff-stat diff-stat-unchanged">${unchanged.length} unchanged</span>
+      </div>
+      <p class="diff-files">${escHtml(data.filename_a)} &rarr; ${escHtml(data.filename_b)}</p>`;
+
+    const renderGroup = (elId, items, cls, label) => {
+      const el = document.getElementById(elId);
+      if (!items.length) { el.innerHTML = ""; return; }
+      el.innerHTML = `<div class="diff-group-label ${cls}-label">${label} (${items.length})</div>` +
+        items.map(r => `<div class="diff-row ${cls}">${escHtml(r)}</div>`).join("");
     };
+    renderGroup("diffAdded",     added,     "diff-added",     "&#43; Added");
+    renderGroup("diffRemoved",   removed,   "diff-removed",   "&#8722; Removed");
+    renderGroup("diffUnchanged", unchanged, "diff-unchanged", "&#8799; Unchanged");
+  }
 
-    // ── Filter state ──────────────────────────────────────────────
-    let activeFilter = null;
-
-    document.getElementById("summaryGrid").addEventListener("click", function (e) {
-      const box = e.target.closest(".summary-box[data-filter]");
-      if (!box) return;
-      const filter = box.dataset.filter;
-
-      if (activeFilter === filter && filter !== "all") {
-        // Second click on same box → reset to show all
-        activeFilter = null;
-        applyFindingFilter(null);
-        document.querySelectorAll(".summary-box").forEach(b => b.classList.remove("filter-active"));
-      } else {
-        activeFilter = filter === "all" ? null : filter;
-        applyFindingFilter(activeFilter);
-        document.querySelectorAll(".summary-box").forEach(b =>
-          b.classList.toggle("filter-active", b === box)
-        );
+  // ════════════════════════════════════════════════════ LIVE CONNECT ══════
+  document.getElementById("connectForm").addEventListener("submit", async function (e) {
+    e.preventDefault();
+    setLoading("connectBtn", "connectText", "connectSpinner", "Connecting\u2026", true);
+    try {
+      const res  = await fetch("/connect", { method: "POST", body: new URLSearchParams(new FormData(this)) });
+      const data = await res.json();
+      if (data.error) {
+        document.getElementById("connectResults").classList.remove("hidden");
+        document.getElementById("connFindingsList").innerHTML = `<div class="alert alert-error">${escHtml(data.error)}</div>`;
+        document.getElementById("connSummaryGrid").innerHTML  = "";
+        document.getElementById("connVendorTag").classList.add("hidden");
+        return;
       }
-    });
+      renderConnectResults(data);
+    } catch (err) {
+      document.getElementById("connectResults").classList.remove("hidden");
+      document.getElementById("connFindingsList").innerHTML = `<div class="alert alert-error">Unexpected error: ${escHtml(err.message)}</div>`;
+    } finally {
+      setLoading("connectBtn", "connectText", "connectSpinner", "Connect & Audit", false);
+    }
+  });
 
-    function applyFindingFilter(filter) {
-      document.querySelectorAll(".finding").forEach(f => {
-        if (!filter) {
-          f.style.display = "";
-          return;
+  function renderConnectResults(data) {
+    document.getElementById("connectResults").classList.remove("hidden");
+    document.getElementById("connectResults").scrollIntoView({ behavior: "smooth" });
+    const tag = document.getElementById("connVendorTag");
+    tag.textContent = (VENDOR_LABELS[data.detected_vendor] || data.detected_vendor) + " @ " + data.host;
+    tag.classList.remove("hidden");
+    document.getElementById("connSummaryGrid").innerHTML = buildSummaryHTML(data.summary);
+    document.getElementById("connFindingsList").innerHTML = data.findings.length
+      ? data.findings.map(f => `<div class="finding ${findingClass(f)}">${escHtml(f)}</div>`).join("")
+      : `<div class="finding finding-pass">[PASS] No issues found</div>`;
+    // Only show the archive-saved banner when the audit actually saved
+    const connArchiveRow = document.getElementById("connArchiveRow");
+    if (data.archive_id) connArchiveRow.classList.remove("hidden");
+    else connArchiveRow.classList.add("hidden");
+  }
+  document.getElementById("connViewHistoryBtn").addEventListener("click", () => switchTab("history"));
+
+  // ════════════════════════════════════════════════ AUDIT HISTORY ══════
+  let historyData = [];
+  let compareSelections = [];
+
+  async function loadHistory() {
+    document.getElementById("historyList").innerHTML = `<p class="text-muted">Loading&hellip;</p>`;
+    try {
+      const res  = await fetch("/archive");
+      historyData = await res.json();
+      compareSelections = [];
+      applyHistoryFilters();
+    } catch (err) {
+      document.getElementById("historyList").innerHTML =
+        `<div class="alert alert-error">Failed to load history: ${escHtml(err.message)}</div>`;
+    }
+  }
+
+  function applyHistoryFilters() {
+    const vendorFilter = document.getElementById("historyVendorFilter").value;
+    const sortMode     = document.getElementById("historySort").value;
+    const search       = document.getElementById("historySearch").value.trim().toLowerCase();
+
+    let entries = historyData.slice();
+    if (vendorFilter) entries = entries.filter(e => e.vendor === vendorFilter);
+    if (search)       entries = entries.filter(e => (e.filename || "").toLowerCase().includes(search));
+
+    if (sortMode === "newest")  entries.sort((a, b) => (b.timestamp || "").localeCompare(a.timestamp || ""));
+    if (sortMode === "oldest")  entries.sort((a, b) => (a.timestamp || "").localeCompare(b.timestamp || ""));
+    if (sortMode === "most")    entries.sort((a, b) => (b.summary?.total || 0) - (a.summary?.total || 0));
+    if (sortMode === "least")   entries.sort((a, b) => (a.summary?.total || 0) - (b.summary?.total || 0));
+
+    renderHistory(entries);
+  }
+
+  ["historyVendorFilter", "historySort"].forEach(id =>
+    document.getElementById(id).addEventListener("change", applyHistoryFilters)
+  );
+  document.getElementById("historySearch").addEventListener("input", applyHistoryFilters);
+
+  function renderHistory(entries) {
+    const el = document.getElementById("historyList");
+    if (!entries.length) {
+      el.innerHTML = `<p class="text-muted">No audit history yet. Run an audit and check &ldquo;Save to Audit History&rdquo;.</p>`;
+      return;
+    }
+    el.innerHTML = entries.map(e => {
+      const ts     = e.timestamp ? new Date(e.timestamp).toLocaleString() : "—";
+      const vendor = VENDOR_LABELS[e.vendor] || e.vendor;
+      const hi = e.summary?.high || 0, med = e.summary?.medium || 0, tot = e.summary?.total || 0;
+      return `<div class="history-entry" data-id="${escHtml(e.id)}">
+        <div class="history-entry-left">
+          <label class="history-check-wrap" title="Select to compare">
+            <input type="checkbox" class="history-check" data-id="${escHtml(e.id)}" />
+          </label>
+          <div class="history-entry-info">
+            <span class="history-filename">${escHtml(e.filename)}</span>
+            <span class="history-meta">${escHtml(vendor)} &bull; ${escHtml(ts)}</span>
+          </div>
+        </div>
+        <div class="history-entry-right">
+          <span class="history-badge sev-high" title="High">${hi}</span>
+          <span class="history-badge sev-medium" title="Medium">${med}</span>
+          <span class="history-badge sev-total" title="Total">${tot}</span>
+          <button class="btn-danger btn-sm" data-delete="${escHtml(e.id)}" title="Delete">&#128465;</button>
+        </div>
+      </div>`;
+    }).join("") + `
+    <div class="history-compare-bar" id="compareBar">
+      <span id="compareBarText">Select two entries to compare</span>
+      <button class="btn-primary btn-sm" id="compareBtn" disabled>Compare Selected</button>
+    </div>`;
+
+    el.querySelectorAll(".history-check").forEach(cb => {
+      cb.addEventListener("change", function () {
+        if (this.checked) {
+          if (compareSelections.length >= 2) {
+            const old = compareSelections.shift();
+            const oldCb = el.querySelector(`.history-check[data-id="${old}"]`);
+            if (oldCb) oldCb.checked = false;
+          }
+          compareSelections.push(this.dataset.id);
+        } else {
+          compareSelections = compareSelections.filter(id => id !== this.dataset.id);
         }
-        const show =
-          filter === "high"       ? f.classList.contains("finding-high") :
-          filter === "medium"     ? f.classList.contains("finding-medium") :
-          filter === "compliance" ? (f.classList.contains("finding-compliance-high") ||
-                                     f.classList.contains("finding-compliance-medium")) :
-          true;
-        f.style.display = show ? "" : "none";
+        updateCompareBar();
       });
-    }
-
-    function renderResults(data) {
-      const section = document.getElementById("resultsSection");
-      section.classList.remove("hidden");
-      section.scrollIntoView({ behavior: "smooth" });
-
-      // Detected vendor tag
-      const tag = document.getElementById("detectedVendorTag");
-      if (data.detected_vendor) {
-        tag.textContent = "Detected: " + (VENDOR_LABELS[data.detected_vendor] || data.detected_vendor);
-        tag.classList.remove("hidden");
-      } else {
-        tag.classList.add("hidden");
-      }
-
-      // License warning
-      const warn = document.getElementById("licenseWarning");
-      if (data.license_warning) {
-        warn.innerHTML = data.license_warning;
-        warn.classList.remove("hidden");
-      } else {
-        warn.classList.add("hidden");
-      }
-
-      // Reset filter state on new results
-      activeFilter = null;
-      applyFindingFilter(null);
-
-      // Summary boxes
-      const s = data.summary;
-      const summaryItems = [
-        { label: "High",   value: s.high,   cls: "sev-high",   filter: "high" },
-        { label: "Medium", value: s.medium, cls: "sev-medium", filter: "medium" },
-        { label: "Total",  value: s.total,  cls: "sev-total",  filter: "all" },
-      ];
-      if (s.pci_high || s.pci_medium) {
-        summaryItems.push({ label: "PCI High",   value: s.pci_high,   cls: "sev-compliance", filter: "compliance" });
-        summaryItems.push({ label: "PCI Medium", value: s.pci_medium, cls: "sev-compliance", filter: "compliance" });
-      }
-      if (s.cis_high || s.cis_medium) {
-        summaryItems.push({ label: "CIS High",   value: s.cis_high,   cls: "sev-compliance", filter: "compliance" });
-        summaryItems.push({ label: "CIS Medium", value: s.cis_medium, cls: "sev-compliance", filter: "compliance" });
-      }
-      if (s.nist_high || s.nist_medium) {
-        summaryItems.push({ label: "NIST High",   value: s.nist_high,   cls: "sev-compliance", filter: "compliance" });
-        summaryItems.push({ label: "NIST Medium", value: s.nist_medium, cls: "sev-compliance", filter: "compliance" });
-      }
-      document.getElementById("summaryGrid").innerHTML = summaryItems
-        .map(i => `<div class="summary-box ${i.cls}" data-filter="${i.filter}" title="Click to filter"><span class="summary-val">${i.value}</span><span class="summary-lbl">${i.label}</span></div>`)
-        .join("");
-
-      // Findings
-      const list = document.getElementById("findingsList");
-      list.innerHTML = data.findings.length
-        ? data.findings.map(f => `<div class="finding ${findingClass(f)}">${escHtml(f)}</div>`).join("")
-        : `<div class="finding finding-pass">[PASS] No issues found</div>`;
-
-      // PDF download
-      const pdfRow = document.getElementById("pdfRow");
-      if (data.report) {
-        document.getElementById("pdfLink").href = "/reports/" + data.report;
-        pdfRow.classList.remove("hidden");
-      } else {
-        pdfRow.classList.add("hidden");
-      }
-    }
-
-    function findingClass(f) {
-      if (f.includes("[HIGH]")   && !f.match(/PCI-|CIS-|NIST-/)) return "finding-high";
-      if (f.includes("[MEDIUM]") && !f.match(/PCI-|CIS-|NIST-/)) return "finding-medium";
-      if (f.match(/PCI-HIGH|CIS-HIGH|NIST-HIGH/))                 return "finding-compliance-high";
-      if (f.match(/PCI-MEDIUM|CIS-MEDIUM|NIST-MEDIUM/))           return "finding-compliance-medium";
-      return "finding-info";
-    }
-
-    function escHtml(s) {
-      return s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
-    }
-
-    // ── License activate ──────────────────────────────────────────
-    document.getElementById("activateForm").addEventListener("submit", async function (e) {
-      e.preventDefault();
-      const key = document.getElementById("licenseKey").value.trim();
-      const res = await fetch("/license/activate", {
-        method: "POST", body: new URLSearchParams({ key }),
-      });
-      const data = await res.json();
-      showLicenseMsg(data.message, data.success ? "ok" : "error");
-      if (data.success) refreshLicenseBadge(true, key.toUpperCase());
     });
 
-    // ── License deactivate ────────────────────────────────────────
-    document.getElementById("deactivateForm").addEventListener("submit", async function (e) {
-      e.preventDefault();
-      const res = await fetch("/license/deactivate", { method: "POST" });
-      const data = await res.json();
-      showLicenseMsg(data.message, data.success ? "ok" : "error");
-      if (data.success) refreshLicenseBadge(false, null);
+    el.querySelectorAll("[data-delete]").forEach(btn => {
+      btn.addEventListener("click", async function () {
+        await fetch("/archive/" + this.dataset.delete, { method: "DELETE" });
+        await loadHistory();
+      });
     });
 
-    function showLicenseMsg(msg, type) {
-      const el = document.getElementById("licenseMsg");
-      el.textContent = msg;
-      el.className = "license-msg " + (type === "ok" ? "msg-ok" : "msg-error");
-      el.classList.remove("hidden");
-    }
+    document.getElementById("compareBtn").addEventListener("click", runCompare);
+  }
 
-    function refreshLicenseBadge(licensed, key) {
-      const badge = document.getElementById("licenseBadge");
-      const status = document.getElementById("licenseStatus");
-      if (licensed) {
-        badge.className = "badge badge-active";
-        badge.innerHTML = "&#10003; Licensed";
-        status.innerHTML = `<p class="status-ok">&#10003; Active license: <code>${escHtml(key)}</code></p>`;
-      } else {
-        badge.className = "badge badge-unlicensed";
-        badge.innerHTML = "&#9888; Unlicensed";
-        status.innerHTML = `<p class="status-warn">No active license. Compliance checks require a valid key.</p>`;
-      }
+  function updateCompareBar() {
+    const btn  = document.getElementById("compareBtn");
+    const text = document.getElementById("compareBarText");
+    const n    = compareSelections.length;
+    btn.disabled = n < 2;
+    text.textContent = n === 0 ? "Select two entries to compare" :
+                       n === 1 ? "Select one more entry" : "Ready to compare";
+  }
+
+  async function runCompare() {
+    if (compareSelections.length < 2) return;
+    // Always put the older entry as baseline (id_a) regardless of selection order
+    const entries = compareSelections.map(id => historyData.find(e => e.id === id)).filter(Boolean);
+    entries.sort((a, b) => (a.timestamp || "").localeCompare(b.timestamp || ""));
+    const id_a = entries[0].id;
+    const id_b = entries[1].id;
+    try {
+      const res  = await fetch("/archive/compare", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id_a, id_b }),
+      });
+      const data = await res.json();
+      if (data.error) { alert("Compare error: " + data.error); return; }
+      renderComparison(data);
+    } catch (err) {
+      alert("Failed to compare: " + err.message);
     }
+  }
+
+  function renderComparison(data) {
+    const section = document.getElementById("compareResults");
+    section.classList.remove("hidden");
+    section.scrollIntoView({ behavior: "smooth" });
+
+    const ea = data.entry_a, eb = data.entry_b, d = data.delta;
+    const tsA = ea.timestamp ? new Date(ea.timestamp).toLocaleString() : "—";
+    const tsB = eb.timestamp ? new Date(eb.timestamp).toLocaleString() : "—";
+
+    const deltaStr = v =>
+      v > 0 ? `<span class="delta-worse">+${v}</span>` :
+      v < 0 ? `<span class="delta-better">${v}</span>` :
+      `<span class="delta-neutral">0</span>`;
+
+    const dirLabel = data.improved   ? "&#8679; Improved" :
+                     d.total === 0   ? "&#8596; No change" : "&#8681; Regressed";
+    const dirClass = data.improved   ? "arrow-better" :
+                     d.total === 0   ? "arrow-neutral" : "arrow-worse";
+
+    document.getElementById("compareContent").innerHTML = `
+      <div class="compare-header">
+        <div class="compare-col">
+          <div class="compare-label">Baseline</div>
+          <div class="compare-filename">${escHtml(ea.filename)}</div>
+          <div class="compare-ts">${escHtml(tsA)}</div>
+          <div class="compare-stats">
+            <span class="sev-high history-badge">${ea.summary.high} High</span>
+            <span class="sev-medium history-badge">${ea.summary.medium} Med</span>
+          </div>
+        </div>
+        <div class="compare-arrow ${dirClass}">${dirLabel}</div>
+        <div class="compare-col">
+          <div class="compare-label">Current</div>
+          <div class="compare-filename">${escHtml(eb.filename)}</div>
+          <div class="compare-ts">${escHtml(tsB)}</div>
+          <div class="compare-stats">
+            <span class="sev-high history-badge">${eb.summary.high} High</span>
+            <span class="sev-medium history-badge">${eb.summary.medium} Med</span>
+          </div>
+        </div>
+      </div>
+      <div class="compare-delta-row">
+        <div class="compare-delta-box"><span class="delta-label">High &Delta;</span>${deltaStr(d.high)}</div>
+        <div class="compare-delta-box"><span class="delta-label">Medium &Delta;</span>${deltaStr(d.medium)}</div>
+        <div class="compare-delta-box"><span class="delta-label">Total &Delta;</span>${deltaStr(d.total)}</div>
+      </div>
+      ${data.resolved_findings.length ? `
+        <div class="diff-group-label diff-added-label">&#10003; Resolved Issues (${data.resolved_findings.length})</div>
+        ${data.resolved_findings.map(f => `<div class="diff-row diff-added">${escHtml(f)}</div>`).join("")}
+      ` : ""}
+      ${data.new_findings.length ? `
+        <div class="diff-group-label diff-removed-label">&#9888; New Issues (${data.new_findings.length})</div>
+        ${data.new_findings.map(f => `<div class="diff-row diff-removed">${escHtml(f)}</div>`).join("")}
+      ` : ""}
+      ${!data.resolved_findings.length && !data.new_findings.length ? `
+        <div class="finding finding-pass">[PASS] No change in findings between the two audits.</div>
+      ` : ""}`;
+  }
+
+  document.getElementById("refreshHistoryBtn").addEventListener("click", loadHistory);
+
+  // ════════════════════════════════════════════════ ACTIVITY LOG ══════
+  const ACTION_LABELS = {
+    file_audit:      "File Audit",
+    ssh_connect:     "Live SSH",
+    config_diff:     "Config Diff",
+    archive_compare: "Comparison",
+  };
+
+  async function loadActivity() {
+    document.getElementById("activityList").innerHTML = `<p class="text-muted">Loading&hellip;</p>`;
+    try {
+      const res    = await fetch("/activity");
+      const events = await res.json();
+      renderActivity(events);
+    } catch (err) {
+      document.getElementById("activityList").innerHTML =
+        `<div class="alert alert-error">Failed to load activity: ${escHtml(err.message)}</div>`;
+    }
+  }
+
+  function renderActivity(events) {
+    const el = document.getElementById("activityList");
+    if (!events.length) {
+      el.innerHTML = `<p class="text-muted">No activity yet.</p>`;
+      return;
+    }
+    el.innerHTML = events.map(e => {
+      const ts     = e.timestamp ? new Date(e.timestamp).toLocaleString() : "—";
+      const action = ACTION_LABELS[e.action] || e.action;
+      const vendor = VENDOR_LABELS[e.vendor] || e.vendor || "";
+      const ok     = e.success;
+      const errMsg = e.error ? `<span class="activity-error">${escHtml(e.error)}</span>` : "";
+      return `<div class="activity-entry ${ok ? "" : "activity-entry-fail"}">
+        <div class="activity-entry-left">
+          <span class="activity-action-badge">${escHtml(action)}</span>
+          <div class="history-entry-info">
+            <span class="history-filename">${escHtml(e.label)}</span>
+            <span class="history-meta">${vendor ? escHtml(vendor) + " &bull; " : ""}${escHtml(ts)}</span>
+            ${errMsg}
+          </div>
+        </div>
+        <div class="activity-entry-right">
+          <span class="${ok ? "activity-ok" : "activity-fail"}">${ok ? "&#10003; OK" : "&#10007; Failed"}</span>
+          <button class="btn-danger btn-sm" data-delete-activity="${escHtml(e.id)}" title="Delete">&#128465;</button>
+        </div>
+      </div>`;
+    }).join("");
+
+    el.querySelectorAll("[data-delete-activity]").forEach(btn => {
+      btn.addEventListener("click", async function () {
+        await fetch("/activity/" + this.dataset.deleteActivity, { method: "DELETE" });
+        await loadActivity();
+      });
+    });
+  }
+
+  document.getElementById("refreshActivityBtn").addEventListener("click", loadActivity);
+  document.getElementById("clearActivityBtn").addEventListener("click", async function () {
+    if (!confirm("Clear all activity log entries?")) return;
+    await fetch("/activity/clear", { method: "POST" });
+    await loadActivity();
+  });
+
+  // ══════════════════════════════════════════════════════════ HELPERS ══
+  function buildSummaryHTML(s) {
+    const items = [
+      { label: "High",   value: s.high,   cls: "sev-high",   filter: "high" },
+      { label: "Medium", value: s.medium, cls: "sev-medium", filter: "medium" },
+      { label: "Total",  value: s.total,  cls: "sev-total",  filter: "all" },
+    ];
+    if (s.pci_high  || s.pci_medium)  { items.push({ label:"PCI High",   value:s.pci_high,   cls:"sev-compliance",filter:"compliance"}); items.push({ label:"PCI Med",    value:s.pci_medium, cls:"sev-compliance",filter:"compliance"}); }
+    if (s.cis_high  || s.cis_medium)  { items.push({ label:"CIS High",   value:s.cis_high,   cls:"sev-compliance",filter:"compliance"}); items.push({ label:"CIS Med",    value:s.cis_medium, cls:"sev-compliance",filter:"compliance"}); }
+    if (s.nist_high || s.nist_medium) { items.push({ label:"NIST High",  value:s.nist_high,  cls:"sev-compliance",filter:"compliance"}); items.push({ label:"NIST Med",   value:s.nist_medium,cls:"sev-compliance",filter:"compliance"}); }
+    return items.map(i =>
+      `<div class="summary-box ${i.cls}" data-filter="${i.filter}" title="Click to filter">
+         <span class="summary-val">${i.value}</span><span class="summary-lbl">${i.label}</span>
+       </div>`
+    ).join("");
+  }
+
+  function findingClass(f) {
+    if (f.includes("[HIGH]")   && !f.match(/PCI-|CIS-|NIST-/)) return "finding-high";
+    if (f.includes("[MEDIUM]") && !f.match(/PCI-|CIS-|NIST-/)) return "finding-medium";
+    if (f.match(/PCI-HIGH|CIS-HIGH|NIST-HIGH/))                 return "finding-compliance-high";
+    if (f.match(/PCI-MEDIUM|CIS-MEDIUM|NIST-MEDIUM/))           return "finding-compliance-medium";
+    return "finding-info";
+  }
+
+  function setLoading(btnId, textId, spinnerId, label, loading) {
+    const btn = document.getElementById(btnId);
+    btn.disabled = loading;
+    document.getElementById(textId).textContent = loading ? label : label.replace(/\u2026$/, "").trim();
+    document.getElementById(spinnerId).classList.toggle("hidden", !loading);
+    if (!loading) {
+      const origLabels = { submitBtn:"Run Audit", diffBtn:"Compare", connectBtn:"Connect & Audit" };
+      document.getElementById(textId).textContent = origLabels[btnId] || label;
+    }
+  }
+
+  function escHtml(s) {
+    return String(s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;");
+  }
   </script>
 </body>
 </html>
