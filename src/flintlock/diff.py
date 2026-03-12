@@ -24,15 +24,15 @@ def diff_asa(path_a, path_b):
 
     # Use Counter so duplicate rules (e.g. same rule with and without 'log') are
     # counted separately rather than collapsed into one dict entry.
-    cnt_a  = Counter(_sig_asa(l) for l in lines_a)
-    cnt_b  = Counter(_sig_asa(l) for l in lines_b)
+    cnt_a  = Counter(_sig_asa(line) for line in lines_a)
+    cnt_b  = Counter(_sig_asa(line) for line in lines_b)
     # Keep first-seen display text for each signature
     text_a = {}
-    for l in lines_a:
-        text_a.setdefault(_sig_asa(l), l)
+    for line in lines_a:
+        text_a.setdefault(_sig_asa(line), line)
     text_b = {}
-    for l in lines_b:
-        text_b.setdefault(_sig_asa(l), l)
+    for line in lines_b:
+        text_b.setdefault(_sig_asa(line), line)
 
     added, removed, unchanged = [], [], []
     for sig in set(cnt_a) | set(cnt_b):

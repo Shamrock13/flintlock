@@ -22,7 +22,7 @@ from .diff import diff_configs
 from .archive import save_audit, list_archive, get_entry, delete_entry, compare_entries
 from .activity_log import (
     log_activity, list_activity, delete_activity_entry, clear_activity,
-    ACTION_FILE_AUDIT, ACTION_SSH_CONNECT, ACTION_CONFIG_DIFF, ACTION_COMPARISON,
+    ACTION_FILE_AUDIT, ACTION_SSH_CONNECT, ACTION_CONFIG_DIFF,
 )
 
 UPLOAD_FOLDER    = os.environ.get("UPLOAD_FOLDER",    "/tmp/flintlock_uploads")

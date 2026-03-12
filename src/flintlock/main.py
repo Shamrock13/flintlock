@@ -1,22 +1,14 @@
 import typer
 from rich.console import Console
-
-_console = Console()
-
 from .license import activate_license, check_license, deactivate_license
-
 from .compliance import check_cis_compliance, check_pci_compliance, check_nist_compliance
-
+from .paloalto import audit_paloalto
+from .reporter import generate_report
+from .fortinet import audit_fortinet
+from .pfsense import audit_pfsense
 from ciscoconfparse import CiscoConfParse
 
-from .paloalto import audit_paloalto
-
-from .reporter import generate_report
-
-from .fortinet import audit_fortinet
-
-from .pfsense import audit_pfsense
-
+_console = Console()
 app = typer.Typer()
 
 def check_any_any(parse):
@@ -95,9 +87,9 @@ def audit(
         if compliance:
             licensed, message = check_license()
             if not licensed:
-                typer.echo(f"\n⚠️  Compliance checks require a valid license.")
+                typer.echo("\n⚠️  Compliance checks require a valid license.")
                 _console.print("   Purchase a license at: [link=https://shamrock13.gumroad.com/l/flintlock]https://shamrock13.gumroad.com/l/flintlock[/link]")
-                typer.echo(f"   Once purchased, activate your key: flintlock --activate YOUR-LICENSE-KEY")
+                typer.echo("   Once purchased, activate your key: flintlock --activate YOUR-LICENSE-KEY")
                 raise typer.Exit()
             typer.echo(f"\n--- {compliance.upper()} Compliance Checks ---")
             if compliance == "cis":
@@ -127,7 +119,7 @@ def audit(
         nist_high = [f for f in findings if "NIST-HIGH" in f]
         nist_medium = [f for f in findings if "NIST-MEDIUM" in f]
 
-        typer.echo(f"\n--- Audit Summary ---")
+        typer.echo("\n--- Audit Summary ---")
         typer.echo(f"High Severity:         {len(high)}")
         typer.echo(f"Medium Severity:       {len(medium)}")
         if pci_high or pci_medium:
@@ -140,7 +132,7 @@ def audit(
             typer.echo(f"NIST Compliance High:  {len(nist_high)}")
             typer.echo(f"NIST Compliance Medium:{len(nist_medium)}")
         typer.echo(f"Total Issues:          {len(findings)}")
-        typer.echo(f"---------------------")
+        typer.echo("---------------------")
     
     elif vendor == "paloalto":
         findings = audit_paloalto(file)
@@ -154,9 +146,9 @@ def audit(
         if compliance:
             licensed, message = check_license()
             if not licensed:
-                typer.echo(f"\n⚠️  Compliance checks require a valid license.")
+                typer.echo("\n⚠️  Compliance checks require a valid license.")
                 _console.print("   Purchase a license at: [link=https://shamrock13.gumroad.com/l/flintlock]https://shamrock13.gumroad.com/l/flintlock[/link]")
-                typer.echo(f"   Once purchased, activate your key: flintlock --activate YOUR-LICENSE-KEY")
+                typer.echo("   Once purchased, activate your key: flintlock --activate YOUR-LICENSE-KEY")
                 raise typer.Exit()
             typer.echo(f"\n--- {compliance.upper()} Compliance Checks ---")
             from .paloalto import parse_paloalto
@@ -188,7 +180,7 @@ def audit(
         nist_high = [f for f in findings if "NIST-HIGH" in f]
         nist_medium = [f for f in findings if "NIST-MEDIUM" in f]
 
-        typer.echo(f"\n--- Audit Summary ---")
+        typer.echo("\n--- Audit Summary ---")
         typer.echo(f"High Severity:         {len(high)}")
         typer.echo(f"Medium Severity:       {len(medium)}")
         if pci_high or pci_medium:
@@ -201,7 +193,7 @@ def audit(
             typer.echo(f"NIST Compliance High:  {len(nist_high)}")
             typer.echo(f"NIST Compliance Medium:{len(nist_medium)}")
         typer.echo(f"Total Issues:          {len(findings)}")
-        typer.echo(f"---------------------")
+        typer.echo("---------------------")
 
     elif vendor == "fortinet":
         from .compliance import check_cis_compliance_forti, check_pci_compliance_forti, check_nist_compliance_forti
@@ -217,9 +209,9 @@ def audit(
         if compliance:
             licensed, message = check_license()
             if not licensed:
-                typer.echo(f"\n⚠️  Compliance checks require a valid license.")
+                typer.echo("\n⚠️  Compliance checks require a valid license.")
                 _console.print("   Purchase a license at: [link=https://shamrock13.gumroad.com/l/flintlock]https://shamrock13.gumroad.com/l/flintlock[/link]")
-                typer.echo(f"   Once purchased, activate your key: flintlock --activate YOUR-LICENSE-KEY")
+                typer.echo("   Once purchased, activate your key: flintlock --activate YOUR-LICENSE-KEY")
                 raise typer.Exit()
             typer.echo(f"\n--- {compliance.upper()} Compliance Checks ---")
             if compliance == "cis":
@@ -248,7 +240,7 @@ def audit(
         nist_high = [f for f in findings if "NIST-HIGH" in f]
         nist_medium = [f for f in findings if "NIST-MEDIUM" in f]
 
-        typer.echo(f"\n--- Audit Summary ---")
+        typer.echo("\n--- Audit Summary ---")
         typer.echo(f"High Severity:         {len(high)}")
         typer.echo(f"Medium Severity:       {len(medium)}")
         if pci_high or pci_medium:
@@ -261,7 +253,7 @@ def audit(
             typer.echo(f"NIST Compliance High:  {len(nist_high)}")
             typer.echo(f"NIST Compliance Medium:{len(nist_medium)}")
         typer.echo(f"Total Issues:          {len(findings)}")
-        typer.echo(f"---------------------")
+        typer.echo("---------------------")
 
     elif vendor == "pfsense":
         from .compliance import check_cis_compliance_pf, check_pci_compliance_pf, check_nist_compliance_pf
@@ -277,9 +269,9 @@ def audit(
         if compliance:
             licensed, message = check_license()
             if not licensed:
-                typer.echo(f"\n⚠️  Compliance checks require a valid license.")
+                typer.echo("\n⚠️  Compliance checks require a valid license.")
                 _console.print("   Purchase a license at: [link=https://shamrock13.gumroad.com/l/flintlock]https://shamrock13.gumroad.com/l/flintlock[/link]")
-                typer.echo(f"   Once purchased, activate your key: flintlock --activate YOUR-LICENSE-KEY")
+                typer.echo("   Once purchased, activate your key: flintlock --activate YOUR-LICENSE-KEY")
                 raise typer.Exit()
             typer.echo(f"\n--- {compliance.upper()} Compliance Checks ---")
             if compliance == "cis":
@@ -308,7 +300,7 @@ def audit(
         nist_high = [f for f in findings if "NIST-HIGH" in f]
         nist_medium = [f for f in findings if "NIST-MEDIUM" in f]
 
-        typer.echo(f"\n--- Audit Summary ---")
+        typer.echo("\n--- Audit Summary ---")
         typer.echo(f"High Severity:         {len(high)}")
         typer.echo(f"Medium Severity:       {len(medium)}")
         if pci_high or pci_medium:
@@ -321,7 +313,7 @@ def audit(
             typer.echo(f"NIST Compliance High:  {len(nist_high)}")
             typer.echo(f"NIST Compliance Medium:{len(nist_medium)}")
         typer.echo(f"Total Issues:          {len(findings)}")
-        typer.echo(f"---------------------")
+        typer.echo("---------------------")
 
 if __name__ == "__main__":
     app()

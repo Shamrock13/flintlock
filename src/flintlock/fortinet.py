@@ -1,4 +1,3 @@
-import re
 
 # Services considered insecure if allowed to broad destinations
 _INSECURE_SERVICES = {"TELNET", "HTTP", "FTP", "TFTP", "SNMP"}
