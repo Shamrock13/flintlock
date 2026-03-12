@@ -20,12 +20,17 @@ from .azure import audit_azure_nsg
 from .reporter import generate_report
 from .diff import diff_configs
 from .archive import save_audit, list_archive, get_entry, delete_entry, compare_entries
+from .activity_log import (
+    log_activity, list_activity, delete_activity_entry, clear_activity,
+    ACTION_FILE_AUDIT, ACTION_SSH_CONNECT, ACTION_CONFIG_DIFF, ACTION_COMPARISON,
+)
 
-UPLOAD_FOLDER  = os.environ.get("UPLOAD_FOLDER",  "/tmp/flintlock_uploads")
-REPORTS_FOLDER = os.environ.get("REPORTS_FOLDER", "/tmp/flintlock_reports")
-ARCHIVE_FOLDER = os.environ.get("ARCHIVE_FOLDER", "/tmp/flintlock_archive")
+UPLOAD_FOLDER    = os.environ.get("UPLOAD_FOLDER",    "/tmp/flintlock_uploads")
+REPORTS_FOLDER   = os.environ.get("REPORTS_FOLDER",   "/tmp/flintlock_reports")
+ARCHIVE_FOLDER   = os.environ.get("ARCHIVE_FOLDER",   "/tmp/flintlock_archive")
+ACTIVITY_FOLDER  = os.environ.get("ACTIVITY_FOLDER",  "/tmp/flintlock_activity")
 
-for _d in (UPLOAD_FOLDER, REPORTS_FOLDER, ARCHIVE_FOLDER):
+for _d in (UPLOAD_FOLDER, REPORTS_FOLDER, ARCHIVE_FOLDER, ACTIVITY_FOLDER):
     os.makedirs(_d, exist_ok=True)
 
 app = Flask(__name__, template_folder="templates", static_folder="static")
@@ -313,10 +318,17 @@ def run_audit():
         findings = _sort_findings(findings)
         summary  = _build_summary(findings)
 
-        # Optional auto-archive
+        # Optional archive save
         archive_id = None
         if archive_it:
             archive_id, _ = save_audit(upload.filename, vendor, findings, summary, config_path=temp_path)
+
+        # Always log activity
+        log_activity(
+            ACTION_FILE_AUDIT, upload.filename, vendor=vendor, success=True,
+            details={"total": summary.get("total", 0), "high": summary.get("high", 0),
+                     "archived": archive_id is not None},
+        )
 
         return jsonify({
             "findings":        findings,
@@ -328,6 +340,8 @@ def run_audit():
         })
 
     except Exception as e:
+        log_activity(ACTION_FILE_AUDIT, upload.filename, vendor=vendor or "unknown",
+                     success=False, error=str(e))
         return jsonify({"error": str(e)}), 500
     finally:
         if os.path.exists(temp_path):
@@ -371,9 +385,19 @@ def run_diff():
         result["vendor"]     = vendor
         result["filename_a"] = upload_a.filename
         result["filename_b"] = upload_b.filename
+
+        log_activity(ACTION_CONFIG_DIFF,
+                     f"{upload_a.filename} → {upload_b.filename}",
+                     vendor=vendor, success=True,
+                     details={"added": len(result.get("added", [])),
+                               "removed": len(result.get("removed", [])),
+                               "unchanged": len(result.get("unchanged", []))})
         return jsonify(result)
 
     except Exception as e:
+        log_activity(ACTION_CONFIG_DIFF,
+                     f"{upload_a.filename} → {upload_b.filename}",
+                     vendor=vendor or "unknown", success=False, error=str(e))
         return jsonify({"error": str(e)}), 500
     finally:
         for p in (path_a, path_b):
@@ -397,6 +421,8 @@ def live_connect():
     if vendor not in ("asa", "fortinet", "paloalto"):
         return jsonify({"error": f"Live SSH not supported for vendor '{vendor}'. Supported: asa, fortinet, paloalto"}), 400
 
+    label = f"{vendor.upper()}@{host}"
+
     try:
         from .ssh_connector import connect_and_pull
         temp_path, _ = connect_and_pull(
@@ -404,6 +430,9 @@ def live_connect():
             timeout=30, upload_folder=UPLOAD_FOLDER
         )
     except Exception as e:
+        # Log the failed attempt to activity log only — do NOT save to Audit History
+        log_activity(ACTION_SSH_CONNECT, label, vendor=vendor, success=False, error=str(e),
+                     details={"host": host, "port": port})
         return jsonify({"error": f"Connection failed: {e}"}), 500
 
     try:
@@ -441,8 +470,13 @@ def live_connect():
         findings = _sort_findings(findings)
         summary  = _build_summary(findings)
 
-        label = f"{vendor.upper()}@{host}"
+        # Save successful SSH audits to Audit History
         archive_id, _ = save_audit(label, vendor, findings, summary, config_path=temp_path)
+
+        # Log successful activity
+        log_activity(ACTION_SSH_CONNECT, label, vendor=vendor, success=True,
+                     details={"host": host, "port": port,
+                              "total": summary.get("total", 0), "high": summary.get("high", 0)})
 
         return jsonify({
             "findings":        findings,
@@ -453,9 +487,11 @@ def live_connect():
         })
 
     except Exception as e:
+        log_activity(ACTION_SSH_CONNECT, label, vendor=vendor, success=False, error=str(e),
+                     details={"host": host, "port": port})
         return jsonify({"error": str(e)}), 500
     finally:
-        if os.path.exists(temp_path):
+        if "temp_path" in dir() and os.path.exists(temp_path):
             os.remove(temp_path)
 
 
@@ -505,6 +541,26 @@ def archive_compare():
     if error:
         return jsonify({"error": error}), 404
     return jsonify(result)
+
+
+# ── Activity Log API ──────────────────────────────────────────────────────────
+
+@app.route("/activity", methods=["GET"])
+def activity_list():
+    limit = int(request.args.get("limit", 200))
+    return jsonify(list_activity(limit=limit))
+
+
+@app.route("/activity/<event_id>", methods=["DELETE"])
+def activity_delete(event_id):
+    deleted = delete_activity_entry(event_id)
+    return jsonify({"deleted": deleted})
+
+
+@app.route("/activity/clear", methods=["POST"])
+def activity_clear():
+    count = clear_activity()
+    return jsonify({"cleared": count})
 
 
 # ── Reports / License ─────────────────────────────────────────────────────────

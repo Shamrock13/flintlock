@@ -878,3 +878,89 @@ select:focus, input[type="text"]:focus {
   .compare-header { flex-direction: column; }
   .compare-arrow  { width: 100%; text-align: center; }
 }
+
+/* ===== History Filters ===== */
+.history-filters {
+  display: flex;
+  gap: 1rem;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  margin-bottom: 1rem;
+  padding: 0.75rem 1rem;
+  background: var(--input-bg);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+}
+.history-filter-group {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+.filter-label {
+  font-size: 0.72rem;
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+  color: var(--text-muted);
+  font-weight: 600;
+}
+.history-filters select,
+.history-filters input {
+  padding: 0.3rem 0.6rem;
+  font-size: 0.85rem;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--card-bg);
+  color: var(--text);
+}
+
+/* ===== Activity Log ===== */
+.activity-entry {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  padding: 0.65rem 0.85rem;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  margin-bottom: 0.5rem;
+  background: var(--card-bg);
+  gap: 0.75rem;
+}
+.activity-entry-fail {
+  border-left: 3px solid var(--high);
+  background: color-mix(in srgb, var(--high) 5%, var(--card-bg));
+}
+.activity-entry-left {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.6rem;
+  flex: 1;
+  min-width: 0;
+}
+.activity-entry-right {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-shrink: 0;
+}
+.activity-action-badge {
+  font-size: 0.7rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+  padding: 0.15rem 0.45rem;
+  border-radius: 4px;
+  background: var(--input-bg);
+  border: 1px solid var(--border);
+  color: var(--text-muted);
+  white-space: nowrap;
+  margin-top: 0.15rem;
+}
+.activity-ok   { color: var(--pass);   font-weight: 600; font-size: 0.85rem; }
+.activity-fail { color: var(--high);   font-weight: 600; font-size: 0.85rem; }
+.activity-error {
+  display: block;
+  font-size: 0.78rem;
+  color: var(--high);
+  margin-top: 0.15rem;
+  word-break: break-all;
+}

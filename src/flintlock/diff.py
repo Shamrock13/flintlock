@@ -1,5 +1,6 @@
 """Rule diff engine — compare two firewall configs of the same vendor."""
 import re
+from collections import Counter
 from ciscoconfparse import CiscoConfParse
 from .paloalto import parse_paloalto
 from .fortinet import parse_fortinet
@@ -18,11 +19,34 @@ def _sig_asa(text):
 def diff_asa(path_a, path_b):
     pa = CiscoConfParse(path_a, ignore_blank_lines=False)
     pb = CiscoConfParse(path_b, ignore_blank_lines=False)
-    rules_a = {_sig_asa(r.text): r.text for r in pa.find_objects(r"access-list")}
-    rules_b = {_sig_asa(r.text): r.text for r in pb.find_objects(r"access-list")}
-    added     = [rules_b[s] for s in rules_b if s not in rules_a]
-    removed   = [rules_a[s] for s in rules_a if s not in rules_b]
-    unchanged = [rules_a[s] for s in rules_a if s in rules_b]
+    lines_a = [r.text for r in pa.find_objects(r"access-list")]
+    lines_b = [r.text for r in pb.find_objects(r"access-list")]
+
+    # Use Counter so duplicate rules (e.g. same rule with and without 'log') are
+    # counted separately rather than collapsed into one dict entry.
+    cnt_a  = Counter(_sig_asa(l) for l in lines_a)
+    cnt_b  = Counter(_sig_asa(l) for l in lines_b)
+    # Keep first-seen display text for each signature
+    text_a = {}
+    for l in lines_a:
+        text_a.setdefault(_sig_asa(l), l)
+    text_b = {}
+    for l in lines_b:
+        text_b.setdefault(_sig_asa(l), l)
+
+    added, removed, unchanged = [], [], []
+    for sig in set(cnt_a) | set(cnt_b):
+        a, b    = cnt_a[sig], cnt_b[sig]
+        keep    = min(a, b)
+        extra_a = a - keep
+        extra_b = b - keep
+        for _ in range(keep):
+            unchanged.append(text_a.get(sig, text_b.get(sig)))
+        for _ in range(extra_a):
+            removed.append(text_a[sig])
+        for _ in range(extra_b):
+            added.append(text_b[sig])
+
     return {"added": added, "removed": removed, "unchanged": unchanged}
 
 
