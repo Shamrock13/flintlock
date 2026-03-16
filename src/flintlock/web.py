@@ -170,10 +170,14 @@ def _sort_findings(findings: list) -> list:
     def priority(f):
         msg = _finding_msg(f)
         is_comp = any(x in msg for x in ("PCI-", "CIS-", "NIST-"))
-        if "[HIGH]"   in msg and not is_comp: return 0
-        if "[MEDIUM]" in msg and not is_comp: return 1
-        if "HIGH"     in msg and is_comp:     return 2
-        if "MEDIUM"   in msg and is_comp:     return 3
+        if "[HIGH]"   in msg and not is_comp:
+            return 0
+        if "[MEDIUM]" in msg and not is_comp:
+            return 1
+        if "HIGH"     in msg and is_comp:
+            return 2
+        if "MEDIUM"   in msg and is_comp:
+            return 3
         return 4
     return sorted(findings, key=priority)
 
