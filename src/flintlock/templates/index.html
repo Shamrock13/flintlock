@@ -83,6 +83,10 @@
         <h2 class="card-title">Run Audit</h2>
         <form id="auditForm" enctype="multipart/form-data">
           <div class="form-grid">
+            <div class="form-group" style="grid-column:1/-1">
+              <label for="deviceTag">Device Tag</label>
+              <input type="text" id="deviceTag" name="tag" placeholder="e.g. ASA01, FortiGate-HQ&hellip;" autocomplete="off" maxlength="64" required />
+            </div>
             <div class="form-group">
               <label for="config">Config File</label>
               <div class="file-input-wrapper">
@@ -94,12 +98,12 @@
               <label for="vendor">Vendor</label>
               <select id="vendor" name="vendor">
                 <option value="auto" selected>Auto-detect (recommended)</option>
-                <option value="asa">Cisco</option>
-                <option value="paloalto">Palo Alto Networks</option>
-                <option value="fortinet">Fortinet</option>
-                <option value="pfsense">pfSense</option>
                 <option value="aws">AWS Security Group</option>
                 <option value="azure">Azure NSG</option>
+                <option value="asa">Cisco</option>
+                <option value="fortinet">Fortinet</option>
+                <option value="paloalto">Palo Alto Networks</option>
+                <option value="pfsense">pfSense</option>
               </select>
             </div>
             <div class="form-group">
@@ -120,10 +124,6 @@
                 <input type="checkbox" id="archive" name="archive" value="1" />
                 <span>Save to Audit History</span>
               </label>
-            </div>
-            <div class="form-group" style="grid-column:1/-1">
-              <label for="deviceTag">Device Tag <span class="optional">(optional)</span></label>
-              <input type="text" id="deviceTag" name="tag" placeholder="e.g. ASA01, FortiGate-HQ&hellip;" autocomplete="off" maxlength="64" />
             </div>
           </div>
           <button type="submit" class="btn-primary" id="submitBtn">
@@ -178,12 +178,12 @@
               <label for="diffVendor">Vendor</label>
               <select id="diffVendor" name="vendor">
                 <option value="auto" selected>Auto-detect (recommended)</option>
-                <option value="asa">Cisco</option>
-                <option value="paloalto">Palo Alto Networks</option>
-                <option value="fortinet">Fortinet</option>
-                <option value="pfsense">pfSense</option>
                 <option value="aws">AWS Security Group</option>
                 <option value="azure">Azure NSG</option>
+                <option value="asa">Cisco</option>
+                <option value="fortinet">Fortinet</option>
+                <option value="paloalto">Palo Alto Networks</option>
+                <option value="pfsense">pfSense</option>
               </select>
             </div>
           </div>
@@ -212,15 +212,19 @@
         <h2 class="card-title">Live SSH Connection</h2>
         <p class="card-desc">Connect directly to a device to pull its running configuration and audit it in real time.</p>
         <div class="alert alert-info">
-          Supported: <strong>Cisco ASA</strong>, <strong>Fortinet</strong>, <strong>Palo Alto Networks</strong> (SSH).
+          Supported: <strong>Cisco</strong>, <strong>Fortinet</strong>, <strong>Palo Alto Networks</strong> (SSH).
           Credentials are used only for the single connection and are never stored.
         </div>
         <form id="connectForm">
           <div class="form-grid connect-grid">
+            <div class="form-group" style="grid-column:1/-1">
+              <label for="connDeviceTag">Device Tag</label>
+              <input type="text" id="connDeviceTag" name="tag" placeholder="e.g. ASA01, FortiGate-HQ&hellip;" autocomplete="off" maxlength="64" required />
+            </div>
             <div class="form-group">
               <label for="connVendor">Vendor</label>
               <select id="connVendor" name="vendor">
-                <option value="asa">Cisco ASA</option>
+                <option value="asa">Cisco</option>
                 <option value="fortinet">Fortinet</option>
                 <option value="paloalto">Palo Alto Networks</option>
               </select>
@@ -249,10 +253,6 @@
                 <option value="pci">PCI-DSS</option>
                 <option value="nist">NIST SP 800-41</option>
               </select>
-            </div>
-            <div class="form-group" style="grid-column:1/-1">
-              <label for="connDeviceTag">Device Tag <span class="optional">(optional)</span></label>
-              <input type="text" id="connDeviceTag" name="tag" placeholder="e.g. ASA01, FortiGate-HQ&hellip;" autocomplete="off" maxlength="64" />
             </div>
           </div>
           <button type="submit" class="btn-primary" id="connectBtn">
@@ -291,12 +291,12 @@
             <label class="filter-label">Vendor</label>
             <select id="historyVendorFilter">
               <option value="">All vendors</option>
-              <option value="asa">Cisco</option>
-              <option value="paloalto">Palo Alto Networks</option>
-              <option value="fortinet">Fortinet</option>
-              <option value="pfsense">pfSense</option>
               <option value="aws">AWS Security Group</option>
               <option value="azure">Azure NSG</option>
+              <option value="asa">Cisco</option>
+              <option value="fortinet">Fortinet</option>
+              <option value="paloalto">Palo Alto Networks</option>
+              <option value="pfsense">pfSense</option>
             </select>
           </div>
           <div class="history-filter-group">

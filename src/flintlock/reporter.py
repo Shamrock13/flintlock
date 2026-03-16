@@ -67,7 +67,7 @@ class FlintlockReport(FPDF):
         self.ln(2)
         self.set_font("Helvetica", "", 7)
         self.set_text_color(*_MUTED)
-        self.cell(0, 5, f"Flintlock v1.0   |   Firewall Security Auditor   |   Page {self.page_no()}", align="C")
+        self.cell(0, 5, f"Flintlock v1.2   |   Firewall Security Auditor   |   Page {self.page_no()}", align="C")
 
 
 def _draw_meta(pdf, filename, vendor, compliance):
