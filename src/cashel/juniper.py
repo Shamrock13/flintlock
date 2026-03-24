@@ -407,7 +407,7 @@ def audit_juniper(filepath: str) -> tuple[list[dict], list[dict]]:
         # parse_juniper returned an error string
         return [_f("HIGH", "parse", f"[HIGH] Parse error: {content_or_err}")], []
 
-    content = content_or_err  # parse_juniper returns content on success
+    content: str = content_or_err or ""  # parse_juniper returns content on success
 
     findings: list[dict] = []
     findings += check_system_juniper(content)
