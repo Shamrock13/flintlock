@@ -6,8 +6,8 @@
   <meta name="csrf-token" content="{{ csrf_token() }}" />
   <title>Cashel &mdash; Firewall Audit</title>
   <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}" />
-  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
-  <script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js" nonce="{{ g.csp_nonce }}"></script>
+  <script nonce="{{ g.csp_nonce }}">
     (function () {
       const t = localStorage.getItem("cashel-theme") || "auto";
       document.documentElement.setAttribute("data-theme", t);
@@ -367,9 +367,30 @@
               <label for="connUser">Username</label>
               <input type="text" id="connUser" name="username" placeholder="admin" autocomplete="off" />
             </div>
-            <div class="form-group">
+            <div class="form-group" style="grid-column:1/-1">
+              <label>Authentication Method</label>
+              <div style="display:flex;gap:1.5rem;margin-top:0.35rem">
+                <label style="display:flex;align-items:center;gap:0.4rem;cursor:pointer">
+                  <input type="radio" name="auth_method" value="password" id="authMethodPassword" checked />
+                  <span>Password</span>
+                </label>
+                <label style="display:flex;align-items:center;gap:0.4rem;cursor:pointer">
+                  <input type="radio" name="auth_method" value="pem_key" id="authMethodPem" />
+                  <span>PEM Key File</span>
+                </label>
+              </div>
+            </div>
+            <div class="form-group" id="connPassGroup">
               <label for="connPass">Password</label>
               <input type="password" id="connPass" name="password" placeholder="&bull;&bull;&bull;&bull;&bull;&bull;&bull;&bull;" autocomplete="current-password" />
+            </div>
+            <div class="form-group hidden" id="connPemGroup">
+              <label for="connPemKey">PEM Key File</label>
+              <input type="file" id="connPemKey" name="pem_key" accept=".pem,.key" />
+            </div>
+            <div class="form-group hidden" id="connPemPassGroup">
+              <label for="connPemPassphrase">Key Passphrase <span class="optional">(if encrypted)</span></label>
+              <input type="password" id="connPemPassphrase" name="pem_passphrase" autocomplete="new-password" />
             </div>
             <div class="form-group">
               <label for="connCompliance">Compliance <span class="optional">(licensed)</span></label>
@@ -669,6 +690,11 @@
             Email (SMTP)
           </button>
 
+          <button class="settings-nav-item" data-pane="auth">
+            <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="7" width="10" height="8" rx="1.5"/><path d="M5 7V5a3 3 0 0 1 6 0v2"/><circle cx="8" cy="11" r="1" fill="currentColor" stroke="none"/></svg>
+            Authentication
+          </button>
+
           <button class="settings-nav-item" data-pane="security">
             <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8 1.5L2 4v4.5c0 3.5 2.5 6.7 6 7.5 3.5-.8 6-4 6-7.5V4L8 1.5z"/><path d="M5.5 8l2 2 3-3"/></svg>
             Security
@@ -778,8 +804,50 @@
             </div>
           </div>
 
+          <!-- Authentication pane -->
+          <div class="settings-pane hidden" id="spane-auth">
+            <div class="settings-pane-header">
+              <h2 class="settings-pane-title">Authentication</h2>
+              <p class="settings-pane-desc">Protect the Cashel web UI and API with an API key. When enabled, all routes require the key — via browser login or <code>X-API-Key</code> header for CI/CD clients.</p>
+            </div>
+
+            <div class="settings-group">
+              <h3 class="settings-group-title">Access Control</h3>
+              <label class="settings-row">
+                <span class="settings-row-label">Enable Authentication</span>
+                <input type="checkbox" class="settings-toggle" id="setting-auth-enabled" />
+              </label>
+              <div class="settings-row">
+                <span class="settings-row-label">Session Lifetime</span>
+                <div style="display:flex;align-items:center;gap:0.5rem">
+                  <input type="number" id="setting-session-lifetime" class="settings-input" style="width:80px" min="5" max="10080" />
+                  <span class="text-muted" style="font-size:0.82rem">minutes</span>
+                </div>
+              </div>
+            </div>
+
+            <div class="settings-group">
+              <h3 class="settings-group-title">API Key</h3>
+              <div class="settings-row">
+                <span class="settings-row-label">Current Key</span>
+                <span class="text-muted" id="authKeyHint" style="font-family:monospace;font-size:0.88rem">not set</span>
+              </div>
+              <div style="margin-top:0.75rem;display:flex;gap:0.75rem;flex-wrap:wrap">
+                <button class="btn-secondary" id="btnGenerateKey">Generate New Key</button>
+              </div>
+              <div id="authNewKeyBox" class="hidden" style="margin-top:1rem;background:var(--card-bg);border:1px solid var(--accent);border-radius:8px;padding:1rem">
+                <p style="font-size:0.82rem;color:var(--high);font-weight:600;margin-bottom:0.5rem">&#9888; Copy this key now — it will not be shown again.</p>
+                <div style="display:flex;align-items:center;gap:0.5rem">
+                  <code id="authNewKeyVal" style="flex:1;padding:0.5rem;background:var(--input-bg);border-radius:4px;word-break:break-all;font-size:0.88rem"></code>
+                  <button class="btn-secondary" onclick="navigator.clipboard.writeText(document.getElementById('authNewKeyVal').textContent).then(()=>this.textContent='Copied!').catch(()=>this.textContent='Error')">Copy</button>
+                </div>
+              </div>
+              <p class="settings-pane-desc" style="margin-top:0.75rem">Use this key in the <code>X-API-Key</code> header for CLI or CI/CD access:<br><code>curl -H "X-API-Key: csh_..." https://your-cashel/api/v1/audit</code></p>
+            </div>
+          </div>
+
           <!-- Security pane -->
-          <div class="settings-pane" id="spane-security">
+          <div class="settings-pane hidden" id="spane-security">
             <div class="settings-pane-header">
               <h2 class="settings-pane-title">Security</h2>
               <p class="settings-pane-desc">Controls for SSH host verification, outbound webhook restrictions, and error reporting exposure.</p>
@@ -899,7 +967,7 @@
     <p>Cashel v1.2 &mdash; Firewall Security Auditor</p>
   </footer>
 
-  <script>
+  <script nonce="{{ g.csp_nonce }}">
   // ═══════════════════════════════════════════════════════════════ THEME ══
   const html = document.documentElement;
   const themeIcon = document.getElementById("themeIcon");
@@ -1519,11 +1587,23 @@
   }
 
   // ════════════════════════════════════════════════════ LIVE CONNECT ══════
+  // PEM auth method toggle
+  document.querySelectorAll('input[name="auth_method"]').forEach(r => {
+    r.addEventListener("change", () => {
+      const isPem = document.getElementById("authMethodPem").checked;
+      document.getElementById("connPassGroup").classList.toggle("hidden", isPem);
+      document.getElementById("connPemGroup").classList.toggle("hidden", !isPem);
+      document.getElementById("connPemPassGroup").classList.toggle("hidden", !isPem);
+    });
+  });
+
   document.getElementById("connectForm").addEventListener("submit", async function (e) {
     e.preventDefault();
     setLoading("connectBtn", "connectText", "connectSpinner", "Connecting\u2026", true);
     try {
-      const res  = await fetch("/connect", { method: "POST", body: new URLSearchParams(new FormData(this)) });
+      // Use raw FormData so PEM file uploads are included
+      const formData = new FormData(this);
+      const res  = await fetch("/connect", { method: "POST", body: formData });
       const data = await res.json();
       if (data.error) {
         document.getElementById("connectResults").classList.remove("hidden");
@@ -2182,6 +2262,11 @@
     document.getElementById("setting-syslog-port").value             = appSettings.syslog_port          || 514;
     document.getElementById("setting-syslog-protocol").value         = appSettings.syslog_protocol      || "udp";
     document.getElementById("setting-syslog-facility").value         = appSettings.syslog_facility      || "local0";
+    // Auth settings
+    document.getElementById("setting-auth-enabled").checked          = !!appSettings.auth_enabled;
+    document.getElementById("setting-session-lifetime").value        = appSettings.session_lifetime_minutes || 480;
+    const hint = appSettings.api_key_hint || (appSettings.api_key_set ? "(key set — hint unavailable)" : "not set");
+    document.getElementById("authKeyHint").textContent               = hint;
   }
 
   // ── Settings sidebar navigation ──────────────────────────────────────────
@@ -2226,6 +2311,9 @@
       syslog_port:          parseInt(document.getElementById("setting-syslog-port").value) || 514,
       syslog_protocol:      document.getElementById("setting-syslog-protocol").value,
       syslog_facility:      document.getElementById("setting-syslog-facility").value,
+      // Auth settings
+      auth_enabled:             document.getElementById("setting-auth-enabled").checked,
+      session_lifetime_minutes: parseInt(document.getElementById("setting-session-lifetime").value) || 480,
       ...(document.getElementById("setting-smtp-password").value
           ? {smtp_password: document.getElementById("setting-smtp-password").value}
           : {}),
@@ -2280,6 +2368,27 @@
     } finally {
       btn.disabled    = false;
       btn.textContent = "✉ Test SMTP";
+    }
+  });
+
+  // ══════════════════════════════════════════════ GENERATE API KEY ══
+  document.getElementById("btnGenerateKey").addEventListener("click", async function () {
+    if (!confirm("Generate a new API key? The current key (if any) will be invalidated immediately.")) return;
+    this.disabled = true;
+    try {
+      const res  = await fetch("/settings/generate-api-key", { method: "POST" });
+      const data = await res.json();
+      if (!data.ok) {
+        alert("Failed to generate key: " + (data.error || "Unknown error"));
+        return;
+      }
+      document.getElementById("authNewKeyVal").textContent = data.api_key;
+      document.getElementById("authNewKeyBox").classList.remove("hidden");
+      document.getElementById("authKeyHint").textContent   = data.api_key_hint || data.api_key.slice(0, 12) + "…";
+    } catch (err) {
+      alert("Request failed: " + err.message);
+    } finally {
+      this.disabled = false;
     }
   });
 

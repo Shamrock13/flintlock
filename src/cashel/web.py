@@ -1,13 +1,21 @@
 import atexit
+import importlib.metadata
 import json
 import logging as _logging
 import os
 import re
+import secrets
+import time
 import uuid
 from defusedxml import ElementTree as ET
 from pathlib import Path
-from flask import Flask, render_template, request, jsonify, send_file
+from flask import (
+    Flask, Blueprint, render_template, request, jsonify,
+    send_file, session, redirect, url_for, g,
+)
 from flask_wtf.csrf import CSRFProtect
+from flask_limiter import Limiter
+from flask_limiter.util import get_remote_address
 
 from .license import check_license, activate_license, deactivate_license, mask_key
 from .ftd import is_ftd_config
@@ -24,7 +32,7 @@ from .activity_log import (
     log_activity, list_activity, delete_activity_entry, clear_activity,
     ACTION_FILE_AUDIT, ACTION_SSH_CONNECT, ACTION_CONFIG_DIFF,
 )
-from .settings import get_settings, save_settings
+from .settings import get_settings, save_settings, save_api_key
 from .schedule_store import (
     list_schedules, get_schedule, create_schedule,
     update_schedule, delete_schedule, ScheduleValidationError,
@@ -46,21 +54,44 @@ for _d in (UPLOAD_FOLDER, REPORTS_FOLDER, ARCHIVE_FOLDER, ACTIVITY_FOLDER):
 # Settings folder is created lazily by settings.py on first save
 
 app = Flask(__name__, template_folder="templates", static_folder="static")
-app.config["SECRET_KEY"] = os.environ.get("CASHEL_SECRET", "change-me-in-production")
-app.config["MAX_CONTENT_LENGTH"] = 10 * 1024 * 1024  # 10 MB upload limit
+app.config["SECRET_KEY"]              = os.environ.get("CASHEL_SECRET", "change-me-in-production")
+app.config["MAX_CONTENT_LENGTH"]      = 50 * 1024 * 1024   # 50 MB total request cap
+app.config["SESSION_COOKIE_HTTPONLY"] = True
+app.config["SESSION_COOKIE_SAMESITE"] = "Lax"
+app.config["SESSION_COOKIE_SECURE"]   = os.environ.get("CASHEL_SECURE_COOKIES", "false").lower() == "true"
+
 csrf = CSRFProtect(app)
+
+limiter = Limiter(
+    app=app,
+    key_func=get_remote_address,
+    default_limits=[],
+    storage_uri="memory://",
+)
+
+_start_time = time.time()
+_MAX_FILE_BYTES = 5 * 1024 * 1024   # 5 MB per-file limit enforced in routes
+
+# ── REST API blueprint (CSRF-exempt; auth via X-API-Key) ──────────────────────
+api_bp = Blueprint("api_v1", __name__, url_prefix="/api/v1")
+csrf.exempt(api_bp)
+
+
+# ── CSP nonce ─────────────────────────────────────────────────────────────────
+
+@app.before_request
+def _assign_csp_nonce():
+    g.csp_nonce = secrets.token_urlsafe(16)
 
 
 # ── HTTP security headers ─────────────────────────────────────────────────────
-# Applied to every response.  HSTS is intentionally omitted here because
-# Cashel may run over plain HTTP in local/dev setups; enable it at the
-# reverse-proxy layer when deploying with TLS.
-# CSP is omitted pending a full frontend audit (inline scripts + CDN assets
-# need to be enumerated first) — tracked in the security roadmap Phase 2.
+# HSTS is intentionally omitted — enable at the reverse-proxy layer when
+# deploying with TLS.
 
 @app.after_request
 def _add_security_headers(response):
-    response.headers.setdefault("X-Frame-Options",        "SAMEORIGIN")
+    nonce = getattr(g, "csp_nonce", "")
+    response.headers.setdefault("X-Frame-Options",        "DENY")
     response.headers.setdefault("X-Content-Type-Options", "nosniff")
     response.headers.setdefault("X-XSS-Protection",       "1; mode=block")
     response.headers.setdefault("Referrer-Policy",        "strict-origin-when-cross-origin")
@@ -68,7 +99,74 @@ def _add_security_headers(response):
         "Permissions-Policy",
         "geolocation=(), microphone=(), camera=()",
     )
+    response.headers.setdefault(
+        "Content-Security-Policy",
+        f"default-src 'self'; "
+        f"script-src 'nonce-{nonce}' https://cdn.jsdelivr.net; "
+        f"style-src 'self' 'unsafe-inline'; "
+        f"img-src 'self' data:; "
+        f"connect-src 'self'; "
+        f"font-src 'self'; "
+        f"object-src 'none'; "
+        f"frame-ancestors 'none';",
+    )
     return response
+
+
+# ── Error handlers ────────────────────────────────────────────────────────────
+
+@app.errorhandler(413)
+def request_too_large(_e):
+    return jsonify({"error": "Upload too large. Maximum file size is 5 MB per file."}), 413
+
+
+@app.errorhandler(429)
+def rate_limit_exceeded(e):
+    return jsonify({"error": "Rate limit exceeded. Please slow down.", "retry_after": str(getattr(e, "retry_after", ""))}), 429
+
+
+# ── Authentication middleware ─────────────────────────────────────────────────
+
+_AUTH_EXEMPT_ENDPOINTS = {"login", "login_post", "logout", "health", "static"}
+
+
+@app.before_request
+def _require_auth():
+    settings = get_settings()
+    if not settings.get("auth_enabled"):
+        return
+
+    if request.endpoint in _AUTH_EXEMPT_ENDPOINTS:
+        return
+
+    # API key auth (header or query param) — used by CLI/CI clients
+    api_key_header = (
+        request.headers.get("X-API-Key") or
+        request.args.get("api_key")
+    )
+    if api_key_header:
+        stored = settings.get("api_key", "")
+        if stored and secrets.compare_digest(api_key_header, stored):
+            g.auth_method = "api_key"
+            return
+        if request.path.startswith("/api/"):
+            return jsonify({"ok": False, "data": None, "error": "Invalid API key."}), 401
+        return jsonify({"error": "Invalid API key."}), 401
+
+    # Session auth (browser)
+    if session.get("authenticated"):
+        lifetime = settings.get("session_lifetime_minutes", 480)
+        if time.time() - session.get("last_seen", 0) < lifetime * 60:
+            session["last_seen"] = time.time()
+            g.auth_method = "session"
+            return
+        session.clear()
+
+    # Not authenticated
+    if request.path.startswith("/api/"):
+        return jsonify({"ok": False, "data": None, "error": "Authentication required."}), 401
+    next_url = request.url if request.method == "GET" else None
+    return redirect(url_for("login", next=next_url))
 
 
 # ── Error response helper ─────────────────────────────────────────────────────
@@ -350,6 +448,54 @@ def extract_hostname(vendor: str, content: str) -> str | None:
 
 # ── Routes ────────────────────────────────────────────────────────────────────
 
+@app.route("/health")
+def health():
+    """Container health/readiness probe — always public."""
+    try:
+        _version = importlib.metadata.version("cashel")
+    except importlib.metadata.PackageNotFoundError:
+        _version = "dev"
+    entries = list_archive()
+    last_audit = entries[0]["timestamp"] if entries else None
+    return jsonify({
+        "ok":               True,
+        "version":          _version,
+        "uptime_seconds":   round(time.time() - _start_time),
+        "scheduler_running": scheduler_available(),
+        "last_audit_at":    last_audit,
+    })
+
+
+@app.route("/login", methods=["GET"])
+def login():
+    if session.get("authenticated"):
+        return redirect(url_for("index"))
+    return render_template("login.html")
+
+
+@app.route("/login", methods=["POST"])
+def login_post():
+    key = request.form.get("api_key", "")
+    settings = get_settings()
+    stored   = settings.get("api_key", "")
+    if stored and secrets.compare_digest(key, stored):
+        session.clear()
+        session["authenticated"] = True
+        session["last_seen"]     = time.time()
+        next_url = request.args.get("next", "")
+        # Guard against open-redirect: only accept relative paths
+        if next_url and next_url.startswith("/") and not next_url.startswith("//"):
+            return redirect(next_url)
+        return redirect(url_for("index"))
+    return render_template("login.html", error="Invalid API key. Please try again."), 401
+
+
+@app.route("/logout", methods=["POST"])
+def logout():
+    session.clear()
+    return redirect(url_for("login"))
+
+
 @app.route("/")
 def index():
     licensed, license_info = check_license()
@@ -359,6 +505,7 @@ def index():
 
 
 @app.route("/audit", methods=["POST"])
+@limiter.limit("30/minute")
 def run_audit():
     if "config" not in request.files or request.files["config"].filename == "":
         return jsonify({"error": "No config file uploaded"}), 400
@@ -379,6 +526,10 @@ def run_audit():
         return jsonify({"error": f"Unknown compliance framework '{compliance}'."}), 400
 
     upload = request.files["config"]
+    upload.seek(0, 2)
+    if upload.tell() > _MAX_FILE_BYTES:
+        return jsonify({"error": "File exceeds the 5 MB per-file limit."}), 413
+    upload.seek(0)
     suffix = Path(upload.filename).suffix or ".txt"
     temp_name = f"{uuid.uuid4()}{suffix}"
     temp_path = os.path.join(UPLOAD_FOLDER, temp_name)
@@ -473,6 +624,7 @@ def run_audit():
 # ── Config diff ───────────────────────────────────────────────────────────────
 
 @app.route("/diff", methods=["POST"])
+@limiter.limit("30/minute")
 def run_diff():
     if "config_a" not in request.files or "config_b" not in request.files:
         return jsonify({"error": "Two config files required (config_a and config_b)"}), 400
@@ -534,6 +686,7 @@ def run_diff():
 # ── Live SSH connect ──────────────────────────────────────────────────────────
 
 @app.route("/connect", methods=["POST"])
+@limiter.limit("10/minute")
 def live_connect():
     host       = request.form.get("host", "").strip()
     port       = request.form.get("port", "22").strip() or "22"
@@ -550,6 +703,19 @@ def live_connect():
     if vendor == "cisco":
         vendor = "asa"
 
+    # PEM key-based auth (optional)
+    pem_key_path   = None
+    pem_passphrase = request.form.get("pem_passphrase", "") or None
+    pem_upload     = request.files.get("pem_key")
+    if pem_upload and pem_upload.filename:
+        pem_path = os.path.join(UPLOAD_FOLDER, f"cashel_pem_{uuid.uuid4().hex}.pem")
+        pem_upload.save(pem_path)
+        try:
+            os.chmod(pem_path, 0o600)
+        except OSError:
+            pass
+        pem_key_path = pem_path
+
     label = f"{vendor.upper()}@{host}"
 
     try:
@@ -559,12 +725,16 @@ def live_connect():
             vendor, host, port, username, password,
             timeout=30, upload_folder=UPLOAD_FOLDER,
             host_key_policy=_settings.get("ssh_host_key_policy", "warn"),
+            pem_key_path=pem_key_path,
+            pem_passphrase=pem_passphrase,
         )
     except Exception as e:
-        # Log the failed attempt to activity log only — do NOT save to Audit History
         log_activity(ACTION_SSH_CONNECT, label, vendor=vendor, success=False, error=str(e),
                      details={"host": host, "port": port})
         return jsonify({"error": f"Connection failed: {e}"}), 500
+    finally:
+        if pem_key_path and os.path.exists(pem_key_path):
+            os.remove(pem_key_path)
 
     try:
         findings, parse, extra_data = run_vendor_audit(vendor, temp_path)
@@ -729,6 +899,7 @@ def activity_clear():
 # ── Bulk audit ────────────────────────────────────────────────────────────────
 
 @app.route("/bulk_audit", methods=["POST"])
+@limiter.limit("10/minute")
 def bulk_audit():
     """Audit multiple config files in one request.
 
@@ -960,7 +1131,12 @@ def license_status():
 
 @app.route("/settings", methods=["GET"])
 def settings_get():
-    return jsonify(get_settings())
+    s = get_settings()
+    # Never expose the plaintext API key over the wire — return masked hint only
+    raw_key = s.pop("api_key", "")
+    s["api_key_set"] = bool(raw_key)
+    s["api_key_hint"] = ("csh_…" + raw_key[-4:]) if len(raw_key) >= 4 else ("set" if raw_key else "")
+    return jsonify(s)
 
 
 @app.route("/settings", methods=["POST"])
@@ -969,7 +1145,18 @@ def settings_save():
     saved = save_settings(data)
     # Reconfigure syslog immediately when settings are changed.
     configure_syslog(saved)
+    saved.pop("api_key", None)
     return jsonify(saved)
+
+
+@app.route("/settings/generate-api-key", methods=["POST"])
+def settings_generate_api_key():
+    """Generate a new random API key, store it encrypted, and return it once in plaintext.
+    The caller must copy and store the key immediately — it cannot be retrieved again.
+    """
+    new_key = "csh_" + secrets.token_urlsafe(32)
+    save_api_key(new_key)
+    return jsonify({"ok": True, "api_key": new_key})
 
 
 @app.route("/settings/test-smtp", methods=["POST"])
@@ -1023,6 +1210,168 @@ def settings_test_smtp():
         return jsonify({"ok": False, "message": f"SMTP error: {exc}"})
     except OSError as exc:
         return jsonify({"ok": False, "message": f"Connection error: {exc}"})
+
+
+# ── REST API v1 (CI/CD integration) ───────────────────────────────────────────
+# Blueprint registered above; CSRF exempt — authenticated via X-API-Key header.
+# All responses use the envelope: {"ok": bool, "data": ..., "error": str|null}
+
+def _api_ok(data):
+    return jsonify({"ok": True, "data": data, "error": None})
+
+
+def _api_err(message, status=400):
+    return jsonify({"ok": False, "data": None, "error": message}), status
+
+
+@api_bp.route("/audit", methods=["POST"])
+@limiter.limit("30/minute")
+def api_audit():
+    """POST /api/v1/audit — audit a config file, returns findings + summary."""
+    if "config" not in request.files or not request.files["config"].filename:
+        return _api_err("config file is required")
+
+    vendor     = request.form.get("vendor", "auto").strip().lower()
+    compliance = request.form.get("compliance", "").strip().lower() or None
+    archive_it = request.form.get("archive", "1") == "1"
+    tag        = request.form.get("tag", "").strip() or None
+
+    if vendor not in ("auto", *ALL_VENDORS):
+        return _api_err(f"Unknown vendor '{vendor}'.")
+
+    from .schedule_store import VALID_FRAMEWORKS
+    if compliance and compliance not in VALID_FRAMEWORKS:
+        return _api_err(f"Unknown compliance framework '{compliance}'.")
+
+    upload = request.files["config"]
+    upload.seek(0, 2)
+    if upload.tell() > _MAX_FILE_BYTES:
+        return _api_err("File exceeds the 5 MB per-file limit.", 413)
+    upload.seek(0)
+
+    suffix    = Path(upload.filename).suffix or ".txt"
+    temp_path = os.path.join(UPLOAD_FOLDER, f"{uuid.uuid4()}{suffix}")
+    upload.save(temp_path)
+
+    try:
+        sample = open(temp_path, encoding="utf-8", errors="ignore").read(4096)
+
+        if vendor in ("auto", "cisco"):
+            detected = detect_vendor(sample, upload.filename)
+            if vendor == "auto":
+                if not detected:
+                    return _api_err("Could not auto-detect vendor. Specify vendor explicitly.")
+                vendor = detected
+            elif vendor == "cisco":
+                vendor = "ftd" if is_ftd_config(sample) else "asa"
+        elif vendor == "asa" and is_ftd_config(sample):
+            vendor = "ftd"
+
+        findings, parse, extra_data = run_vendor_audit(vendor, temp_path)
+
+        if compliance and vendor not in ("aws", "azure", "gcp", "iptables", "nftables"):
+            licensed, _ = check_license()
+            if licensed:
+                raw = run_compliance_checks(vendor, compliance, parse, extra_data)
+                findings += [_wrap_compliance(c) for c in raw]
+
+        findings = _sort_findings(findings)
+        summary  = _build_summary(findings)
+        archive_id = None
+        if archive_it:
+            archive_id, _ = save_audit(
+                upload.filename, vendor, _findings_to_strings(findings),
+                summary, config_path=temp_path, tag=tag,
+            )
+
+        return _api_ok({
+            "archive_id":        archive_id,
+            "vendor":            vendor,
+            "summary":           summary,
+            "findings":          _findings_to_strings(findings),
+            "enriched_findings": findings,
+            "detected_hostname": extract_hostname(vendor, sample),
+        })
+    except Exception as e:
+        return _api_err(_err(e, "Audit failed."), 500)
+    finally:
+        if os.path.exists(temp_path):
+            os.remove(temp_path)
+
+
+@api_bp.route("/audit/<entry_id>", methods=["GET"])
+def api_audit_get(entry_id):
+    """GET /api/v1/audit/<id> — retrieve a specific archived audit result."""
+    entry = get_entry(entry_id)
+    if not entry:
+        return _api_err("Audit not found.", 404)
+    return _api_ok(entry)
+
+
+@api_bp.route("/history", methods=["GET"])
+def api_history():
+    """GET /api/v1/history — list audit history (metadata only, no findings)."""
+    try:
+        limit  = min(int(request.args.get("limit", 50)), 500)
+    except (ValueError, TypeError):
+        limit  = 50
+    vendor_filter = request.args.get("vendor", "").strip().lower() or None
+    tag_filter    = request.args.get("tag", "").strip() or None
+
+    entries = list_archive()
+    if vendor_filter:
+        entries = [e for e in entries if e.get("vendor") == vendor_filter]
+    if tag_filter:
+        entries = [e for e in entries if e.get("tag") == tag_filter]
+    entries = entries[:limit]
+
+    # Strip bulky findings list from history response
+    slim = [{k: v for k, v in e.items() if k != "findings"} for e in entries]
+    return _api_ok(slim)
+
+
+@api_bp.route("/diff", methods=["POST"])
+@limiter.limit("30/minute")
+def api_diff():
+    """POST /api/v1/diff — compare two config files."""
+    if "config_a" not in request.files or "config_b" not in request.files:
+        return _api_err("config_a and config_b files are required.")
+
+    vendor = request.form.get("vendor", "auto").strip().lower()
+    if vendor not in ("auto", *ALL_VENDORS):
+        return _api_err(f"Unknown vendor '{vendor}'.")
+
+    paths = []
+    try:
+        for field in ("config_a", "config_b"):
+            f = request.files[field]
+            suffix = Path(f.filename).suffix or ".txt"
+            p = os.path.join(UPLOAD_FOLDER, f"{uuid.uuid4()}{suffix}")
+            f.save(p)
+            paths.append(p)
+
+        path_a, path_b = paths
+        sample_a = open(path_a, encoding="utf-8", errors="ignore").read(4096)
+
+        if vendor in ("auto", "cisco"):
+            detected = detect_vendor(sample_a, request.files["config_a"].filename)
+            vendor   = detected if vendor == "auto" and detected else (
+                ("ftd" if is_ftd_config(sample_a) else "asa") if vendor == "cisco" else (detected or "asa")
+            )
+        elif vendor == "asa" and is_ftd_config(sample_a):
+            vendor = "ftd"
+
+        result = diff_configs(vendor, path_a, path_b)
+        return _api_ok(result)
+    except Exception as e:
+        return _api_err(_err(e, "Diff failed."), 500)
+    finally:
+        for p in paths:
+            if os.path.exists(p):
+                os.remove(p)
+
+
+app.register_blueprint(api_bp)
 
 
 def main():
