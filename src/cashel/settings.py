@@ -1,13 +1,7 @@
 """Global application settings — persisted as JSON.
 
-SMTP passwords are encrypted at rest using Fernet (see crypto.py).
+SMTP passwords and API keys are encrypted at rest using Fernet (see crypto.py).
 Legacy plaintext passwords are transparently migrated on next save.
-
-SECURITY ROADMAP NOTES
-━━━━━━━━━━━━━━━━━━━━━━
-Phase 2 — API Key Authentication (pending):
-  Keys to add: ``auth_enabled`` (bool), ``api_key_hash`` (bcrypt/scrypt hash of
-  the admin key), ``session_lifetime_minutes`` (int).
 """
 import json
 import os
@@ -58,6 +52,14 @@ DEFAULTS: dict = {
     # "full"      → return raw exception text (development only)
     "error_detail": "sanitized",
 
+    # ── Authentication ────────────────────────────────────────────────────────
+    # When auth_enabled is True, all web UI and API routes require the API key.
+    # The key is stored encrypted (api_key_enc) and never shown after first
+    # generation — treat it like a password.  Session lifetime controls how long
+    # a browser login is valid (sliding window).
+    "auth_enabled":              False,
+    "session_lifetime_minutes":  480,   # 8 hours default
+
     # ── Syslog ────────────────────────────────────────────────────────────────
     # Forward application events to a remote syslog server for SIEM integration.
     # Protocol: "udp" (RFC 3164, default) or "tcp" (reliable delivery).
@@ -79,6 +81,8 @@ def get_settings() -> dict:
         # Decrypt smtp_password — stored encrypted, exposed in-process as plaintext
         if data.get("smtp_password_enc"):
             merged["smtp_password"] = decrypt(data["smtp_password_enc"])
+        # Decrypt api_key — stored encrypted, never exposed to the template directly
+        merged["api_key"] = decrypt(data["api_key_enc"]) if data.get("api_key_enc") else ""
         return merged
     except (FileNotFoundError, json.JSONDecodeError):
         return dict(DEFAULTS)
@@ -112,13 +116,41 @@ def save_settings(data: dict) -> dict:
         merged["smtp_password_enc"] = encrypt(smtp_pw)
     elif "smtp_password_enc" not in merged:
         merged["smtp_password_enc"] = ""
-    # Don't store plaintext password key in the file
     merged.pop("smtp_password", None)
+
+    # api_key is managed separately via /settings/generate-api-key; never passed
+    # through save_settings (it would be overwritten to empty on every settings save).
+    # Remove it from the dict — the encrypted api_key_enc is preserved from disk.
+    merged.pop("api_key", None)
+
+    # Preserve existing api_key_enc from disk if not being explicitly updated
+    try:
+        with open(SETTINGS_FILE) as _f:
+            _existing = json.load(_f)
+        if _existing.get("api_key_enc") and "api_key_enc" not in merged:
+            merged["api_key_enc"] = _existing["api_key_enc"]
+    except (FileNotFoundError, json.JSONDecodeError):
+        pass
 
     os.makedirs(os.path.dirname(SETTINGS_FILE), exist_ok=True)
     with open(SETTINGS_FILE, "w") as f:
         json.dump(merged, f, indent=2)
 
-    # Return with decrypted password so callers get the expected key
+    # Return with decrypted values so callers get the expected keys
     merged["smtp_password"] = smtp_pw
     return merged
+
+
+def save_api_key(plaintext_key: str) -> None:
+    """Encrypt and persist the API key. Separate from save_settings so it is
+    never accidentally overwritten by a settings form submission."""
+    from .crypto import encrypt as _enc
+    try:
+        with open(SETTINGS_FILE) as f:
+            data = json.load(f)
+    except (FileNotFoundError, json.JSONDecodeError):
+        data = {}
+    data["api_key_enc"] = _enc(plaintext_key)
+    os.makedirs(os.path.dirname(SETTINGS_FILE), exist_ok=True)
+    with open(SETTINGS_FILE, "w") as f:
+        json.dump(data, f, indent=2)
