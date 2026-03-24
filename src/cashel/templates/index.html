@@ -3,6 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="csrf-token" content="{{ csrf_token() }}" />
   <title>Cashel &mdash; Firewall Audit</title>
   <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}" />
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
@@ -999,6 +1000,19 @@
   );
 
   // ═════════════════════════════════════════════════════ FILE AUDIT ══════
+  // ── CSRF: attach token to every non-GET fetch automatically ─────────────────
+  (function () {
+    const token = document.querySelector('meta[name="csrf-token"]').content;
+    const _fetch = window.fetch;
+    window.fetch = function (url, opts) {
+      opts = opts || {};
+      if (opts.method && opts.method.toUpperCase() !== "GET") {
+        opts.headers = Object.assign({ "X-CSRFToken": token }, opts.headers || {});
+      }
+      return _fetch.call(this, url, opts);
+    };
+  })();
+
   const VENDOR_LABELS = {
     asa: "Cisco", ftd: "Cisco", cisco: "Cisco", paloalto: "Palo Alto Networks", fortinet: "Fortinet",
     pfsense: "pfSense", aws: "AWS Security Group", azure: "Azure NSG",

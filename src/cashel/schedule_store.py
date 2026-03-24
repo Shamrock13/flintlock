@@ -1,23 +1,20 @@
 """Schedule store — persists scheduled SSH audit jobs as individual JSON files.
 
-Passwords are stored base64-encoded in the schedule file. This is obfuscation,
-not encryption. Run Cashel behind a firewall or reverse proxy with access
-controls and restrict SCHEDULES_FOLDER permissions (chmod 600).
-
-SECURITY ROADMAP — Phase 3:
-  Replace base64 password storage with Fernet symmetric encryption.
-  A key will be generated on first start and stored in a separate key file
-  outside the schedules directory (e.g. /etc/cashel/secret.key).
+Passwords are encrypted with Fernet symmetric encryption via crypto.py.
+The key lives at CASHEL_KEY_FILE (default /data/cashel.key) and is
+generated automatically on first use. Legacy base64-encoded passwords
+are transparently migrated to Fernet on next write.
 """
-import base64
 import json
 import os
 import uuid
 from datetime import datetime
 
+from .crypto import encrypt, decrypt
+
 SCHEDULES_FOLDER = os.environ.get("SCHEDULES_FOLDER", "/tmp/cashel_schedules")
 
-VALID_VENDORS    = ("asa", "ftd", "fortinet", "iptables", "juniper", "nftables", "paloalto", "pfsense")
+VALID_VENDORS    = ("asa", "cisco", "ftd", "fortinet", "iptables", "juniper", "nftables", "paloalto", "pfsense")
 VALID_FREQS      = ("hourly", "daily", "weekly")
 VALID_FRAMEWORKS = ("", "cis", "hipaa", "nist", "pci", "soc2", "stig")
 VALID_DOW        = ("mon", "tue", "wed", "thu", "fri", "sat", "sun")
@@ -89,14 +86,11 @@ def _path(entry_id: str) -> str:
 
 
 def _encode_password(password: str) -> str:
-    return base64.b64encode(password.encode("utf-8")).decode("ascii")
+    return encrypt(password)
 
 
 def _decode_password(encoded: str) -> str:
-    try:
-        return base64.b64decode(encoded.encode("ascii")).decode("utf-8")
-    except Exception:
-        return ""
+    return decrypt(encoded)
 
 
 def _strip_password(schedule: dict) -> dict:

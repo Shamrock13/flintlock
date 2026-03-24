@@ -1,5 +1,8 @@
+name: cashel
+
 services:
-  cashel:
+  app:
+    container_name: cashel
     build: .
     ports:
       - "8080:5000"

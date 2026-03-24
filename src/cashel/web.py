@@ -7,6 +7,7 @@ import uuid
 from defusedxml import ElementTree as ET
 from pathlib import Path
 from flask import Flask, render_template, request, jsonify, send_file
+from flask_wtf.csrf import CSRFProtect
 
 from .license import check_license, activate_license, deactivate_license, mask_key
 from .ftd import is_ftd_config
@@ -45,7 +46,9 @@ for _d in (UPLOAD_FOLDER, REPORTS_FOLDER, ARCHIVE_FOLDER, ACTIVITY_FOLDER):
 # Settings folder is created lazily by settings.py on first save
 
 app = Flask(__name__, template_folder="templates", static_folder="static")
+app.config["SECRET_KEY"] = os.environ.get("CASHEL_SECRET", "change-me-in-production")
 app.config["MAX_CONTENT_LENGTH"] = 10 * 1024 * 1024  # 10 MB upload limit
+csrf = CSRFProtect(app)
 
 
 # ── HTTP security headers ─────────────────────────────────────────────────────

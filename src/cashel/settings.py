@@ -1,27 +1,18 @@
 """Global application settings — persisted as JSON.
 
+SMTP passwords are encrypted at rest using Fernet (see crypto.py).
+Legacy plaintext passwords are transparently migrated on next save.
+
 SECURITY ROADMAP NOTES
 ━━━━━━━━━━━━━━━━━━━━━━
-Phase 2 — API Key Authentication (planned):
+Phase 2 — API Key Authentication (pending):
   Keys to add: ``auth_enabled`` (bool), ``api_key_hash`` (bcrypt/scrypt hash of
-  the admin key), ``session_lifetime_minutes`` (int).  The login page will POST
-  the key, compare it against the hash, and issue a signed session cookie.
-  All state-changing routes will require either the session or X-API-Key header.
-
-Phase 3 — Fernet Encryption for Stored Credentials (planned):
-  Keys to add: ``encryption_enabled`` (bool).  A Fernet key is generated on
-  first start and stored in a separate file (``CASHEL_KEY_FILE`` env var,
-  default: ``~/.config/cashel/secret.key``).  The ``password_enc`` field in
-  schedule files and the ``smtp_password`` setting will be Fernet-encrypted
-  instead of base64-encoded.  Migration code will re-encrypt existing files on
-  startup when ``encryption_enabled`` is first set.
-
-Phase 4 — CSRF Protection (planned):
-  Requires Flask-WTF.  A ``WTF_CSRF_SECRET_KEY`` will be auto-generated and
-  stored here; the frontend will embed CSRF tokens in all form submissions.
+  the admin key), ``session_lifetime_minutes`` (int).
 """
 import json
 import os
+
+from .crypto import encrypt, decrypt
 
 SETTINGS_FILE = os.environ.get("SETTINGS_FILE", "/tmp/cashel_settings/settings.json")
 
@@ -84,7 +75,11 @@ def get_settings() -> dict:
     try:
         with open(SETTINGS_FILE) as f:
             data = json.load(f)
-        return {**DEFAULTS, **{k: data[k] for k in DEFAULTS if k in data}}
+        merged = {**DEFAULTS, **{k: data[k] for k in DEFAULTS if k in data}}
+        # Decrypt smtp_password — stored encrypted, exposed in-process as plaintext
+        if data.get("smtp_password_enc"):
+            merged["smtp_password"] = decrypt(data["smtp_password_enc"])
+        return merged
     except (FileNotFoundError, json.JSONDecodeError):
         return dict(DEFAULTS)
 
@@ -111,7 +106,19 @@ def save_settings(data: dict) -> dict:
     except (TypeError, ValueError):
         merged["syslog_port"] = 514
 
+    # Encrypt smtp_password before persisting; store under smtp_password_enc
+    smtp_pw = merged.pop("smtp_password", "")
+    if smtp_pw:
+        merged["smtp_password_enc"] = encrypt(smtp_pw)
+    elif "smtp_password_enc" not in merged:
+        merged["smtp_password_enc"] = ""
+    # Don't store plaintext password key in the file
+    merged.pop("smtp_password", None)
+
     os.makedirs(os.path.dirname(SETTINGS_FILE), exist_ok=True)
     with open(SETTINGS_FILE, "w") as f:
         json.dump(merged, f, indent=2)
+
+    # Return with decrypted password so callers get the expected key
+    merged["smtp_password"] = smtp_pw
     return merged
