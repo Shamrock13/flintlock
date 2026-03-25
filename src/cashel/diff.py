@@ -1,4 +1,5 @@
 """Rule diff engine — compare two firewall configs of the same vendor."""
+
 import re
 from collections import Counter
 from ciscoconfparse import CiscoConfParse
@@ -11,11 +12,12 @@ from .azure import parse_azure_nsg, _props
 
 # ── ASA ──────────────────────────────────────────────────────────────────────
 
+
 def _sig_asa(text):
     """Normalise a Cisco access-list line for comparison (strip log variants)."""
     t = text.strip().lower()
-    t = re.sub(r'\s+log\b.*', '', t)
-    return re.sub(r'\s+', ' ', t).strip()
+    t = re.sub(r"\s+log\b.*", "", t)
+    return re.sub(r"\s+", " ", t).strip()
 
 
 def diff_asa(path_a, path_b):
@@ -26,8 +28,8 @@ def diff_asa(path_a, path_b):
 
     # Use Counter so duplicate rules (e.g. same rule with and without 'log') are
     # counted separately rather than collapsed into one dict entry.
-    cnt_a  = Counter(_sig_asa(line) for line in lines_a)
-    cnt_b  = Counter(_sig_asa(line) for line in lines_b)
+    cnt_a = Counter(_sig_asa(line) for line in lines_a)
+    cnt_b = Counter(_sig_asa(line) for line in lines_b)
     # Keep first-seen display text for each signature
     text_a = {}
     for line in lines_a:
@@ -38,8 +40,8 @@ def diff_asa(path_a, path_b):
 
     added, removed, unchanged = [], [], []
     for sig in set(cnt_a) | set(cnt_b):
-        a, b    = cnt_a[sig], cnt_b[sig]
-        keep    = min(a, b)
+        a, b = cnt_a[sig], cnt_b[sig]
+        keep = min(a, b)
         extra_a = a - keep
         extra_b = b - keep
         for _ in range(keep):
@@ -54,6 +56,7 @@ def diff_asa(path_a, path_b):
 
 # ── Fortinet ─────────────────────────────────────────────────────────────────
 
+
 def _sig_forti(policy):
     return (
         tuple(sorted(policy.get("srcaddr", []))),
@@ -65,8 +68,8 @@ def _sig_forti(policy):
 
 def _fmt_forti(p):
     name = p.get("name") or f"Policy {p.get('id')}"
-    src  = ",".join(p.get("srcaddr", []))
-    dst  = ",".join(p.get("dstaddr", []))
+    src = ",".join(p.get("srcaddr", []))
+    dst = ",".join(p.get("dstaddr", []))
     return f"{name}: {src} → {dst} ({p.get('action', '')})"
 
 
@@ -75,13 +78,14 @@ def diff_fortinet(path_a, path_b):
     pols_b, _ = parse_fortinet(path_b)
     sig_a = {_sig_forti(p): p for p in (pols_a or [])}
     sig_b = {_sig_forti(p): p for p in (pols_b or [])}
-    added     = [_fmt_forti(sig_b[s]) for s in sig_b if s not in sig_a]
-    removed   = [_fmt_forti(sig_a[s]) for s in sig_a if s not in sig_b]
+    added = [_fmt_forti(sig_b[s]) for s in sig_b if s not in sig_a]
+    removed = [_fmt_forti(sig_a[s]) for s in sig_a if s not in sig_b]
     unchanged = [_fmt_forti(sig_a[s]) for s in sig_a if s in sig_b]
     return {"added": added, "removed": removed, "unchanged": unchanged}
 
 
 # ── Palo Alto ─────────────────────────────────────────────────────────────────
+
 
 def _sig_pa(rule):
     return (
@@ -94,9 +98,9 @@ def _sig_pa(rule):
 
 
 def _fmt_pa(rule):
-    name   = rule.get("name", "unnamed")
-    src    = ",".join(s.text for s in rule.findall(".//source/member"))
-    dst    = ",".join(d.text for d in rule.findall(".//destination/member"))
+    name = rule.get("name", "unnamed")
+    src = ",".join(s.text for s in rule.findall(".//source/member"))
+    dst = ",".join(d.text for d in rule.findall(".//destination/member"))
     action = rule.findtext(".//action") or ""
     return f"{name}: {src} → {dst} ({action})"
 
@@ -106,13 +110,14 @@ def diff_paloalto(path_a, path_b):
     rules_b, _ = parse_paloalto(path_b)
     sig_a = {_sig_pa(r): r for r in (rules_a or [])}
     sig_b = {_sig_pa(r): r for r in (rules_b or [])}
-    added     = [_fmt_pa(sig_b[s]) for s in sig_b if s not in sig_a]
-    removed   = [_fmt_pa(sig_a[s]) for s in sig_a if s not in sig_b]
+    added = [_fmt_pa(sig_b[s]) for s in sig_b if s not in sig_a]
+    removed = [_fmt_pa(sig_a[s]) for s in sig_a if s not in sig_b]
     unchanged = [_fmt_pa(sig_a[s]) for s in sig_a if s in sig_b]
     return {"added": added, "removed": removed, "unchanged": unchanged}
 
 
 # ── pfSense ───────────────────────────────────────────────────────────────────
+
 
 def _sig_pf(rule):
     return (rule["type"], rule["source"], rule["destination"], rule["protocol"])
@@ -127,23 +132,24 @@ def diff_pfsense(path_a, path_b):
     rules_b, _ = parse_pfsense(path_b)
     sig_a = {_sig_pf(r): r for r in (rules_a or [])}
     sig_b = {_sig_pf(r): r for r in (rules_b or [])}
-    added     = [_fmt_pf(sig_b[s]) for s in sig_b if s not in sig_a]
-    removed   = [_fmt_pf(sig_a[s]) for s in sig_a if s not in sig_b]
+    added = [_fmt_pf(sig_b[s]) for s in sig_b if s not in sig_a]
+    removed = [_fmt_pf(sig_a[s]) for s in sig_a if s not in sig_b]
     unchanged = [_fmt_pf(sig_a[s]) for s in sig_a if s in sig_b]
     return {"added": added, "removed": removed, "unchanged": unchanged}
 
 
 # ── AWS ───────────────────────────────────────────────────────────────────────
 
+
 def _flatten_aws_rules(groups):
     """Yield display strings for all inbound rules across all SGs."""
     tuples = []
-    for sg in (groups or []):
+    for sg in groups or []:
         sg_name = sg.get("GroupName") or sg.get("GroupId", "unknown-sg")
         for rule in sg.get("IpPermissions", []):
             proto = (rule.get("IpProtocol") or "all").lower()
             from_port = rule.get("FromPort", "*")
-            to_port   = rule.get("ToPort",   "*")
+            to_port = rule.get("ToPort", "*")
             # IPv4 ranges
             for r4 in rule.get("IpRanges", []):
                 cidr = r4.get("CidrIp", "?")
@@ -154,7 +160,9 @@ def _flatten_aws_rules(groups):
                 tuples.append(f"[{sg_name}] {proto} {from_port}-{to_port} from {cidr}")
             # If no ranges (e.g. SG ref), record a generic entry
             if not rule.get("IpRanges") and not rule.get("Ipv6Ranges"):
-                tuples.append(f"[{sg_name}] {proto} {from_port}-{to_port} from <sg-ref>")
+                tuples.append(
+                    f"[{sg_name}] {proto} {from_port}-{to_port} from <sg-ref>"
+                )
     return tuples
 
 
@@ -166,7 +174,7 @@ def diff_aws(path_a, path_b):
     added, removed, unchanged = [], [], []
     for sig in set(rules_a) | set(rules_b):
         a, b = rules_a[sig], rules_b[sig]
-        keep    = min(a, b)
+        keep = min(a, b)
         extra_a = a - keep
         extra_b = b - keep
         for _ in range(keep):
@@ -180,22 +188,33 @@ def diff_aws(path_a, path_b):
 
 # ── Azure ──────────────────────────────────────────────────────────────────────
 
+
 def _flatten_azure_rules(nsgs):
     """Yield display strings for all security rules across all NSGs."""
     results = []
-    for nsg in (nsgs or []):
+    for nsg in nsgs or []:
         nsg_name = nsg.get("name", "unknown-nsg")
         for rule in nsg.get("securityRules", []):
             rule_name = rule.get("name", "?")
-            props     = _props(rule)
+            props = _props(rule)
             direction = props.get("direction", "")
-            access    = props.get("access", "")
-            src       = props.get("sourceAddressPrefix") or props.get("sourceAddressPrefixes") or "*"
+            access = props.get("access", "")
+            src = (
+                props.get("sourceAddressPrefix")
+                or props.get("sourceAddressPrefixes")
+                or "*"
+            )
             if isinstance(src, list):
                 src = ",".join(src)
             # Destination ports
-            port = props.get("destinationPortRange") or ",".join(props.get("destinationPortRanges", [])) or "*"
-            display = f"[{nsg_name}] {rule_name}: {direction} {access} {src} \u2192 {port}"
+            port = (
+                props.get("destinationPortRange")
+                or ",".join(props.get("destinationPortRanges", []))
+                or "*"
+            )
+            display = (
+                f"[{nsg_name}] {rule_name}: {direction} {access} {src} \u2192 {port}"
+            )
             results.append(display)
     return results
 
@@ -203,12 +222,16 @@ def _flatten_azure_rules(nsgs):
 def diff_azure(path_a, path_b):
     nsgs_a, _ = parse_azure_nsg(path_a)
     nsgs_b, _ = parse_azure_nsg(path_b)
-    rules_a = {r.split("] ", 1)[1].split(":")[0] if "] " in r else r: r
-               for r in _flatten_azure_rules(nsgs_a or [])}
-    rules_b = {r.split("] ", 1)[1].split(":")[0] if "] " in r else r: r
-               for r in _flatten_azure_rules(nsgs_b or [])}
-    added     = [rules_b[k] for k in rules_b if k not in rules_a]
-    removed   = [rules_a[k] for k in rules_a if k not in rules_b]
+    rules_a = {
+        r.split("] ", 1)[1].split(":")[0] if "] " in r else r: r
+        for r in _flatten_azure_rules(nsgs_a or [])
+    }
+    rules_b = {
+        r.split("] ", 1)[1].split(":")[0] if "] " in r else r: r
+        for r in _flatten_azure_rules(nsgs_b or [])
+    }
+    added = [rules_b[k] for k in rules_b if k not in rules_a]
+    removed = [rules_a[k] for k in rules_a if k not in rules_b]
     unchanged = [rules_a[k] for k in rules_a if k in rules_b]
     return {"added": added, "removed": removed, "unchanged": unchanged}
 
@@ -216,11 +239,13 @@ def diff_azure(path_a, path_b):
 # ── Cisco FTD ─────────────────────────────────────────────────────────────────
 # FTD LINA CLI uses the same access-list syntax as ASA, so we reuse diff_asa.
 
+
 def diff_ftd(path_a, path_b):
     return diff_asa(path_a, path_b)
 
 
 # ── Main entrypoint ───────────────────────────────────────────────────────────
+
 
 def diff_configs(vendor, path_a, path_b):
     """Compare two configs of the same vendor. Returns {added, removed, unchanged}."""

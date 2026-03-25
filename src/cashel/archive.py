@@ -1,4 +1,5 @@
 """Archival review system — persist and compare historical audit results."""
+
 import os
 import json
 import hashlib
@@ -20,32 +21,39 @@ def _fingerprint(filepath):
 
 # ── Persistence ───────────────────────────────────────────────────────────────
 
+
 def save_audit(filename, vendor, findings, summary, config_path=None, tag=None):
     """
     Save an audit result to the archive.
     Returns (entry_id, entry_dict).
     """
     entry_id = uuid.uuid4().hex[:12]
-    fingerprint = _fingerprint(config_path) if config_path and os.path.exists(config_path) else None
+    fingerprint = (
+        _fingerprint(config_path)
+        if config_path and os.path.exists(config_path)
+        else None
+    )
 
     # Auto-version: find max version for same tag+vendor, increment
     version = 1
     if tag:
         existing = list_archive()
-        prior = [e for e in existing if e.get("tag") == tag and e.get("vendor") == vendor]
+        prior = [
+            e for e in existing if e.get("tag") == tag and e.get("vendor") == vendor
+        ]
         if prior:
             version = max(e.get("version", 1) for e in prior) + 1
 
     entry = {
-        "id":          entry_id,
-        "filename":    filename,
-        "vendor":      vendor,
-        "timestamp":   datetime.utcnow().strftime("%Y-%m-%dT%H:%M:%SZ"),
+        "id": entry_id,
+        "filename": filename,
+        "vendor": vendor,
+        "timestamp": datetime.utcnow().strftime("%Y-%m-%dT%H:%M:%SZ"),
         "fingerprint": fingerprint,
-        "summary":     summary,
-        "findings":    findings,
-        "tag":         tag or None,
-        "version":     version,
+        "summary": summary,
+        "findings": findings,
+        "tag": tag or None,
+        "version": version,
     }
     path = os.path.join(ARCHIVE_FOLDER, f"{entry_id}.json")
     with open(path, "w") as f:
@@ -91,6 +99,7 @@ def delete_entry(entry_id):
 
 # ── Comparison ────────────────────────────────────────────────────────────────
 
+
 def compare_entries(id_a, id_b):
     """
     Compare two archived audits (A = baseline / older, B = current / newer).
@@ -110,21 +119,24 @@ def compare_entries(id_a, id_b):
         return None, "One or both archive entries not found."
 
     if entry_a.get("vendor") != entry_b.get("vendor"):
-        return None, "Cannot compare audits from different vendors. Both entries must be the same vendor."
+        return (
+            None,
+            "Cannot compare audits from different vendors. Both entries must be the same vendor.",
+        )
 
     s_a, s_b = entry_a["summary"], entry_b["summary"]
     set_a = set(entry_a.get("findings", []))
     set_b = set(entry_b.get("findings", []))
 
     return {
-        "entry_a":           entry_a,
-        "entry_b":           entry_b,
+        "entry_a": entry_a,
+        "entry_b": entry_b,
         "delta": {
-            "high":   s_b.get("high", 0)   - s_a.get("high", 0),
+            "high": s_b.get("high", 0) - s_a.get("high", 0),
             "medium": s_b.get("medium", 0) - s_a.get("medium", 0),
-            "total":  s_b.get("total", 0)  - s_a.get("total", 0),
+            "total": s_b.get("total", 0) - s_a.get("total", 0),
         },
-        "new_findings":      sorted(set_b - set_a),
+        "new_findings": sorted(set_b - set_a),
         "resolved_findings": sorted(set_a - set_b),
-        "improved":          s_b.get("total", 0) < s_a.get("total", 0),
+        "improved": s_b.get("total", 0) < s_a.get("total", 0),
     }, None

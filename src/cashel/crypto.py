@@ -13,10 +13,12 @@ Migration: decrypt() silently falls back to legacy base64 decoding so
 existing schedule files and settings are transparently upgraded on next
 write without a manual migration step.
 """
+
 import base64
 import os
 
 from cryptography.fernet import Fernet, InvalidToken
+
 
 def _key_file() -> str:
     """Return the path to the Fernet key file.

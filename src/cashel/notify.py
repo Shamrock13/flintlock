@@ -4,6 +4,7 @@ Supports two channels — Slack (incoming webhook) and email (SMTP).
 Both functions are fire-and-forget: they log errors but never raise, so a
 misconfigured webhook or SMTP server cannot crash the background scheduler.
 """
+
 import ipaddress
 import json
 import logging
@@ -24,7 +25,7 @@ logger = logging.getLogger(__name__)
 # the webhook_allowlist setting (comma-separated).
 _DEFAULT_WEBHOOK_DOMAINS: tuple[str, ...] = (
     "hooks.slack.com",
-    "webhook.office.com",   # Microsoft Teams
+    "webhook.office.com",  # Microsoft Teams
     "discord.com",
     "discordapp.com",
 )
@@ -35,10 +36,10 @@ _PRIVATE_NETS = [
     ipaddress.ip_network("172.16.0.0/12"),
     ipaddress.ip_network("192.168.0.0/16"),
     ipaddress.ip_network("127.0.0.0/8"),
-    ipaddress.ip_network("169.254.0.0/16"),   # link-local / AWS IMDS
+    ipaddress.ip_network("169.254.0.0/16"),  # link-local / AWS IMDS
     ipaddress.ip_network("::1/128"),
-    ipaddress.ip_network("fc00::/7"),          # ULA IPv6
-    ipaddress.ip_network("fe80::/10"),         # link-local IPv6
+    ipaddress.ip_network("fc00::/7"),  # ULA IPv6
+    ipaddress.ip_network("fe80::/10"),  # link-local IPv6
 ]
 
 
@@ -49,7 +50,9 @@ def _host_matches(host: str, pattern: str) -> bool:
     return host == pattern or host.endswith("." + pattern)
 
 
-def validate_webhook_url(url: str, extra_domains: list[str] | None = None) -> tuple[bool, str]:
+def validate_webhook_url(
+    url: str, extra_domains: list[str] | None = None
+) -> tuple[bool, str]:
     """Validate a webhook URL to prevent SSRF.
 
     Rules enforced:
@@ -102,13 +105,17 @@ def validate_webhook_url(url: str, extra_domains: list[str] | None = None) -> tu
 
     return True, ""
 
+
 # Maximum number of individual HIGH findings shown in an alert message.
 _MAX_FINDINGS_IN_ALERT = 5
 
 
 # ── Message helpers ───────────────────────────────────────────────────────────
 
-def _top_high_findings(findings: list, limit: int = _MAX_FINDINGS_IN_ALERT) -> list[str]:
+
+def _top_high_findings(
+    findings: list, limit: int = _MAX_FINDINGS_IN_ALERT
+) -> list[str]:
     """Return up to *limit* plain-string HIGH findings."""
     highs = [
         (f.get("message") or f) if isinstance(f, dict) else f
@@ -120,8 +127,8 @@ def _top_high_findings(findings: list, limit: int = _MAX_FINDINGS_IN_ALERT) -> l
 
 def _audit_subject(schedule: dict, summary: dict, error: str | None) -> str:
     vendor = (schedule.get("vendor") or "device").upper()
-    host   = schedule.get("host") or "unknown"
-    label  = f"{vendor}@{host}"
+    host = schedule.get("host") or "unknown"
+    label = f"{vendor}@{host}"
     if error:
         return f"[Cashel] ❌ Audit error on {label}"
     high = summary.get("high", 0)
@@ -130,14 +137,15 @@ def _audit_subject(schedule: dict, summary: dict, error: str | None) -> str:
     return f"[Cashel] ✅ Audit complete — {label} (no HIGH findings)"
 
 
-def _audit_body_text(schedule: dict, summary: dict, findings: list,
-                     error: str | None) -> str:
+def _audit_body_text(
+    schedule: dict, summary: dict, findings: list, error: str | None
+) -> str:
     """Return a plain-text body suitable for email or Slack fallback."""
-    vendor  = (schedule.get("vendor") or "device").upper()
-    host    = schedule.get("host") or "unknown"
-    tag     = schedule.get("tag") or ""
-    label   = f"{vendor}@{host}" + (f" [{tag}]" if tag else "")
-    now     = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M UTC")
+    vendor = (schedule.get("vendor") or "device").upper()
+    host = schedule.get("host") or "unknown"
+    tag = schedule.get("tag") or ""
+    label = f"{vendor}@{host}" + (f" [{tag}]" if tag else "")
+    now = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M UTC")
 
     lines = [
         f"Cashel Scheduled Audit — {label}",
@@ -148,10 +156,10 @@ def _audit_body_text(schedule: dict, summary: dict, findings: list,
     if error:
         lines += [f"ERROR: {error}", ""]
     else:
-        high  = summary.get("high",   0)
-        med   = summary.get("medium", 0)
-        low   = summary.get("low",    0)
-        total = summary.get("total",  0)
+        high = summary.get("high", 0)
+        med = summary.get("medium", 0)
+        low = summary.get("low", 0)
+        total = summary.get("total", 0)
         lines += [
             f"Summary: {total} finding(s) — {high} HIGH · {med} MEDIUM · {low} LOW",
             "",
@@ -175,6 +183,7 @@ def _audit_body_text(schedule: dict, summary: dict, findings: list,
 
 # ── Slack ─────────────────────────────────────────────────────────────────────
 
+
 def send_slack(
     webhook_url: str,
     schedule: dict,
@@ -196,24 +205,25 @@ def send_slack(
     if not valid:
         logger.warning(
             "Slack alert blocked for schedule %s — invalid webhook URL: %s",
-            schedule.get("id"), reason,
+            schedule.get("id"),
+            reason,
         )
         return
 
     vendor = (schedule.get("vendor") or "device").upper()
-    host   = schedule.get("host") or "unknown"
-    tag    = schedule.get("tag") or ""
-    label  = f"{vendor}@{host}" + (f" [{tag}]" if tag else "")
+    host = schedule.get("host") or "unknown"
+    tag = schedule.get("tag") or ""
+    label = f"{vendor}@{host}" + (f" [{tag}]" if tag else "")
 
     if error:
         text = f":x: *Cashel audit error* — {label}\n```{error}```"
     else:
-        high  = summary.get("high",   0)
-        med   = summary.get("medium", 0)
-        low   = summary.get("low",    0)
-        total = summary.get("total",  0)
-        icon  = ":fire:" if high else ":white_check_mark:"
-        text  = (
+        high = summary.get("high", 0)
+        med = summary.get("medium", 0)
+        low = summary.get("low", 0)
+        total = summary.get("total", 0)
+        icon = ":fire:" if high else ":white_check_mark:"
+        text = (
             f"{icon} *Cashel audit complete* — {label}\n"
             f"*{total} finding(s): {high} HIGH · {med} MEDIUM · {low} LOW*"
         )
@@ -236,12 +246,17 @@ def send_slack(
             pass
         logger.info("Slack alert sent for schedule %s", schedule.get("id"))
     except urllib.error.URLError as exc:
-        logger.warning("Slack alert failed for schedule %s: %s", schedule.get("id"), exc)
+        logger.warning(
+            "Slack alert failed for schedule %s: %s", schedule.get("id"), exc
+        )
     except Exception as exc:  # noqa: BLE001
-        logger.warning("Slack alert unexpected error for schedule %s: %s", schedule.get("id"), exc)
+        logger.warning(
+            "Slack alert unexpected error for schedule %s: %s", schedule.get("id"), exc
+        )
 
 
 # ── Email ─────────────────────────────────────────────────────────────────────
+
 
 def send_email(
     to_address: str,
@@ -264,19 +279,19 @@ def send_email(
         logger.warning("Email alert skipped: smtp_host not configured.")
         return
 
-    smtp_port     = int(smtp_cfg.get("smtp_port") or 587)
-    smtp_user     = (smtp_cfg.get("smtp_user") or "").strip()
+    smtp_port = int(smtp_cfg.get("smtp_port") or 587)
+    smtp_user = (smtp_cfg.get("smtp_user") or "").strip()
     smtp_password = smtp_cfg.get("smtp_password") or ""
-    smtp_from     = (smtp_cfg.get("smtp_from") or smtp_user or "cashel@localhost").strip()
-    use_tls       = bool(smtp_cfg.get("smtp_tls", True))
+    smtp_from = (smtp_cfg.get("smtp_from") or smtp_user or "cashel@localhost").strip()
+    use_tls = bool(smtp_cfg.get("smtp_tls", True))
 
     subject = _audit_subject(schedule, summary, error)
-    body    = _audit_body_text(schedule, summary, findings, error)
+    body = _audit_body_text(schedule, summary, findings, error)
 
     msg = MIMEText(body, "plain", "utf-8")
     msg["Subject"] = subject
-    msg["From"]    = smtp_from
-    msg["To"]      = to_address
+    msg["From"] = smtp_from
+    msg["To"] = to_address
 
     try:
         context = ssl.create_default_context()
@@ -286,16 +301,25 @@ def send_email(
             if smtp_user:
                 server.login(smtp_user, smtp_password)
             server.sendmail(smtp_from, [to_address], msg.as_string())
-        logger.info("Email alert sent to %s for schedule %s", to_address, schedule.get("id"))
+        logger.info(
+            "Email alert sent to %s for schedule %s", to_address, schedule.get("id")
+        )
     except smtplib.SMTPException as exc:
-        logger.warning("Email alert SMTP error for schedule %s: %s", schedule.get("id"), exc)
+        logger.warning(
+            "Email alert SMTP error for schedule %s: %s", schedule.get("id"), exc
+        )
     except OSError as exc:
-        logger.warning("Email alert connection error for schedule %s: %s", schedule.get("id"), exc)
+        logger.warning(
+            "Email alert connection error for schedule %s: %s", schedule.get("id"), exc
+        )
     except Exception as exc:  # noqa: BLE001
-        logger.warning("Email alert unexpected error for schedule %s: %s", schedule.get("id"), exc)
+        logger.warning(
+            "Email alert unexpected error for schedule %s: %s", schedule.get("id"), exc
+        )
 
 
 # ── Microsoft Teams ───────────────────────────────────────────────────────────
+
 
 def send_teams(
     webhook_url: str,
@@ -320,26 +344,27 @@ def send_teams(
     if not valid:
         logger.warning(
             "Teams alert blocked for schedule %s — invalid webhook URL: %s",
-            schedule.get("id"), reason,
+            schedule.get("id"),
+            reason,
         )
         return
 
     vendor = (schedule.get("vendor") or "device").upper()
-    host   = schedule.get("host") or "unknown"
-    tag    = schedule.get("tag") or ""
-    label  = f"{vendor}@{host}" + (f" [{tag}]" if tag else "")
-    now    = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M UTC")
+    host = schedule.get("host") or "unknown"
+    tag = schedule.get("tag") or ""
+    label = f"{vendor}@{host}" + (f" [{tag}]" if tag else "")
+    now = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M UTC")
 
     if error:
         theme_color = "CC2200"
-        title       = f"\u274c Cashel Audit Error — {label}"
-        facts       = [{"name": "Error", "value": error}]
-        text        = ""
+        title = f"\u274c Cashel Audit Error — {label}"
+        facts = [{"name": "Error", "value": error}]
+        text = ""
     else:
-        high  = summary.get("high",   0)
-        med   = summary.get("medium", 0)
-        low   = summary.get("low",    0)
-        total = summary.get("total",  0)
+        high = summary.get("high", 0)
+        med = summary.get("medium", 0)
+        low = summary.get("low", 0)
+        total = summary.get("total", 0)
         theme_color = "CC2200" if high else "1A8055"
         title = (
             f"\U0001f525 {high} HIGH finding(s) — {label}"
@@ -348,13 +373,13 @@ def send_teams(
         )
         facts = [
             {"name": "Completed", "value": now},
-            {"name": "Total",     "value": str(total)},
-            {"name": "HIGH",      "value": str(high)},
-            {"name": "MEDIUM",    "value": str(med)},
-            {"name": "LOW",       "value": str(low)},
+            {"name": "Total", "value": str(total)},
+            {"name": "HIGH", "value": str(high)},
+            {"name": "MEDIUM", "value": str(med)},
+            {"name": "LOW", "value": str(low)},
         ]
         highs = _top_high_findings(findings)
-        text  = ""
+        text = ""
         if highs:
             bullet_list = "\n\n".join(f"- {h}" for h in highs)
             extra = summary.get("high", 0) - len(highs)
@@ -363,15 +388,15 @@ def send_teams(
             text = f"**Top HIGH findings:**\n\n{bullet_list}"
 
     card = {
-        "@type":      "MessageCard",
-        "@context":   "http://schema.org/extensions",
+        "@type": "MessageCard",
+        "@context": "http://schema.org/extensions",
         "themeColor": theme_color,
-        "summary":    title,
+        "summary": title,
         "sections": [
             {
-                "activityTitle":    "**Cashel Firewall Auditor**",
+                "activityTitle": "**Cashel Firewall Auditor**",
                 "activitySubtitle": title,
-                "facts":            facts,
+                "facts": facts,
                 **({"text": text} if text else {}),
             }
         ],
@@ -389,6 +414,10 @@ def send_teams(
             pass
         logger.info("Teams alert sent for schedule %s", schedule.get("id"))
     except urllib.error.URLError as exc:
-        logger.warning("Teams alert failed for schedule %s: %s", schedule.get("id"), exc)
+        logger.warning(
+            "Teams alert failed for schedule %s: %s", schedule.get("id"), exc
+        )
     except Exception as exc:  # noqa: BLE001
-        logger.warning("Teams alert unexpected error for schedule %s: %s", schedule.get("id"), exc)
+        logger.warning(
+            "Teams alert unexpected error for schedule %s: %s", schedule.get("id"), exc
+        )

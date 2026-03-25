@@ -14,7 +14,7 @@ def generate_key(email: str) -> str:
     raw = f"{email.strip().lower()}:{SECRET_SALT}"
     digest = hashlib.sha256(raw.encode()).hexdigest().upper()
     # Format as CSL-XXXXXXXX-XXXXXXXX-XXXXXXXX-XXXXXXXX-XXXXXXXX (5 groups of 8)
-    groups = "-".join(digest[i:i+8] for i in range(0, 40, 8))
+    groups = "-".join(digest[i : i + 8] for i in range(0, 40, 8))
     return f"CSL-{groups}"
 
 
@@ -34,7 +34,10 @@ def activate_license(key: str) -> tuple:
     """Activate and store a license key"""
     key = key.strip().upper()
     if not validate_key(key):
-        return False, "Invalid license key format. Keys should look like: CSL-XXXXXXXX-XXXXXXXX-XXXXXXXX-XXXXXXXX-XXXXXXXX"
+        return (
+            False,
+            "Invalid license key format. Keys should look like: CSL-XXXXXXXX-XXXXXXXX-XXXXXXXX-XXXXXXXX-XXXXXXXX",
+        )
 
     license_data = {
         "key": key,
@@ -42,7 +45,7 @@ def activate_license(key: str) -> tuple:
     }
 
     try:
-        with open(LICENSE_FILE, 'w') as f:
+        with open(LICENSE_FILE, "w") as f:
             json.dump(license_data, f)
         return True, "License activated successfully"
     except Exception as e:
@@ -64,13 +67,16 @@ def check_license() -> tuple:
         return False, "No license found."
 
     try:
-        with open(LICENSE_FILE, 'r') as f:
+        with open(LICENSE_FILE, "r") as f:
             data = json.load(f)
         key = data.get("key", "")
         if validate_key(key):
             return True, key
         else:
-            return False, "Invalid license key. Please re-enter your CSL- key to reactivate."
+            return (
+                False,
+                "Invalid license key. Please re-enter your CSL- key to reactivate.",
+            )
     except Exception as e:
         return False, f"License check failed: {e}"
 

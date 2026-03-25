@@ -2,53 +2,54 @@ from fpdf import FPDF
 from datetime import datetime
 
 # Brand colors (matching web light mode)
-_NAVY       = (30,  64, 128)   # #1E4080 header
-_NAVY_DARK  = (26,  26,  46)   # #1A1A2E dark accent
-_WHITE      = (255, 255, 255)
-_LIGHT_BG   = (245, 246, 251)  # page background tint
-_BORDER     = (208, 213, 234)  # card border
-_TEXT       = (26,  26,  46)   # body text
-_MUTED      = (107, 107, 138)  # secondary text
+_NAVY = (30, 64, 128)  # #1E4080 header
+_NAVY_DARK = (26, 26, 46)  # #1A1A2E dark accent
+_WHITE = (255, 255, 255)
+_LIGHT_BG = (245, 246, 251)  # page background tint
+_BORDER = (208, 213, 234)  # card border
+_TEXT = (26, 26, 46)  # body text
+_MUTED = (107, 107, 138)  # secondary text
 
-_HIGH       = (204,  34,   0)  # #CC2200
-_HIGH_BG    = (255, 240, 238)
-_MEDIUM     = (153, 102,   0)  # #996600
-_MEDIUM_BG  = (255, 248, 230)
-_COMP       = ( 26,  85, 204)  # #1A55CC compliance blue
-_COMP_BG    = (235, 242, 255)
-_PASS       = ( 26, 128,  85)  # #1A8055
-_PASS_BG    = (235, 250, 244)
+_HIGH = (204, 34, 0)  # #CC2200
+_HIGH_BG = (255, 240, 238)
+_MEDIUM = (153, 102, 0)  # #996600
+_MEDIUM_BG = (255, 248, 230)
+_COMP = (26, 85, 204)  # #1A55CC compliance blue
+_COMP_BG = (235, 242, 255)
+_PASS = (26, 128, 85)  # #1A8055
+_PASS_BG = (235, 250, 244)
+
 
 def _sanitize(text: str) -> str:
     """Replace Unicode characters that fall outside Latin-1 with ASCII equivalents.
     Required because fpdf2 core fonts (Courier, Helvetica) only support cp1252/Latin-1."""
     _MAP = {
-        '\u2014': '-',    # em dash
-        '\u2013': '-',    # en dash
-        '\u2192': '->',   # right arrow
-        '\u2190': '<-',   # left arrow
-        '\u2022': '*',    # bullet
-        '\u2026': '...',  # ellipsis
-        '\u201c': '"',    # left double quote
-        '\u201d': '"',    # right double quote
-        '\u2018': "'",    # left single quote
-        '\u2019': "'",    # right single quote
-        '\u2713': 'OK',   # checkmark
-        '\u2718': 'X',    # cross mark
+        "\u2014": "-",  # em dash
+        "\u2013": "-",  # en dash
+        "\u2192": "->",  # right arrow
+        "\u2190": "<-",  # left arrow
+        "\u2022": "*",  # bullet
+        "\u2026": "...",  # ellipsis
+        "\u201c": '"',  # left double quote
+        "\u201d": '"',  # right double quote
+        "\u2018": "'",  # left single quote
+        "\u2019": "'",  # right single quote
+        "\u2713": "OK",  # checkmark
+        "\u2718": "X",  # cross mark
     }
     for char, replacement in _MAP.items():
         text = text.replace(char, replacement)
     # Final fallback: drop anything still outside Latin-1
-    return text.encode('latin-1', errors='replace').decode('latin-1')
+    return text.encode("latin-1", errors="replace").decode("latin-1")
 
 
 VENDOR_DISPLAY = {
-    "asa":      "Cisco",
+    "asa": "Cisco",
     "paloalto": "Palo Alto Networks",
     "fortinet": "Fortinet",
-    "pfsense":  "pfSense",
-    "aws":      "AWS Security Group",
-    "azure":    "Azure NSG",
+    "pfsense": "pfSense",
+    "aws": "AWS Security Group",
+    "azure": "Azure NSG",
 }
 
 
@@ -74,7 +75,12 @@ class CashelReport(FPDF):
         self.set_font("Helvetica", "", 8)
         self.set_text_color(180, 200, 235)
         self.set_xy(0, 19)
-        self.cell(198, 6, f"Generated: {datetime.now().strftime('%Y-%m-%d  %H:%M')}", align="R")
+        self.cell(
+            198,
+            6,
+            f"Generated: {datetime.now().strftime('%Y-%m-%d  %H:%M')}",
+            align="R",
+        )
 
         # Thin accent stripe at base of header
         self.set_fill_color(233, 69, 96)
@@ -90,7 +96,12 @@ class CashelReport(FPDF):
         self.ln(2)
         self.set_font("Helvetica", "", 7)
         self.set_text_color(*_MUTED)
-        self.cell(0, 5, f"Cashel v1.1   |   Firewall Security Auditor   |   Page {self.page_no()}", align="C")
+        self.cell(
+            0,
+            5,
+            f"Cashel v1.1   |   Firewall Security Auditor   |   Page {self.page_no()}",
+            align="C",
+        )
 
 
 def _draw_meta(pdf, filename, vendor, compliance):
@@ -113,36 +124,40 @@ def _draw_meta(pdf, filename, vendor, compliance):
 def _draw_summary_boxes(pdf, high, medium, total, score=None):
     """Four bordered summary boxes side by side (3 + optional score)."""
     # Determine score color
-    _SCORE_GREEN  = (26, 128, 85)
+    _SCORE_GREEN = (26, 128, 85)
     _SCORE_GREEN_BG = (235, 250, 244)
-    _SCORE_AMBER  = (153, 102, 0)
+    _SCORE_AMBER = (153, 102, 0)
     _SCORE_AMBER_BG = (255, 248, 230)
-    _SCORE_RED    = (204, 34, 0)
+    _SCORE_RED = (204, 34, 0)
     _SCORE_RED_BG = (255, 240, 238)
 
     if score is not None:
-        sc, sb = (_SCORE_GREEN, _SCORE_GREEN_BG) if score >= 80 else \
-                 (_SCORE_AMBER, _SCORE_AMBER_BG) if score >= 50 else \
-                 (_SCORE_RED,   _SCORE_RED_BG)
+        sc, sb = (
+            (_SCORE_GREEN, _SCORE_GREEN_BG)
+            if score >= 80
+            else (_SCORE_AMBER, _SCORE_AMBER_BG)
+            if score >= 50
+            else (_SCORE_RED, _SCORE_RED_BG)
+        )
         box_w, box_h = 43, 24
         positions = [10, 57, 104, 151]
         styles = [
-            (_HIGH_BG,   _HIGH,   _HIGH,   str(high),         "High Severity"),
-            (_MEDIUM_BG, _MEDIUM, _MEDIUM, str(medium),       "Medium Severity"),
-            (_LIGHT_BG,  _BORDER, _NAVY,   str(total),        "Total Issues"),
-            (sb,         sc,      sc,      str(score) + "/100", "Score"),
+            (_HIGH_BG, _HIGH, _HIGH, str(high), "High Severity"),
+            (_MEDIUM_BG, _MEDIUM, _MEDIUM, str(medium), "Medium Severity"),
+            (_LIGHT_BG, _BORDER, _NAVY, str(total), "Total Issues"),
+            (sb, sc, sc, str(score) + "/100", "Score"),
         ]
     else:
         box_w, box_h = 58, 24
         positions = [10, 76, 142]
         styles = [
-            (_HIGH_BG,   _HIGH,   _HIGH,   str(high),   "High Severity"),
+            (_HIGH_BG, _HIGH, _HIGH, str(high), "High Severity"),
             (_MEDIUM_BG, _MEDIUM, _MEDIUM, str(medium), "Medium Severity"),
-            (_LIGHT_BG,  _BORDER, _NAVY,   str(total),  "Total Issues"),
+            (_LIGHT_BG, _BORDER, _NAVY, str(total), "Total Issues"),
         ]
     y = pdf.get_y()
 
-    for (x, (fill, draw, text, val, lbl)) in zip(positions, styles):
+    for x, (fill, draw, text, val, lbl) in zip(positions, styles):
         pdf.set_fill_color(*fill)
         pdf.set_draw_color(*draw)
         pdf.set_line_width(0.4)
@@ -175,16 +190,18 @@ def _section_header(pdf, title, color):
 
 
 _CATEGORY_COLORS = {
-    "exposure":   (204,  34,   0),
-    "logging":    (153, 102,   0),
-    "protocol":   (170,  68, 255),
-    "hygiene":    ( 26,  85, 204),
+    "exposure": (204, 34, 0),
+    "logging": (153, 102, 0),
+    "protocol": (170, 68, 255),
+    "hygiene": (26, 85, 204),
     "redundancy": (107, 107, 138),
-    "compliance": ( 26,  85, 204),
+    "compliance": (26, 85, 204),
 }
 
 
-def _draw_finding(pdf, finding, bar_color, bg_color, text_color, category=None, remediation=None):
+def _draw_finding(
+    pdf, finding, bar_color, bg_color, text_color, category=None, remediation=None
+):
     """Single finding row with colored left bar, optional category prefix and remediation."""
     x, w = 10, 190
     bar_w = 3
@@ -249,14 +266,23 @@ def _findings_group(pdf, title, findings, bar_color, bg_color, text_color):
     _section_header(pdf, title, bar_color)
     for f in findings:
         if isinstance(f, dict):
-            _draw_finding(pdf, f["message"], bar_color, bg_color, text_color,
-                          category=f.get("category"), remediation=f.get("remediation"))
+            _draw_finding(
+                pdf,
+                f["message"],
+                bar_color,
+                bg_color,
+                text_color,
+                category=f.get("category"),
+                remediation=f.get("remediation"),
+            )
         else:
             _draw_finding(pdf, f, bar_color, bg_color, text_color)
     pdf.ln(4)
 
 
-def generate_report(findings, filename, vendor, compliance=None, output_path="report.pdf", summary=None):
+def generate_report(
+    findings, filename, vendor, compliance=None, output_path="report.pdf", summary=None
+):
     # Normalize: accept both string findings and dict findings; keep dicts for display
     def _msg(f):
         return f["message"] if isinstance(f, dict) else f
@@ -265,16 +291,26 @@ def generate_report(findings, filename, vendor, compliance=None, output_path="re
     def _contains(f, tag):
         return tag in _msg(f)
 
-    high    = [f for f in findings if _contains(f, "[HIGH]")   and not any(_contains(f, x) for x in ("PCI-", "CIS-", "NIST-"))]
-    medium  = [f for f in findings if _contains(f, "[MEDIUM]") and not any(_contains(f, x) for x in ("PCI-", "CIS-", "NIST-"))]
-    pci_h   = [f for f in findings if _contains(f, "PCI-HIGH")]
-    pci_m   = [f for f in findings if _contains(f, "PCI-MEDIUM")]
-    cis_h   = [f for f in findings if _contains(f, "CIS-HIGH")]
-    cis_m   = [f for f in findings if _contains(f, "CIS-MEDIUM")]
-    nist_h  = [f for f in findings if _contains(f, "NIST-HIGH")]
-    nist_m  = [f for f in findings if _contains(f, "NIST-MEDIUM")]
+    high = [
+        f
+        for f in findings
+        if _contains(f, "[HIGH]")
+        and not any(_contains(f, x) for x in ("PCI-", "CIS-", "NIST-"))
+    ]
+    medium = [
+        f
+        for f in findings
+        if _contains(f, "[MEDIUM]")
+        and not any(_contains(f, x) for x in ("PCI-", "CIS-", "NIST-"))
+    ]
+    pci_h = [f for f in findings if _contains(f, "PCI-HIGH")]
+    pci_m = [f for f in findings if _contains(f, "PCI-MEDIUM")]
+    cis_h = [f for f in findings if _contains(f, "CIS-HIGH")]
+    cis_m = [f for f in findings if _contains(f, "CIS-MEDIUM")]
+    nist_h = [f for f in findings if _contains(f, "NIST-HIGH")]
+    nist_m = [f for f in findings if _contains(f, "NIST-MEDIUM")]
 
-    total_high   = len(high)   + len(pci_h) + len(cis_h) + len(nist_h)
+    total_high = len(high) + len(pci_h) + len(cis_h) + len(nist_h)
     total_medium = len(medium) + len(pci_m) + len(cis_m) + len(nist_m)
 
     score = summary.get("score") if isinstance(summary, dict) else None
@@ -297,17 +333,25 @@ def generate_report(findings, filename, vendor, compliance=None, output_path="re
         pdf.set_text_color(*_PASS)
         pdf.cell(0, 8, "[PASS]  No issues found", align="C")
     else:
-        _findings_group(pdf, "High Severity",   high,   _HIGH,   _HIGH_BG,   _HIGH)
+        _findings_group(pdf, "High Severity", high, _HIGH, _HIGH_BG, _HIGH)
         _findings_group(pdf, "Medium Severity", medium, _MEDIUM, _MEDIUM_BG, _MEDIUM)
         if pci_h or pci_m:
-            _findings_group(pdf, "PCI Compliance — High",   pci_h, _COMP, _COMP_BG, _COMP)
-            _findings_group(pdf, "PCI Compliance — Medium", pci_m, _COMP, _COMP_BG, _COMP)
+            _findings_group(pdf, "PCI Compliance — High", pci_h, _COMP, _COMP_BG, _COMP)
+            _findings_group(
+                pdf, "PCI Compliance — Medium", pci_m, _COMP, _COMP_BG, _COMP
+            )
         if cis_h or cis_m:
-            _findings_group(pdf, "CIS Compliance — High",   cis_h, _COMP, _COMP_BG, _COMP)
-            _findings_group(pdf, "CIS Compliance — Medium", cis_m, _COMP, _COMP_BG, _COMP)
+            _findings_group(pdf, "CIS Compliance — High", cis_h, _COMP, _COMP_BG, _COMP)
+            _findings_group(
+                pdf, "CIS Compliance — Medium", cis_m, _COMP, _COMP_BG, _COMP
+            )
         if nist_h or nist_m:
-            _findings_group(pdf, "NIST Compliance — High",   nist_h, _COMP, _COMP_BG, _COMP)
-            _findings_group(pdf, "NIST Compliance — Medium", nist_m, _COMP, _COMP_BG, _COMP)
+            _findings_group(
+                pdf, "NIST Compliance — High", nist_h, _COMP, _COMP_BG, _COMP
+            )
+            _findings_group(
+                pdf, "NIST Compliance — Medium", nist_m, _COMP, _COMP_BG, _COMP
+            )
 
     pdf.output(output_path)
     return output_path

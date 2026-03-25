@@ -2,6 +2,7 @@
 
 Run with:  python3 tests/test_iptables.py
 """
+
 import os
 import sys
 import tempfile
@@ -110,6 +111,7 @@ def _write(content: str, suffix=".txt") -> str:
 
 # ══════════════════════════════════════════════════════ IPTABLES PARSER ══
 
+
 def test_iptables_parse_secure():
     path = _write(IPTABLES_SECURE)
     try:
@@ -160,6 +162,7 @@ def test_iptables_parse_invalid_format():
 
 
 # ══════════════════════════════════════════════════ IPTABLES CHECKS ══
+
 
 def _risky_data():
     path = _write(IPTABLES_RISKY)
@@ -244,6 +247,7 @@ def test_icmp_unrestricted_flagged():
 
 # ══════════════════════════════════════════════════════ AUDIT IPTABLES ══
 
+
 def test_audit_iptables_risky():
     path = _write(IPTABLES_RISKY)
     try:
@@ -272,6 +276,7 @@ def test_audit_iptables_parse_error():
 
 
 # ══════════════════════════════════════════════════ NFTABLES PARSER ══
+
 
 def test_nftables_parse_secure():
     path = _write(NFTABLES_SECURE)
@@ -313,6 +318,7 @@ def test_nftables_parse_invalid():
 
 
 # ══════════════════════════════════════════════════ NFTABLES CHECKS ══
+
 
 def _nft_risky():
     path = _write(NFTABLES_RISKY)
@@ -387,6 +393,7 @@ table inet filter {
 
 # ══════════════════════════════════════════════════ AUDIT NFTABLES ══
 
+
 def test_audit_nftables_risky():
     path = _write(NFTABLES_RISKY)
     try:
@@ -420,23 +427,41 @@ if __name__ == "__main__":
     import traceback
 
     tests = [
-        test_iptables_parse_secure, test_iptables_parse_risky,
-        test_iptables_parse_ipv6_detected, test_iptables_parse_missing_file,
+        test_iptables_parse_secure,
+        test_iptables_parse_risky,
+        test_iptables_parse_ipv6_detected,
+        test_iptables_parse_missing_file,
         test_iptables_parse_invalid_format,
-        test_default_policy_flagged, test_default_policy_clean,
-        test_any_any_accept_flagged, test_any_any_accept_clean,
-        test_internet_ingress_ssh, test_internet_ingress_rdp, test_internet_ingress_clean,
-        test_forward_chain_flagged, test_forward_chain_clean,
-        test_missing_logging_flagged, test_missing_logging_clean,
+        test_default_policy_flagged,
+        test_default_policy_clean,
+        test_any_any_accept_flagged,
+        test_any_any_accept_clean,
+        test_internet_ingress_ssh,
+        test_internet_ingress_rdp,
+        test_internet_ingress_clean,
+        test_forward_chain_flagged,
+        test_forward_chain_clean,
+        test_missing_logging_flagged,
+        test_missing_logging_clean,
         test_icmp_unrestricted_flagged,
-        test_audit_iptables_risky, test_audit_iptables_secure, test_audit_iptables_parse_error,
-        test_nftables_parse_secure, test_nftables_parse_risky,
-        test_nftables_parse_missing_file, test_nftables_parse_invalid,
-        test_nft_default_policy_flagged, test_nft_default_policy_clean,
-        test_nft_any_any_accept_flagged, test_nft_any_any_accept_clean,
-        test_nft_missing_logging_flagged, test_nft_missing_logging_clean,
-        test_nft_icmp_unrestricted_flagged, test_nft_internet_ingress,
-        test_audit_nftables_risky, test_audit_nftables_secure, test_audit_nftables_parse_error,
+        test_audit_iptables_risky,
+        test_audit_iptables_secure,
+        test_audit_iptables_parse_error,
+        test_nftables_parse_secure,
+        test_nftables_parse_risky,
+        test_nftables_parse_missing_file,
+        test_nftables_parse_invalid,
+        test_nft_default_policy_flagged,
+        test_nft_default_policy_clean,
+        test_nft_any_any_accept_flagged,
+        test_nft_any_any_accept_clean,
+        test_nft_missing_logging_flagged,
+        test_nft_missing_logging_clean,
+        test_nft_icmp_unrestricted_flagged,
+        test_nft_internet_ingress,
+        test_audit_nftables_risky,
+        test_audit_nftables_secure,
+        test_audit_nftables_parse_error,
     ]
 
     passed = failed = 0

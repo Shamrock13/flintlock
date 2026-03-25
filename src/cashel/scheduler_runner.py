@@ -1,4 +1,5 @@
 """Background scheduler for automated SSH audits."""
+
 import logging
 import os
 
@@ -14,6 +15,7 @@ _scheduler = None
 
 # ── Job execution ──────────────────────────────────────────────────────────────
 
+
 def _run_scheduled_audit(schedule_id: str):
     """Execute one scheduled SSH audit and persist results."""
     from .schedule_store import get_schedule, get_password, record_run
@@ -22,8 +24,12 @@ def _run_scheduled_audit(schedule_id: str):
     from .license import check_license
     from .activity_log import log_activity, ACTION_SSH_CONNECT
     from .audit_engine import (
-        run_vendor_audit, run_compliance_checks,
-        _sort_findings, _build_summary, _findings_to_strings, _wrap_compliance,
+        run_vendor_audit,
+        run_compliance_checks,
+        _sort_findings,
+        _build_summary,
+        _findings_to_strings,
+        _wrap_compliance,
     )
     from .notify import send_slack, send_teams, send_email
     from .settings import get_settings
@@ -32,43 +38,71 @@ def _run_scheduled_audit(schedule_id: str):
     if not schedule or not schedule.get("enabled"):
         return
 
-    vendor     = schedule["vendor"]
-    host       = schedule["host"]
-    port       = schedule["port"]
-    username   = schedule["username"]
-    password   = get_password(schedule_id)
-    tag        = schedule.get("tag") or f"{vendor.upper()}@{host}"
+    vendor = schedule["vendor"]
+    host = schedule["host"]
+    port = schedule["port"]
+    username = schedule["username"]
+    password = get_password(schedule_id)
+    tag = schedule.get("tag") or f"{vendor.upper()}@{host}"
     compliance = schedule.get("compliance") or None
-    label      = f"{vendor.upper()}@{host}"
+    label = f"{vendor.upper()}@{host}"
 
     upload_folder = os.environ.get("UPLOAD_FOLDER", "/tmp/cashel_uploads")
     os.makedirs(upload_folder, exist_ok=True)
 
     settings = get_settings()
     _extra_domains = [
-        d.strip()
-        for d in settings.get("webhook_allowlist", "").split(",")
-        if d.strip()
+        d.strip() for d in settings.get("webhook_allowlist", "").split(",") if d.strip()
     ]
 
     # ── SSH pull ──────────────────────────────────────────────────────────────
     temp_path = None
     try:
         temp_path, _ = connect_and_pull(
-            vendor, host, port, username, password,
-            timeout=30, upload_folder=upload_folder,
+            vendor,
+            host,
+            port,
+            username,
+            password,
+            timeout=30,
+            upload_folder=upload_folder,
             host_key_policy=settings.get("ssh_host_key_policy", "warn"),
         )
     except Exception as e:
         record_run(schedule_id, "error", str(e))
-        log_activity(ACTION_SSH_CONNECT, label, vendor=vendor, success=False,
-                     error=str(e), details={"host": host, "scheduled": True})
+        log_activity(
+            ACTION_SSH_CONNECT,
+            label,
+            vendor=vendor,
+            success=False,
+            error=str(e),
+            details={"host": host, "scheduled": True},
+        )
         if schedule.get("notify_on_error"):
-            send_slack(schedule.get("notify_slack_webhook", ""), schedule, {}, [],
-                       error=str(e), extra_webhook_domains=_extra_domains)
-            send_teams(schedule.get("notify_teams_webhook", ""), schedule, {}, [],
-                       error=str(e), extra_webhook_domains=_extra_domains)
-            send_email(schedule.get("notify_email", ""), schedule, {}, [], settings, error=str(e))
+            send_slack(
+                schedule.get("notify_slack_webhook", ""),
+                schedule,
+                {},
+                [],
+                error=str(e),
+                extra_webhook_domains=_extra_domains,
+            )
+            send_teams(
+                schedule.get("notify_teams_webhook", ""),
+                schedule,
+                {},
+                [],
+                error=str(e),
+                extra_webhook_domains=_extra_domains,
+            )
+            send_email(
+                schedule.get("notify_email", ""),
+                schedule,
+                {},
+                [],
+                settings,
+                error=str(e),
+            )
         return
 
     # ── Audit + compliance ────────────────────────────────────────────────────
@@ -78,37 +112,90 @@ def _run_scheduled_audit(schedule_id: str):
         if compliance:
             licensed, _ = check_license()
             if licensed:
-                raw = run_compliance_checks(vendor, compliance, parse, extra_data, temp_path)
+                raw = run_compliance_checks(
+                    vendor, compliance, parse, extra_data, temp_path
+                )
                 findings += [_wrap_compliance(c) for c in raw]
 
         findings = _sort_findings(findings)
-        summary  = _build_summary(findings)
+        summary = _build_summary(findings)
 
-        save_audit(label, vendor, _findings_to_strings(findings), summary,
-                   config_path=temp_path, tag=tag)
-        log_activity(ACTION_SSH_CONNECT, label, vendor=vendor, success=True,
-                     details={"host": host, "scheduled": True,
-                               "total": summary.get("total", 0),
-                               "high": summary.get("high", 0)})
+        save_audit(
+            label,
+            vendor,
+            _findings_to_strings(findings),
+            summary,
+            config_path=temp_path,
+            tag=tag,
+        )
+        log_activity(
+            ACTION_SSH_CONNECT,
+            label,
+            vendor=vendor,
+            success=True,
+            details={
+                "host": host,
+                "scheduled": True,
+                "total": summary.get("total", 0),
+                "high": summary.get("high", 0),
+            },
+        )
         record_run(schedule_id, "ok")
 
         if schedule.get("notify_on_finding") and summary.get("high", 0) > 0:
-            send_slack(schedule.get("notify_slack_webhook", ""), schedule, summary, findings,
-                       extra_webhook_domains=_extra_domains)
-            send_teams(schedule.get("notify_teams_webhook", ""), schedule, summary, findings,
-                       extra_webhook_domains=_extra_domains)
-            send_email(schedule.get("notify_email", ""), schedule, summary, findings, settings)
+            send_slack(
+                schedule.get("notify_slack_webhook", ""),
+                schedule,
+                summary,
+                findings,
+                extra_webhook_domains=_extra_domains,
+            )
+            send_teams(
+                schedule.get("notify_teams_webhook", ""),
+                schedule,
+                summary,
+                findings,
+                extra_webhook_domains=_extra_domains,
+            )
+            send_email(
+                schedule.get("notify_email", ""), schedule, summary, findings, settings
+            )
 
     except Exception as e:
         record_run(schedule_id, "error", str(e))
-        log_activity(ACTION_SSH_CONNECT, label, vendor=vendor, success=False,
-                     error=str(e), details={"host": host, "scheduled": True})
+        log_activity(
+            ACTION_SSH_CONNECT,
+            label,
+            vendor=vendor,
+            success=False,
+            error=str(e),
+            details={"host": host, "scheduled": True},
+        )
         if schedule.get("notify_on_error"):
-            send_slack(schedule.get("notify_slack_webhook", ""), schedule, {}, [],
-                       error=str(e), extra_webhook_domains=_extra_domains)
-            send_teams(schedule.get("notify_teams_webhook", ""), schedule, {}, [],
-                       error=str(e), extra_webhook_domains=_extra_domains)
-            send_email(schedule.get("notify_email", ""), schedule, {}, [], settings, error=str(e))
+            send_slack(
+                schedule.get("notify_slack_webhook", ""),
+                schedule,
+                {},
+                [],
+                error=str(e),
+                extra_webhook_domains=_extra_domains,
+            )
+            send_teams(
+                schedule.get("notify_teams_webhook", ""),
+                schedule,
+                {},
+                [],
+                error=str(e),
+                extra_webhook_domains=_extra_domains,
+            )
+            send_email(
+                schedule.get("notify_email", ""),
+                schedule,
+                {},
+                [],
+                settings,
+                error=str(e),
+            )
     finally:
         if temp_path and os.path.exists(temp_path):
             os.remove(temp_path)
@@ -116,11 +203,12 @@ def _run_scheduled_audit(schedule_id: str):
 
 # ── Trigger factory ────────────────────────────────────────────────────────────
 
+
 def _build_trigger(schedule: dict):
-    freq   = schedule.get("frequency", "daily")
-    hour   = schedule.get("hour", 2)
+    freq = schedule.get("frequency", "daily")
+    hour = schedule.get("hour", 2)
     minute = schedule.get("minute", 0)
-    dow    = schedule.get("day_of_week", "mon")
+    dow = schedule.get("day_of_week", "mon")
 
     if freq == "hourly":
         return CronTrigger(minute=minute)
@@ -130,6 +218,7 @@ def _build_trigger(schedule: dict):
 
 
 # ── Lifecycle ──────────────────────────────────────────────────────────────────
+
 
 def start_scheduler():
     """Start the APScheduler background scheduler and load all enabled jobs."""
@@ -142,6 +231,7 @@ def start_scheduler():
     _scheduler = BackgroundScheduler(timezone="UTC")
 
     from .schedule_store import list_schedules
+
     for sched in list_schedules(include_password=True):
         if sched.get("enabled"):
             try:
@@ -191,6 +281,7 @@ def reload_job(schedule_id: str, schedule: dict | None = None):
 def run_now(schedule_id: str):
     """Fire the scheduled audit immediately in a daemon thread."""
     import threading
+
     t = threading.Thread(target=_run_scheduled_audit, args=(schedule_id,), daemon=True)
     t.start()
 

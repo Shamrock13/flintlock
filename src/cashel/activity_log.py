@@ -1,4 +1,5 @@
 """Activity log — record every user action (audits, SSH attempts, diffs) including failures."""
+
 import os
 import json
 import uuid
@@ -8,15 +9,20 @@ ACTIVITY_FOLDER = os.environ.get("ACTIVITY_FOLDER", "/tmp/cashel_activity")
 os.makedirs(ACTIVITY_FOLDER, exist_ok=True)
 
 # Action type constants
-ACTION_FILE_AUDIT   = "file_audit"
-ACTION_SSH_CONNECT  = "ssh_connect"
-ACTION_CONFIG_DIFF  = "config_diff"
-ACTION_COMPARISON   = "archive_compare"
+ACTION_FILE_AUDIT = "file_audit"
+ACTION_SSH_CONNECT = "ssh_connect"
+ACTION_CONFIG_DIFF = "config_diff"
+ACTION_COMPARISON = "archive_compare"
 
 
-def log_activity(action_type: str, label: str, vendor: str | None = None,
-                 success: bool = True, error: str | None = None,
-                 details: dict | None = None) -> str:
+def log_activity(
+    action_type: str,
+    label: str,
+    vendor: str | None = None,
+    success: bool = True,
+    error: str | None = None,
+    details: dict | None = None,
+) -> str:
     """
     Append an activity event.
 
@@ -24,14 +30,14 @@ def log_activity(action_type: str, label: str, vendor: str | None = None,
     """
     event_id = uuid.uuid4().hex[:12]
     event = {
-        "id":          event_id,
-        "action":      action_type,
-        "label":       label,
-        "vendor":      vendor or "",
-        "success":     success,
-        "error":       error or "",
-        "details":     details or {},
-        "timestamp":   datetime.utcnow().strftime("%Y-%m-%dT%H:%M:%SZ"),
+        "id": event_id,
+        "action": action_type,
+        "label": label,
+        "vendor": vendor or "",
+        "success": success,
+        "error": error or "",
+        "details": details or {},
+        "timestamp": datetime.utcnow().strftime("%Y-%m-%dT%H:%M:%SZ"),
     }
     path = os.path.join(ACTIVITY_FOLDER, f"{event_id}.json")
     with open(path, "w") as f:

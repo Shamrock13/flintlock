@@ -3,72 +3,75 @@
 SMTP passwords and API keys are encrypted at rest using Fernet (see crypto.py).
 Legacy plaintext passwords are transparently migrated on next save.
 """
+
 import json
 import os
 
 from .crypto import encrypt, decrypt
 
-_DEFAULT_SETTINGS_DIR  = os.path.join(os.path.expanduser("~"), ".config", "cashel")
+_DEFAULT_SETTINGS_DIR = os.path.join(os.path.expanduser("~"), ".config", "cashel")
 _DEFAULT_SETTINGS_FILE = os.path.join(_DEFAULT_SETTINGS_DIR, "settings.json")
 SETTINGS_FILE = os.environ.get("SETTINGS_FILE", _DEFAULT_SETTINGS_FILE)
 
 # Valid values for enumerated security settings.
-VALID_SSH_KEY_POLICIES  = ("warn", "strict", "auto_add")
-VALID_ERROR_DETAIL      = ("sanitized", "full")
-VALID_SYSLOG_PROTOCOLS  = ("udp", "tcp")
+VALID_SSH_KEY_POLICIES = ("warn", "strict", "auto_add")
+VALID_ERROR_DETAIL = ("sanitized", "full")
+VALID_SYSLOG_PROTOCOLS = ("udp", "tcp")
 VALID_SYSLOG_FACILITIES = (
-    "kernel", "user", "daemon",
-    "local0", "local1", "local2", "local3",
-    "local4", "local5", "local6", "local7",
+    "kernel",
+    "user",
+    "daemon",
+    "local0",
+    "local1",
+    "local2",
+    "local3",
+    "local4",
+    "local5",
+    "local6",
+    "local7",
 )
 
 DEFAULTS: dict = {
     # ── General ───────────────────────────────────────────────────────────────
-    "auto_pdf":           False,
-    "auto_archive":       False,
+    "auto_pdf": False,
+    "auto_archive": False,
     "default_compliance": "",
-
     # ── SMTP (scheduled-audit email alerts) ───────────────────────────────────
-    "smtp_host":     "",
-    "smtp_port":     587,
-    "smtp_user":     "",
+    "smtp_host": "",
+    "smtp_port": 587,
+    "smtp_user": "",
     "smtp_password": "",
-    "smtp_from":     "",
-    "smtp_tls":      True,
-
+    "smtp_from": "",
+    "smtp_tls": True,
     # ── Security — SSH ────────────────────────────────────────────────────────
     # Controls how unknown SSH host keys are handled for Live Connect audits.
     # "warn"     → log a warning and proceed (default; balances usability + visibility)
     # "strict"   → reject connections to hosts not in known_hosts (most secure)
     # "auto_add" → silently accept any host key (insecure; lab use only)
     "ssh_host_key_policy": "warn",
-
     # ── Security — Webhooks ───────────────────────────────────────────────────
     # Comma-separated list of extra hostname suffixes allowed as webhook targets,
     # in addition to the built-in allowlist (hooks.slack.com, webhook.office.com,
     # discord.com).  Example: "webhooks.mycorp.com, hooks.internal.net"
     "webhook_allowlist": "",
-
     # ── Security — Error detail ───────────────────────────────────────────────
     # "sanitized" → return generic messages to the browser (production default)
     # "full"      → return raw exception text (development only)
     "error_detail": "sanitized",
-
     # ── Authentication ────────────────────────────────────────────────────────
     # When auth_enabled is True, all web UI and API routes require the API key.
     # The key is stored encrypted (api_key_enc) and never shown after first
     # generation — treat it like a password.  Session lifetime controls how long
     # a browser login is valid (sliding window).
-    "auth_enabled":              False,
-    "session_lifetime_minutes":  480,   # 8 hours default
-
+    "auth_enabled": False,
+    "session_lifetime_minutes": 480,  # 8 hours default
     # ── Syslog ────────────────────────────────────────────────────────────────
     # Forward application events to a remote syslog server for SIEM integration.
     # Protocol: "udp" (RFC 3164, default) or "tcp" (reliable delivery).
     # Facility: LOCAL0–LOCAL7, DAEMON, USER.
-    "syslog_enabled":  False,
-    "syslog_host":     "localhost",
-    "syslog_port":     514,
+    "syslog_enabled": False,
+    "syslog_host": "localhost",
+    "syslog_port": 514,
     "syslog_protocol": "udp",
     "syslog_facility": "local0",
 }
@@ -84,7 +87,9 @@ def get_settings() -> dict:
         if data.get("smtp_password_enc"):
             merged["smtp_password"] = decrypt(data["smtp_password_enc"])
         # Decrypt api_key — stored encrypted, never exposed to the template directly
-        merged["api_key"] = decrypt(data["api_key_enc"]) if data.get("api_key_enc") else ""
+        merged["api_key"] = (
+            decrypt(data["api_key_enc"]) if data.get("api_key_enc") else ""
+        )
         return merged
     except (FileNotFoundError, json.JSONDecodeError):
         return dict(DEFAULTS)
@@ -147,6 +152,7 @@ def save_api_key(plaintext_key: str) -> None:
     """Encrypt and persist the API key. Separate from save_settings so it is
     never accidentally overwritten by a settings form submission."""
     from .crypto import encrypt as _enc
+
     try:
         with open(SETTINGS_FILE) as f:
             data = json.load(f)

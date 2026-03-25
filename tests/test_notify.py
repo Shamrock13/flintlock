@@ -2,6 +2,7 @@
 
 Run with:  python3 tests/test_notify.py
 """
+
 import json
 import os
 import sys
@@ -20,22 +21,37 @@ from cashel.notify import (
 # ── Fixtures ──────────────────────────────────────────────────────────────────
 
 SCHEDULE = {
-    "id":     "abc123",
+    "id": "abc123",
     "vendor": "asa",
-    "host":   "192.168.1.1",
-    "tag":    "ASA-EDGE",
-    "notify_on_finding":    True,
-    "notify_on_error":      True,
+    "host": "192.168.1.1",
+    "tag": "ASA-EDGE",
+    "notify_on_finding": True,
+    "notify_on_error": True,
     "notify_slack_webhook": "https://hooks.slack.com/services/TEST",
-    "notify_email":         "ops@example.com",
+    "notify_email": "ops@example.com",
 }
 
 SUMMARY = {"high": 2, "medium": 1, "low": 0, "total": 3}
 
 FINDINGS = [
-    {"severity": "HIGH",   "category": "exposure",   "message": "[HIGH] Permit any any found.",   "remediation": "Remove the rule."},
-    {"severity": "HIGH",   "category": "management", "message": "[HIGH] Telnet enabled.",          "remediation": "Disable telnet."},
-    {"severity": "MEDIUM", "category": "logging",    "message": "[MEDIUM] No syslog configured.", "remediation": "Add a syslog server."},
+    {
+        "severity": "HIGH",
+        "category": "exposure",
+        "message": "[HIGH] Permit any any found.",
+        "remediation": "Remove the rule.",
+    },
+    {
+        "severity": "HIGH",
+        "category": "management",
+        "message": "[HIGH] Telnet enabled.",
+        "remediation": "Disable telnet.",
+    },
+    {
+        "severity": "MEDIUM",
+        "category": "logging",
+        "message": "[MEDIUM] No syslog configured.",
+        "remediation": "Add a syslog server.",
+    },
 ]
 
 PLAIN_FINDINGS = [
@@ -46,6 +62,7 @@ PLAIN_FINDINGS = [
 
 
 # ══════════════════════════════════════ _top_high_findings ══
+
 
 def test_top_high_enriched():
     highs = _top_high_findings(FINDINGS)
@@ -59,17 +76,23 @@ def test_top_high_plain():
 
 
 def test_top_high_limit():
-    many = [{"severity": "HIGH", "message": f"[HIGH] finding {i}", "category": "x"} for i in range(10)]
+    many = [
+        {"severity": "HIGH", "message": f"[HIGH] finding {i}", "category": "x"}
+        for i in range(10)
+    ]
     highs = _top_high_findings(many, limit=3)
     assert len(highs) == 3
 
 
 def test_top_high_no_highs():
-    low_only = [{"severity": "MEDIUM", "message": "[MEDIUM] something", "category": "x"}]
+    low_only = [
+        {"severity": "MEDIUM", "message": "[MEDIUM] something", "category": "x"}
+    ]
     assert _top_high_findings(low_only) == []
 
 
 # ══════════════════════════════════════════ _audit_subject ══
+
 
 def test_subject_high_findings():
     subj = _audit_subject(SCHEDULE, SUMMARY, error=None)
@@ -90,6 +113,7 @@ def test_subject_no_findings():
 
 
 # ══════════════════════════════════════════ _audit_body_text ══
+
 
 def test_body_contains_label():
     body = _audit_body_text(SCHEDULE, SUMMARY, FINDINGS, error=None)
@@ -115,22 +139,35 @@ def test_body_error_message():
 
 
 def test_body_clean_audit():
-    body = _audit_body_text(SCHEDULE, {"high": 0, "medium": 0, "low": 0, "total": 0}, [], error=None)
+    body = _audit_body_text(
+        SCHEDULE, {"high": 0, "medium": 0, "low": 0, "total": 0}, [], error=None
+    )
     assert "No issues found" in body
 
 
 # ════════════════════════════════════════════════ send_slack ══
 
+
 class _MockHTTPResponse:
     status = 200
-    def __enter__(self): return self
-    def __exit__(self, *a): pass
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, *a):
+        pass
+
 
 class _RaisingHTTPHandler:
     """Simulate a network failure."""
+
     import urllib.error
-    def __enter__(self): raise ConnectionRefusedError("mock failure")
-    def __exit__(self, *a): pass
+
+    def __enter__(self):
+        raise ConnectionRefusedError("mock failure")
+
+    def __exit__(self, *a):
+        pass
 
 
 def test_send_slack_empty_webhook_no_crash():
@@ -144,6 +181,7 @@ def test_send_slack_url_error_no_crash(monkeypatch=None):
     import urllib.error
 
     original = urllib.request.urlopen
+
     def fake_urlopen(req, timeout=None):
         raise urllib.error.URLError("simulated failure")
 
@@ -163,6 +201,7 @@ def test_send_slack_payload_structure():
         return _MockHTTPResponse()
 
     import urllib.request as ureq
+
     orig = ureq.urlopen
     ureq.urlopen = fake_urlopen
     try:
@@ -176,6 +215,7 @@ def test_send_slack_payload_structure():
 
 # ════════════════════════════════════════════════ send_email ══
 
+
 def test_send_email_empty_address_no_crash():
     """send_email with no address must return silently."""
     send_email("", SCHEDULE, SUMMARY, FINDINGS, {})
@@ -188,16 +228,26 @@ def test_send_email_missing_smtp_host_no_crash():
 
 def test_send_email_smtp_exception_no_crash():
     """send_email must swallow SMTPException without propagating."""
-    smtp_cfg = {"smtp_host": "smtp.example.com", "smtp_port": 587,
-                "smtp_user": "u", "smtp_password": "p",
-                "smtp_from": "from@example.com", "smtp_tls": True}
+    smtp_cfg = {
+        "smtp_host": "smtp.example.com",
+        "smtp_port": 587,
+        "smtp_user": "u",
+        "smtp_password": "p",
+        "smtp_from": "from@example.com",
+        "smtp_tls": True,
+    }
 
     original_smtp = smtplib.SMTP
 
     class FakeSMTP:
-        def __init__(self, *a, **kw): pass
-        def __enter__(self): raise smtplib.SMTPException("connection refused")
-        def __exit__(self, *a): pass
+        def __init__(self, *a, **kw):
+            pass
+
+        def __enter__(self):
+            raise smtplib.SMTPException("connection refused")
+
+        def __exit__(self, *a):
+            pass
 
     smtplib.SMTP = FakeSMTP
     try:

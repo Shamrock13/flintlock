@@ -2,6 +2,7 @@
 
 Run with:  python3 tests/test_gcp.py
 """
+
 import json
 import os
 import sys
@@ -120,6 +121,7 @@ def _write_json(data) -> str:
 
 # ══════════════════════════════════════════════════════════ PARSER ══
 
+
 def test_parse_list():
     path = _write_json(RULES_CLEAN)
     try:
@@ -171,6 +173,7 @@ def test_parse_missing_file():
 
 # ══════════════════════════════════════════════════ INGRESS CHECKS ══
 
+
 def test_internet_ingress_all_traffic():
     findings = check_internet_ingress_gcp(RULES_RISKY)
     msgs = [f["message"] for f in findings]
@@ -201,22 +204,25 @@ def test_internet_ingress_skips_disabled():
 
 
 def test_internet_ingress_wide_port_range():
-    rules = [{
-        "name": "wide-range",
-        "network": "https://.../networks/test",
-        "direction": "INGRESS",
-        "priority": 1000,
-        "disabled": False,
-        "description": "test",
-        "sourceRanges": ["0.0.0.0/0"],
-        "allowed": [{"IPProtocol": "tcp", "ports": ["1000-2000"]}],
-    }]
+    rules = [
+        {
+            "name": "wide-range",
+            "network": "https://.../networks/test",
+            "direction": "INGRESS",
+            "priority": 1000,
+            "disabled": False,
+            "description": "test",
+            "sourceRanges": ["0.0.0.0/0"],
+            "allowed": [{"IPProtocol": "tcp", "ports": ["1000-2000"]}],
+        }
+    ]
     findings = check_internet_ingress_gcp(rules)
     assert any("wide port range" in f["message"] for f in findings)
     assert all(f["severity"] == "MEDIUM" for f in findings)
 
 
 # ══════════════════════════════════════════════════ EGRESS CHECKS ══
+
 
 def test_unrestricted_egress_flagged():
     findings = check_unrestricted_egress_gcp(RULES_RISKY)
@@ -231,6 +237,7 @@ def test_unrestricted_egress_clean():
 
 # ══════════════════════════════════════════════ DEFAULT NETWORK ══
 
+
 def test_default_network_flagged():
     findings = check_default_network_rules_gcp(RULES_RISKY)
     assert len(findings) == 1  # one finding per network, not per rule
@@ -243,6 +250,7 @@ def test_default_network_clean():
 
 
 # ══════════════════════════════════════════ MISSING DESCRIPTION ══
+
 
 def test_missing_description_flagged():
     findings = check_missing_description_gcp(RULES_RISKY)
@@ -263,6 +271,7 @@ def test_missing_description_skips_disabled():
 
 # ══════════════════════════════════════════════ DISABLED RULES ══
 
+
 def test_disabled_rules_flagged():
     findings = check_disabled_rules_gcp(RULES_RISKY)
     assert len(findings) == 1
@@ -275,6 +284,7 @@ def test_disabled_rules_clean():
 
 
 # ══════════════════════════════════════════ NO TARGET RESTRICTION ══
+
 
 def test_no_target_restriction_flagged():
     findings = check_no_target_restriction_gcp(RULES_RISKY)
@@ -290,6 +300,7 @@ def test_no_target_restriction_clean():
 
 # ══════════════════════════════════════════════════ ICMP CHECK ══
 
+
 def test_icmp_unrestricted_flagged():
     findings = check_icmp_unrestricted_gcp(RULES_RISKY)
     assert any("allow-icmp" in f["message"] for f in findings)
@@ -301,6 +312,7 @@ def test_icmp_unrestricted_clean():
 
 
 # ══════════════════════════════════════════════ audit_gcp_firewall ══
+
 
 def test_audit_gcp_risky():
     path = _write_json(RULES_RISKY)
@@ -337,19 +349,33 @@ if __name__ == "__main__":
     import traceback
 
     tests = [
-        test_parse_list, test_parse_items_wrapper, test_parse_single_object,
-        test_parse_invalid_json, test_parse_missing_file,
-        test_internet_ingress_all_traffic, test_internet_ingress_ssh,
-        test_internet_ingress_rdp, test_internet_ingress_clean,
-        test_internet_ingress_skips_disabled, test_internet_ingress_wide_port_range,
-        test_unrestricted_egress_flagged, test_unrestricted_egress_clean,
-        test_default_network_flagged, test_default_network_clean,
-        test_missing_description_flagged, test_missing_description_clean,
+        test_parse_list,
+        test_parse_items_wrapper,
+        test_parse_single_object,
+        test_parse_invalid_json,
+        test_parse_missing_file,
+        test_internet_ingress_all_traffic,
+        test_internet_ingress_ssh,
+        test_internet_ingress_rdp,
+        test_internet_ingress_clean,
+        test_internet_ingress_skips_disabled,
+        test_internet_ingress_wide_port_range,
+        test_unrestricted_egress_flagged,
+        test_unrestricted_egress_clean,
+        test_default_network_flagged,
+        test_default_network_clean,
+        test_missing_description_flagged,
+        test_missing_description_clean,
         test_missing_description_skips_disabled,
-        test_disabled_rules_flagged, test_disabled_rules_clean,
-        test_no_target_restriction_flagged, test_no_target_restriction_clean,
-        test_icmp_unrestricted_flagged, test_icmp_unrestricted_clean,
-        test_audit_gcp_risky, test_audit_gcp_clean, test_audit_gcp_parse_error,
+        test_disabled_rules_flagged,
+        test_disabled_rules_clean,
+        test_no_target_restriction_flagged,
+        test_no_target_restriction_clean,
+        test_icmp_unrestricted_flagged,
+        test_icmp_unrestricted_clean,
+        test_audit_gcp_risky,
+        test_audit_gcp_clean,
+        test_audit_gcp_parse_error,
     ]
 
     passed = failed = 0

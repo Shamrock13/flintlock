@@ -2,6 +2,7 @@
 
 Run with:  python3 tests/test_juniper.py
 """
+
 import os
 import sys
 import tempfile
@@ -116,6 +117,7 @@ security {
 
 # ══════════════════════════════════════════════ SET-STYLE PARSER ══
 
+
 def test_set_parse_basic():
     policies = _parse_set_style(SET_STYLE_CLEAN)
     assert len(policies) == 2
@@ -128,7 +130,7 @@ def test_set_parse_zone_fields():
     policies = _parse_set_style(SET_STYLE_CLEAN)
     web = next(p for p in policies if p["name"] == "allow-web")
     assert web["from_zone"] == "trust"
-    assert web["to_zone"]   == "untrust"
+    assert web["to_zone"] == "untrust"
 
 
 def test_set_parse_action_permit():
@@ -147,13 +149,16 @@ def test_set_parse_action_deny():
 def test_set_parse_src_dst_app():
     policies = _parse_set_style(SET_STYLE_CLEAN)
     web = next(p for p in policies if p["name"] == "allow-web")
-    assert "corp-subnet"  in web["src"]
-    assert "any"          in web["dst"]
-    assert "junos-http"   in web["app"]
+    assert "corp-subnet" in web["src"]
+    assert "any" in web["dst"]
+    assert "junos-http" in web["app"]
 
 
 def test_set_parse_deactivated():
-    config = SET_STYLE_CLEAN + "\ndeactivate security policies from-zone trust to-zone untrust policy allow-web\n"
+    config = (
+        SET_STYLE_CLEAN
+        + "\ndeactivate security policies from-zone trust to-zone untrust policy allow-web\n"
+    )
     policies = _parse_set_style(config)
     web = next(p for p in policies if p["name"] == "allow-web")
     assert web["disabled"] is True
@@ -161,10 +166,11 @@ def test_set_parse_deactivated():
 
 # ══════════════════════════════════════════ HIERARCHICAL PARSER ══
 
+
 def test_hier_parse_basic():
     policies = _parse_hierarchical(HIERARCHICAL_CLEAN)
-    assert any(p["name"] == "allow-web"  for p in policies)
-    assert any(p["name"] == "deny-all"   for p in policies)
+    assert any(p["name"] == "allow-web" for p in policies)
+    assert any(p["name"] == "deny-all" for p in policies)
 
 
 def test_hier_parse_log():
@@ -186,6 +192,7 @@ def test_hier_parse_deny_action():
 
 
 # ══════════════════════════════════════════════ POLICY CHECKS ══
+
 
 def test_any_any_detects_violation():
     policies = _parse_set_style(SET_STYLE_RISKY)
@@ -240,6 +247,7 @@ def test_deny_all_present():
 
 # ══════════════════════════════════════════════ SYSTEM CHECKS ══
 
+
 def test_system_detects_telnet():
     findings = check_system_juniper(SET_STYLE_RISKY)
     msgs = [f["message"] for f in findings]
@@ -267,11 +275,14 @@ def test_system_no_syslog():
 def test_system_clean_config():
     findings = check_system_juniper(SET_STYLE_CLEAN)
     # Clean config has SSH, NTP, syslog — no HIGH system findings expected
-    high_system = [f for f in findings if f["severity"] == "HIGH" and f["category"] == "management"]
+    high_system = [
+        f for f in findings if f["severity"] == "HIGH" and f["category"] == "management"
+    ]
     assert len(high_system) == 0
 
 
 # ══════════════════════════════════════════ SHADOW DETECTION ══
+
 
 def test_shadow_rules_detected():
     # allow-all shadows allow-telnet in the risky config
@@ -288,6 +299,7 @@ def test_shadow_rules_clean():
 
 
 # ══════════════════════════════════════════════ audit_juniper ══
+
 
 def _write_tmp(content: str) -> str:
     fd, path = tempfile.mkstemp(suffix=".conf")
@@ -331,17 +343,34 @@ if __name__ == "__main__":
     import traceback
 
     tests = [
-        test_set_parse_basic, test_set_parse_zone_fields, test_set_parse_action_permit,
-        test_set_parse_action_deny, test_set_parse_src_dst_app, test_set_parse_deactivated,
-        test_hier_parse_basic, test_hier_parse_log, test_hier_parse_inactive, test_hier_parse_deny_action,
-        test_any_any_detects_violation, test_any_any_clean_config,
-        test_missing_log_detects, test_missing_log_clean,
-        test_insecure_apps_detects_telnet, test_insecure_apps_clean,
-        test_deny_all_missing, test_deny_all_present,
-        test_system_detects_telnet, test_system_detects_snmp_community,
-        test_system_no_ntp, test_system_no_syslog, test_system_clean_config,
-        test_shadow_rules_detected, test_shadow_rules_clean,
-        test_audit_juniper_risky, test_audit_juniper_hierarchical, test_audit_juniper_missing_file,
+        test_set_parse_basic,
+        test_set_parse_zone_fields,
+        test_set_parse_action_permit,
+        test_set_parse_action_deny,
+        test_set_parse_src_dst_app,
+        test_set_parse_deactivated,
+        test_hier_parse_basic,
+        test_hier_parse_log,
+        test_hier_parse_inactive,
+        test_hier_parse_deny_action,
+        test_any_any_detects_violation,
+        test_any_any_clean_config,
+        test_missing_log_detects,
+        test_missing_log_clean,
+        test_insecure_apps_detects_telnet,
+        test_insecure_apps_clean,
+        test_deny_all_missing,
+        test_deny_all_present,
+        test_system_detects_telnet,
+        test_system_detects_snmp_community,
+        test_system_no_ntp,
+        test_system_no_syslog,
+        test_system_clean_config,
+        test_shadow_rules_detected,
+        test_shadow_rules_clean,
+        test_audit_juniper_risky,
+        test_audit_juniper_hierarchical,
+        test_audit_juniper_missing_file,
     ]
 
     passed = failed = 0

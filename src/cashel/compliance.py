@@ -33,9 +33,13 @@ def check_cis_compliance(parse):
 
     # CIS 4 — SSH must be locked to version 2
     if parse.find_objects(r"^ssh version 1"):
-        findings.append("[CIS-HIGH] CIS Control 4: SSHv1 is enabled — disable it and enforce SSHv2 only")
+        findings.append(
+            "[CIS-HIGH] CIS Control 4: SSHv1 is enabled — disable it and enforce SSHv2 only"
+        )
     elif not parse.find_objects(r"^ssh version 2"):
-        findings.append("[CIS-MEDIUM] CIS Control 4: SSH version not explicitly locked to version 2")
+        findings.append(
+            "[CIS-MEDIUM] CIS Control 4: SSH version not explicitly locked to version 2"
+        )
 
     # CIS 5 — SNMPv1/v2c community strings must not be used
     for r in parse.find_objects(r"^snmp-server community"):
@@ -69,7 +73,9 @@ def check_cis_compliance(parse):
         )
 
     # CIS 10 — Password encryption must be enabled
-    if not parse.find_objects(r"^password encryption aes") and not parse.find_objects(r"^service password-encryption"):
+    if not parse.find_objects(r"^password encryption aes") and not parse.find_objects(
+        r"^service password-encryption"
+    ):
         findings.append(
             "[CIS-MEDIUM] CIS Control 10: Password encryption not configured — enable 'service password-encryption' or AES encryption"
         )
@@ -130,7 +136,9 @@ def check_pci_compliance(parse):
         )
 
     # PCI Req 2.2 — HTTP/ASDM server exposure
-    if parse.find_objects(r"^http server enable") and not parse.find_objects(r"^http\s+\d"):
+    if parse.find_objects(r"^http server enable") and not parse.find_objects(
+        r"^http\s+\d"
+    ):
         findings.append(
             "[PCI-MEDIUM] PCI Req 2.2: HTTP/ASDM server enabled with no host restriction — restrict to authorized management hosts"
         )
@@ -164,7 +172,9 @@ def check_nist_compliance(parse):
 
     # NIST SC-7 — Boundary protection: deny-all must exist
     if not parse.find_objects(r"access-list.*deny ip any any"):
-        findings.append("[NIST-HIGH] NIST SC-7: No boundary protection deny-all rule found")
+        findings.append(
+            "[NIST-HIGH] NIST SC-7: No boundary protection deny-all rule found"
+        )
 
     # NIST SC-8 — Transmission confidentiality: no Telnet
     if parse.find_objects(r"^telnet\s"):
@@ -201,7 +211,9 @@ def check_nist_compliance(parse):
         )
 
     # NIST AC-17 — Remote access: HTTP/ASDM exposure
-    if parse.find_objects(r"^http server enable") and not parse.find_objects(r"^http\s+\d"):
+    if parse.find_objects(r"^http server enable") and not parse.find_objects(
+        r"^http\s+\d"
+    ):
         findings.append(
             "[NIST-MEDIUM] NIST AC-17: HTTP/ASDM management server unrestricted — limit remote access to authorized management hosts"
         )
@@ -241,16 +253,22 @@ def check_cis_compliance_ftd(parse):
         )
 
     # CIS 5 — Intrusion policy (IPS/Snort) must be referenced
-    if not parse.find_objects(r"^intrusion-policy") and not parse.find_objects(r"snort"):
+    if not parse.find_objects(r"^intrusion-policy") and not parse.find_objects(
+        r"snort"
+    ):
         findings.append(
             "[CIS-HIGH] CIS Control 5: No intrusion prevention policy reference found — assign an IPS policy in FMC"
         )
 
     # CIS 6 — SSH version 2 only
     if parse.find_objects(r"^ssh version 1"):
-        findings.append("[CIS-HIGH] CIS Control 6: SSHv1 is enabled — enforce SSHv2 only")
+        findings.append(
+            "[CIS-HIGH] CIS Control 6: SSHv1 is enabled — enforce SSHv2 only"
+        )
     elif not parse.find_objects(r"^ssh version 2"):
-        findings.append("[CIS-MEDIUM] CIS Control 6: SSH version not locked to version 2")
+        findings.append(
+            "[CIS-MEDIUM] CIS Control 6: SSH version not locked to version 2"
+        )
 
     # CIS 7 — SNMPv1/v2c must not be used
     for r in parse.find_objects(r"^snmp-server community"):
@@ -320,7 +338,9 @@ def check_pci_compliance_ftd(parse):
         )
 
     # PCI 6.4 — IPS must be deployed
-    if not parse.find_objects(r"^intrusion-policy") and not parse.find_objects(r"snort"):
+    if not parse.find_objects(r"^intrusion-policy") and not parse.find_objects(
+        r"snort"
+    ):
         findings.append(
             "[PCI-HIGH] PCI Req 6.6: No intrusion prevention policy found — IPS is required to detect and block web-based attacks"
         )
@@ -354,7 +374,9 @@ def check_nist_compliance_ftd(parse):
 
     # NIST SC-7 — Boundary protection
     if not parse.find_objects(r"access-list.*deny ip any any"):
-        findings.append("[NIST-HIGH] NIST SC-7: No boundary protection deny-all rule found")
+        findings.append(
+            "[NIST-HIGH] NIST SC-7: No boundary protection deny-all rule found"
+        )
 
     # NIST SC-8 — No Telnet
     if parse.find_objects(r"^telnet\s"):
@@ -363,7 +385,9 @@ def check_nist_compliance_ftd(parse):
         )
 
     # NIST SI-3 — IPS/malware protection
-    if not parse.find_objects(r"^intrusion-policy") and not parse.find_objects(r"snort"):
+    if not parse.find_objects(r"^intrusion-policy") and not parse.find_objects(
+        r"snort"
+    ):
         findings.append(
             "[NIST-HIGH] NIST SI-3: No intrusion prevention policy found — NIST SI-3 requires malicious code protection"
         )
@@ -448,7 +472,11 @@ def check_cis_compliance_pa(rules):
         findings.append("[CIS-HIGH] CIS Control 5: No default deny-all rule found")
 
     # CIS 6 — Unnamed rules
-    unnamed = [r for r in rules if not r.get("name") or r.get("name", "").lower() in ("unnamed", "")]
+    unnamed = [
+        r
+        for r in rules
+        if not r.get("name") or r.get("name", "").lower() in ("unnamed", "")
+    ]
     if unnamed:
         findings.append(
             f"[CIS-MEDIUM] CIS Control 6: {len(unnamed)} unnamed rule(s) found — all rules must be named for audit clarity"
@@ -560,7 +588,9 @@ def check_nist_compliance_pa(rules):
         for rule in rules
     )
     if not has_deny_all:
-        findings.append("[NIST-HIGH] NIST SC-7: No boundary protection deny-all rule found")
+        findings.append(
+            "[NIST-HIGH] NIST SC-7: No boundary protection deny-all rule found"
+        )
 
     return findings
 
@@ -741,7 +771,9 @@ def check_nist_compliance_forti(policies):
         for p in policies
     )
     if not has_deny_all:
-        findings.append("[NIST-HIGH] NIST SC-7: No boundary protection deny-all rule found")
+        findings.append(
+            "[NIST-HIGH] NIST SC-7: No boundary protection deny-all rule found"
+        )
 
     return findings
 
@@ -859,7 +891,9 @@ def check_nist_compliance_pf(rules):
         for r in rules
     )
     if not has_deny_all:
-        findings.append("[NIST-HIGH] NIST SC-7: No boundary protection deny-all rule found")
+        findings.append(
+            "[NIST-HIGH] NIST SC-7: No boundary protection deny-all rule found"
+        )
 
     return findings
 
@@ -984,10 +1018,10 @@ def check_hipaa_compliance_pa(rules):
 
     for rule in rules:
         name = rule.get("name", "unnamed")
-        src  = rule.get("from", [])
-        dst  = rule.get("to", [])
-        act  = rule.get("action", "")
-        log  = rule.get("log-end", "no")
+        src = rule.get("from", [])
+        dst = rule.get("to", [])
+        act = rule.get("action", "")
+        log = rule.get("log-end", "no")
 
         # §164.312(a)(1) — Access control: any/any permit
         if act == "allow" and "any" in src and "any" in dst:
@@ -1011,7 +1045,9 @@ def check_hipaa_compliance_pa(rules):
 
     # §164.308(a)(1)(ii)(A) — Risk analysis: no deny-all
     has_deny_all = any(
-        r.get("action") == "deny" and "any" in r.get("from", []) and "any" in r.get("to", [])
+        r.get("action") == "deny"
+        and "any" in r.get("from", [])
+        and "any" in r.get("to", [])
         for r in rules
     )
     if not has_deny_all:
@@ -1027,13 +1063,13 @@ def check_hipaa_compliance_forti(policies):
     findings = []
 
     for p in policies:
-        name    = p.get("name", f"policy-{p.get('policyid', '?')}")
+        name = p.get("name", f"policy-{p.get('policyid', '?')}")
         srcaddr = p.get("srcaddr", [])
         dstaddr = p.get("dstaddr", [])
-        action  = p.get("action", "")
-        logtr   = p.get("logtraffic", "disable")
-        av      = p.get("av-profile", "")
-        ips     = p.get("ips-sensor", "")
+        action = p.get("action", "")
+        logtr = p.get("logtraffic", "disable")
+        av = p.get("av-profile", "")
+        ips = p.get("ips-sensor", "")
 
         # §164.312(a)(1) — Access control: any/any permit
         if action == "accept" and "all" in srcaddr and "all" in dstaddr:
@@ -1126,7 +1162,8 @@ def _juniper_any_any(policies):
     """Return policies with permit any-src any-dst any-app."""
     broad = {"any", "any-ipv4", "any-ipv6"}
     return [
-        p for p in policies
+        p
+        for p in policies
         if p.get("action") == "permit"
         and not p.get("disabled")
         and all(s.lower() in broad for s in (p.get("src") or ["any"]))
@@ -1138,15 +1175,19 @@ def _juniper_any_any(policies):
 def check_cis_compliance_juniper(data: dict) -> list:
     """CIS Juniper SRX Benchmark checks."""
     import re
-    content  = data.get("content", "")
+
+    content = data.get("content", "")
     policies = data.get("policies", [])
     findings = []
 
     # CIS 1 — Explicit deny-all at end of each zone-pair
     from .juniper import check_deny_all_juniper
+
     deny_findings = check_deny_all_juniper(policies)
     if deny_findings:
-        findings.append("[CIS-HIGH] CIS Control 1: One or more zone pairs lack an explicit deny-all catch-all policy")
+        findings.append(
+            "[CIS-HIGH] CIS Control 1: One or more zone pairs lack an explicit deny-all catch-all policy"
+        )
 
     # CIS 2 — No any/any/any permit rules
     any_any = _juniper_any_any(policies)
@@ -1156,7 +1197,11 @@ def check_cis_compliance_juniper(data: dict) -> list:
         )
 
     # CIS 3 — All permit rules must log
-    no_log = [p for p in policies if p.get("action") == "permit" and not p.get("disabled") and not p.get("log")]
+    no_log = [
+        p
+        for p in policies
+        if p.get("action") == "permit" and not p.get("disabled") and not p.get("log")
+    ]
     for p in no_log:
         findings.append(
             f"[CIS-MEDIUM] CIS Control 3: Policy '{p['name']}' ({p['from_zone']}→{p['to_zone']}) has no session logging"
@@ -1166,23 +1211,36 @@ def check_cis_compliance_juniper(data: dict) -> list:
     if re.search(r"set system services telnet", content) or (
         "services {" in content and re.search(r"\btelnet;", content)
     ):
-        findings.append("[CIS-HIGH] CIS Control 4: Telnet management is enabled — disable and use SSH only")
+        findings.append(
+            "[CIS-HIGH] CIS Control 4: Telnet management is enabled — disable and use SSH only"
+        )
 
     # CIS 5 — SNMPv1/v2c community strings
     for comm in re.findall(r"set snmp community (\S+)", content):
-        findings.append(f"[CIS-HIGH] CIS Control 5: SNMPv1/v2c community '{comm}' — migrate to SNMPv3")
+        findings.append(
+            f"[CIS-HIGH] CIS Control 5: SNMPv1/v2c community '{comm}' — migrate to SNMPv3"
+        )
 
     # CIS 6 — NTP configured
     if not re.search(r"set system ntp", content) and "ntp {" not in content.lower():
-        findings.append("[CIS-MEDIUM] CIS Control 6: No NTP configured — accurate timestamps required for audit")
+        findings.append(
+            "[CIS-MEDIUM] CIS Control 6: No NTP configured — accurate timestamps required for audit"
+        )
 
     # CIS 7 — Remote syslog
-    if not re.search(r"set system syslog", content) and "syslog {" not in content.lower():
-        findings.append("[CIS-HIGH] CIS Control 7: No syslog configured — audit trail cannot be preserved remotely")
+    if (
+        not re.search(r"set system syslog", content)
+        and "syslog {" not in content.lower()
+    ):
+        findings.append(
+            "[CIS-HIGH] CIS Control 7: No syslog configured — audit trail cannot be preserved remotely"
+        )
 
     # CIS 8 — Root SSH login denied
     if re.search(r"set system services ssh root-login allow", content):
-        findings.append("[CIS-HIGH] CIS Control 8: SSH root login is permitted — enforce 'root-login deny'")
+        findings.append(
+            "[CIS-HIGH] CIS Control 8: SSH root login is permitted — enforce 'root-login deny'"
+        )
 
     return findings
 
@@ -1190,7 +1248,8 @@ def check_cis_compliance_juniper(data: dict) -> list:
 def check_pci_compliance_juniper(data: dict) -> list:
     """PCI-DSS v4.0 Juniper SRX checks."""
     import re
-    content  = data.get("content", "")
+
+    content = data.get("content", "")
     policies = data.get("policies", [])
     findings = []
 
@@ -1202,7 +1261,11 @@ def check_pci_compliance_juniper(data: dict) -> list:
         )
 
     # Req 1.3.2 — All permit rules must log for PCI traffic visibility
-    no_log = [p for p in policies if p.get("action") == "permit" and not p.get("disabled") and not p.get("log")]
+    no_log = [
+        p
+        for p in policies
+        if p.get("action") == "permit" and not p.get("disabled") and not p.get("log")
+    ]
     if no_log:
         findings.append(
             f"[PCI-HIGH] PCI Req 10.2: {len(no_log)} permit policy/policies lack session logging — required for PCI audit"
@@ -1210,16 +1273,26 @@ def check_pci_compliance_juniper(data: dict) -> list:
 
     # Req 1.5 — Explicit deny at boundary
     from .juniper import check_deny_all_juniper
+
     if check_deny_all_juniper(policies):
-        findings.append("[PCI-HIGH] PCI Req 1.3.2: One or more zone pairs have no explicit deny-all — implicit deny is not auditable")
+        findings.append(
+            "[PCI-HIGH] PCI Req 1.3.2: One or more zone pairs have no explicit deny-all — implicit deny is not auditable"
+        )
 
     # Req 8 — No telnet / cleartext protocols
     if re.search(r"set system services telnet", content):
-        findings.append("[PCI-HIGH] PCI Req 8.2: Telnet enabled — transmits credentials in cleartext, violating PCI Req 8")
+        findings.append(
+            "[PCI-HIGH] PCI Req 8.2: Telnet enabled — transmits credentials in cleartext, violating PCI Req 8"
+        )
 
     # Req 10.5 — Remote syslog
-    if not re.search(r"set system syslog", content) and "syslog {" not in content.lower():
-        findings.append("[PCI-HIGH] PCI Req 10.5: No remote syslog — audit logs must be sent to a centralised log server")
+    if (
+        not re.search(r"set system syslog", content)
+        and "syslog {" not in content.lower()
+    ):
+        findings.append(
+            "[PCI-HIGH] PCI Req 10.5: No remote syslog — audit logs must be sent to a centralised log server"
+        )
 
     return findings
 
@@ -1227,14 +1300,18 @@ def check_pci_compliance_juniper(data: dict) -> list:
 def check_nist_compliance_juniper(data: dict) -> list:
     """NIST SP 800-41 Juniper SRX checks."""
     import re
-    content  = data.get("content", "")
+
+    content = data.get("content", "")
     policies = data.get("policies", [])
     findings = []
 
     # SC-7(5) — Default deny posture
     from .juniper import check_deny_all_juniper
+
     if check_deny_all_juniper(policies):
-        findings.append("[NIST-HIGH] NIST SC-7(5): No explicit deny-all — policy must deny all traffic not explicitly permitted")
+        findings.append(
+            "[NIST-HIGH] NIST SC-7(5): No explicit deny-all — policy must deny all traffic not explicitly permitted"
+        )
 
     # CM-7 — Least functionality: no any/any/any permits
     any_any = _juniper_any_any(policies)
@@ -1244,17 +1321,27 @@ def check_nist_compliance_juniper(data: dict) -> list:
         )
 
     # AU-2 — Logging on permit rules
-    no_log = [p for p in policies if p.get("action") == "permit" and not p.get("disabled") and not p.get("log")]
+    no_log = [
+        p
+        for p in policies
+        if p.get("action") == "permit" and not p.get("disabled") and not p.get("log")
+    ]
     if no_log:
-        findings.append(f"[NIST-MEDIUM] NIST AU-2: {len(no_log)} permit policy/policies without session logging")
+        findings.append(
+            f"[NIST-MEDIUM] NIST AU-2: {len(no_log)} permit policy/policies without session logging"
+        )
 
     # AC-17 — Management only via encrypted protocols
     if re.search(r"set system services telnet", content):
-        findings.append("[NIST-HIGH] NIST AC-17: Telnet management enabled — remote access must use encrypted channels")
+        findings.append(
+            "[NIST-HIGH] NIST AC-17: Telnet management enabled — remote access must use encrypted channels"
+        )
 
     # AU-12 — NTP for log timestamp integrity
     if not re.search(r"set system ntp", content) and "ntp {" not in content.lower():
-        findings.append("[NIST-MEDIUM] NIST AU-12: No NTP — log timestamps cannot be trusted without synchronised time")
+        findings.append(
+            "[NIST-MEDIUM] NIST AU-12: No NTP — log timestamps cannot be trusted without synchronised time"
+        )
 
     return findings
 
@@ -1262,7 +1349,8 @@ def check_nist_compliance_juniper(data: dict) -> list:
 def check_hipaa_compliance_juniper(data: dict) -> list:
     """HIPAA Security Rule Juniper SRX checks."""
     import re
-    content  = data.get("content", "")
+
+    content = data.get("content", "")
     policies = data.get("policies", [])
     findings = []
 
@@ -1274,7 +1362,11 @@ def check_hipaa_compliance_juniper(data: dict) -> list:
         )
 
     # §164.312(b) — Audit controls: logging on all permit rules
-    no_log = [p for p in policies if p.get("action") == "permit" and not p.get("disabled") and not p.get("log")]
+    no_log = [
+        p
+        for p in policies
+        if p.get("action") == "permit" and not p.get("disabled") and not p.get("log")
+    ]
     if no_log:
         findings.append(
             f"[HIPAA-HIGH] HIPAA §164.312(b): {len(no_log)} permit policy/policies have no session logging — audit trail incomplete"
@@ -1282,11 +1374,18 @@ def check_hipaa_compliance_juniper(data: dict) -> list:
 
     # §164.312(e)(1) — Transmission security: no cleartext management
     if re.search(r"set system services telnet", content):
-        findings.append("[HIPAA-HIGH] HIPAA §164.312(e)(1): Telnet is enabled — ePHI-adjacent management traffic must be encrypted")
+        findings.append(
+            "[HIPAA-HIGH] HIPAA §164.312(e)(1): Telnet is enabled — ePHI-adjacent management traffic must be encrypted"
+        )
 
     # §164.308(a)(1)(ii)(A) — Risk analysis: no syslog = no audit trail
-    if not re.search(r"set system syslog", content) and "syslog {" not in content.lower():
-        findings.append("[HIPAA-MEDIUM] HIPAA §164.308(a)(1)(ii)(A): No remote syslog — ePHI access logs not preserved off-device")
+    if (
+        not re.search(r"set system syslog", content)
+        and "syslog {" not in content.lower()
+    ):
+        findings.append(
+            "[HIPAA-MEDIUM] HIPAA §164.308(a)(1)(ii)(A): No remote syslog — ePHI access logs not preserved off-device"
+        )
 
     return findings
 
@@ -1306,6 +1405,7 @@ def check_hipaa_compliance_juniper(data: dict) -> list:
 
 # ── SOC 2 — Cisco ASA ─────────────────────────────────────────────────────────
 
+
 def check_soc2_compliance(parse):
     """SOC 2 Trust Services Criteria checks for Cisco ASA."""
     findings = []
@@ -1319,11 +1419,15 @@ def check_soc2_compliance(parse):
 
     # CC6.1 — Explicit deny-all required
     if not parse.find_objects(r"access-list.*deny ip any any"):
-        findings.append("[SOC2-HIGH] CC6.1: No explicit deny-all rule — default-deny posture not documented")
+        findings.append(
+            "[SOC2-HIGH] CC6.1: No explicit deny-all rule — default-deny posture not documented"
+        )
 
     # CC6.7 — No cleartext management (Telnet)
     if parse.find_objects(r"^telnet\s"):
-        findings.append("[SOC2-HIGH] CC6.7: Telnet management enabled — credentials transmitted in cleartext")
+        findings.append(
+            "[SOC2-HIGH] CC6.7: Telnet management enabled — credentials transmitted in cleartext"
+        )
 
     # CC7.2 — All permit rules must log
     for rule in parse.find_objects(r"access-list.*permit"):
@@ -1334,11 +1438,14 @@ def check_soc2_compliance(parse):
 
     # CC7.2 — Remote syslog for centralised audit trail
     if not parse.find_objects(r"^logging host"):
-        findings.append("[SOC2-HIGH] CC7.2: No remote syslog host — audit trail not preserved off-device")
+        findings.append(
+            "[SOC2-HIGH] CC7.2: No remote syslog host — audit trail not preserved off-device"
+        )
 
     # CC8.1 — All ACLs should have a remark (documentation)
     acl_names = {
-        r.text.split()[1] for r in parse.find_objects(r"^access-list\s")
+        r.text.split()[1]
+        for r in parse.find_objects(r"^access-list\s")
         if len(r.text.split()) >= 2
     }
     for acl in acl_names:
@@ -1352,12 +1459,15 @@ def check_soc2_compliance(parse):
 
 # ── SOC 2 — Cisco FTD ─────────────────────────────────────────────────────────
 
+
 def check_soc2_compliance_ftd(parse):
     """SOC 2 Trust Services Criteria checks for Cisco FTD."""
     findings = []
 
     if parse.find_objects(r"access-list.*permit.*any any"):
-        findings.append("[SOC2-HIGH] CC6.6: Any/any permit rule(s) found — access restriction not enforced")
+        findings.append(
+            "[SOC2-HIGH] CC6.6: Any/any permit rule(s) found — access restriction not enforced"
+        )
 
     if not parse.find_objects(r"access-list.*deny ip any any"):
         findings.append("[SOC2-HIGH] CC6.1: No explicit deny-all rule")
@@ -1367,7 +1477,9 @@ def check_soc2_compliance_ftd(parse):
 
     for rule in parse.find_objects(r"access-list.*permit"):
         if "log" not in rule.text:
-            findings.append(f"[SOC2-MEDIUM] CC7.2: Permit rule missing logging: {rule.text.strip()}")
+            findings.append(
+                f"[SOC2-MEDIUM] CC7.2: Permit rule missing logging: {rule.text.strip()}"
+            )
 
     if not parse.find_objects(r"^logging host"):
         findings.append("[SOC2-HIGH] CC7.2: No remote syslog host configured")
@@ -1377,6 +1489,7 @@ def check_soc2_compliance_ftd(parse):
 
 # ── SOC 2 — Palo Alto ────────────────────────────────────────────────────────
 
+
 def check_soc2_compliance_pa(rules):
     """SOC 2 Trust Services Criteria checks for Palo Alto PAN-OS."""
     findings = []
@@ -1385,11 +1498,11 @@ def check_soc2_compliance_pa(rules):
     any_any_rules = []
 
     for rule in rules:
-        name    = rule.get("name", "unnamed")
-        src     = [s.text for s in rule.findall(".//source/member")]
-        dst     = [d.text for d in rule.findall(".//destination/member")]
-        app     = [a.text for a in rule.findall(".//application/member")]
-        action  = rule.findtext(".//action") or ""
+        name = rule.get("name", "unnamed")
+        src = [s.text for s in rule.findall(".//source/member")]
+        dst = [d.text for d in rule.findall(".//destination/member")]
+        app = [a.text for a in rule.findall(".//application/member")]
+        action = rule.findtext(".//action") or ""
         log_end = rule.findtext(".//log-end") or "yes"
         log_fwd = rule.findtext(".//log-setting") or ""
         disabled = rule.findtext(".//disabled") == "yes"
@@ -1398,8 +1511,7 @@ def check_soc2_compliance_pa(rules):
             continue
 
         # CC6.6 — any/any/any permit
-        if (action == "allow"
-                and "any" in src and "any" in dst and "any" in app):
+        if action == "allow" and "any" in src and "any" in dst and "any" in app:
             any_any_rules.append(name)
 
         # CC7.2 — logging
@@ -1423,12 +1535,14 @@ def check_soc2_compliance_pa(rules):
 
 # ── SOC 2 — Fortinet ─────────────────────────────────────────────────────────
 
+
 def check_soc2_compliance_forti(policies):
     """SOC 2 Trust Services Criteria checks for Fortinet."""
     findings = []
 
     any_any = [
-        p for p in policies
+        p
+        for p in policies
         if p.get("action") == "accept"
         and "all" in p.get("srcaddr", [])
         and "all" in p.get("dstaddr", [])
@@ -1440,7 +1554,8 @@ def check_soc2_compliance_forti(policies):
         )
 
     no_log = [
-        p for p in policies
+        p
+        for p in policies
         if p.get("action") == "accept"
         and p.get("status") != "disable"
         and p.get("logtraffic") not in ("all", "utm", "enable")
@@ -1450,7 +1565,8 @@ def check_soc2_compliance_forti(policies):
         findings.append(f"[SOC2-MEDIUM] CC7.2: Policy '{name}' has no traffic logging")
 
     no_name = [
-        p for p in policies
+        p
+        for p in policies
         if p.get("action") == "accept"
         and p.get("status") != "disable"
         and not p.get("name", "").strip()
@@ -1465,6 +1581,7 @@ def check_soc2_compliance_forti(policies):
 
 # ── SOC 2 — pfSense ──────────────────────────────────────────────────────────
 
+
 def check_soc2_compliance_pf(rules):
     """SOC 2 Trust Services Criteria checks for pfSense."""
     findings = []
@@ -1472,8 +1589,8 @@ def check_soc2_compliance_pf(rules):
     for r in rules:
         iface = r.get("interface", "?")
         descr = r.get("descr") or r.get("description") or ""
-        src   = r.get("source", "1")
-        dst   = r.get("destination", "1")
+        src = r.get("source", "1")
+        dst = r.get("destination", "1")
 
         if r.get("type") == "pass" and src == "1" and dst == "1":
             findings.append(
@@ -1495,10 +1612,12 @@ def check_soc2_compliance_pf(rules):
 
 # ── SOC 2 — Juniper SRX ──────────────────────────────────────────────────────
 
+
 def check_soc2_compliance_juniper(data: dict) -> list:
     """SOC 2 Trust Services Criteria checks for Juniper SRX."""
     import re
-    content  = data.get("content", "")
+
+    content = data.get("content", "")
     policies = data.get("policies", [])
     findings = []
 
@@ -1506,8 +1625,10 @@ def check_soc2_compliance_juniper(data: dict) -> list:
 
     # CC6.6 — any-any-any permits
     any_any = [
-        p for p in policies
-        if p.get("action") == "permit" and not p.get("disabled")
+        p
+        for p in policies
+        if p.get("action") == "permit"
+        and not p.get("disabled")
         and all(s.lower() in broad for s in (p.get("src") or ["any"]))
         and all(d.lower() in broad for d in (p.get("dst") or ["any"]))
     ]
@@ -1518,26 +1639,41 @@ def check_soc2_compliance_juniper(data: dict) -> list:
 
     # CC6.1 — Deny-all per zone pair
     from .juniper import check_deny_all_juniper
+
     if check_deny_all_juniper(policies):
-        findings.append("[SOC2-HIGH] CC6.1: One or more zone pairs lack an explicit deny-all — default-deny not documented")
+        findings.append(
+            "[SOC2-HIGH] CC6.1: One or more zone pairs lack an explicit deny-all — default-deny not documented"
+        )
 
     # CC6.7 — No Telnet
     if re.search(r"set system services telnet", content):
-        findings.append("[SOC2-HIGH] CC6.7: Telnet management enabled — credentials transmitted in cleartext")
+        findings.append(
+            "[SOC2-HIGH] CC6.7: Telnet management enabled — credentials transmitted in cleartext"
+        )
 
     # CC7.2 — Logging on permit policies
-    no_log = [p for p in policies if p.get("action") == "permit" and not p.get("disabled") and not p.get("log")]
+    no_log = [
+        p
+        for p in policies
+        if p.get("action") == "permit" and not p.get("disabled") and not p.get("log")
+    ]
     for p in no_log:
-        findings.append(f"[SOC2-MEDIUM] CC7.2: Policy '{p['name']}' ({p['from_zone']}→{p['to_zone']}) has no session logging")
+        findings.append(
+            f"[SOC2-MEDIUM] CC7.2: Policy '{p['name']}' ({p['from_zone']}→{p['to_zone']}) has no session logging"
+        )
 
     # CC7.2 — Remote syslog
-    if not re.search(r"set system syslog", content) and "syslog {" not in content.lower():
-        findings.append("[SOC2-HIGH] CC7.2: No syslog configured — audit trail not preserved remotely")
+    if (
+        not re.search(r"set system syslog", content)
+        and "syslog {" not in content.lower()
+    ):
+        findings.append(
+            "[SOC2-HIGH] CC7.2: No syslog configured — audit trail not preserved remotely"
+        )
 
     # CC8.1 — Policy descriptions (only for set-style configs where we can check)
     no_desc_count = sum(
-        1 for p in policies
-        if p.get("action") == "permit" and not p.get("disabled")
+        1 for p in policies if p.get("action") == "permit" and not p.get("disabled")
     )
     if no_desc_count:
         findings.append(
@@ -1564,13 +1700,16 @@ def check_soc2_compliance_juniper(data: dict) -> list:
 
 # ── DISA STIG — Cisco ASA ────────────────────────────────────────────────────
 
+
 def check_stig_compliance(parse):
     """DISA STIG checks for Cisco ASA (based on ASA STIG V1R4+)."""
     findings = []
 
     # CAT I — Telnet management must not be used (ASA STIG V-239945)
     if parse.find_objects(r"^telnet\s"):
-        findings.append("[STIG-CAT-I] V-239945: Telnet management is enabled — must be disabled, use SSH only")
+        findings.append(
+            "[STIG-CAT-I] V-239945: Telnet management is enabled — must be disabled, use SSH only"
+        )
 
     # CAT I — No any/any permit (ASA STIG V-239952)
     any_any = parse.find_objects(r"access-list.*permit.*any any")
@@ -1587,17 +1726,23 @@ def check_stig_compliance(parse):
 
     # CAT II — SSH must be limited to version 2 (ASA STIG V-239946)
     if parse.find_objects(r"^ssh version 1"):
-        findings.append("[STIG-CAT-II] V-239946: SSHv1 is enabled — must enforce SSH protocol version 2 only")
+        findings.append(
+            "[STIG-CAT-II] V-239946: SSHv1 is enabled — must enforce SSH protocol version 2 only"
+        )
     elif not parse.find_objects(r"^ssh version 2"):
         findings.append("[STIG-CAT-II] V-239946: SSH version not explicitly set to 2")
 
     # CAT II — NTP must be configured (ASA STIG V-239972)
     if not parse.find_objects(r"^ntp server"):
-        findings.append("[STIG-CAT-II] V-239972: NTP not configured — timestamps required for audit log integrity")
+        findings.append(
+            "[STIG-CAT-II] V-239972: NTP not configured — timestamps required for audit log integrity"
+        )
 
     # CAT II — Logging must be enabled and sent to a syslog server (ASA STIG V-239973)
     if not parse.find_objects(r"^logging host"):
-        findings.append("[STIG-CAT-II] V-239973: No remote syslog host — audit records must be sent off-device")
+        findings.append(
+            "[STIG-CAT-II] V-239973: No remote syslog host — audit records must be sent off-device"
+        )
 
     if not parse.find_objects(r"^logging enable"):
         findings.append("[STIG-CAT-II] V-239973: Logging not explicitly enabled")
@@ -1605,16 +1750,22 @@ def check_stig_compliance(parse):
     # CAT II — All permit rules must log (ASA STIG V-239975)
     for rule in parse.find_objects(r"access-list.*permit"):
         if "log" not in rule.text:
-            findings.append(f"[STIG-CAT-II] V-239975: Permit rule missing log keyword: {rule.text.strip()}")
+            findings.append(
+                f"[STIG-CAT-II] V-239975: Permit rule missing log keyword: {rule.text.strip()}"
+            )
 
     # CAT II — HTTP management must be disabled or restricted (ASA STIG V-239948)
     if parse.find_objects(r"^http server enable"):
         if not parse.find_objects(r"^http\s+\d"):
-            findings.append("[STIG-CAT-II] V-239948: ASDM/HTTP enabled with no host restriction")
+            findings.append(
+                "[STIG-CAT-II] V-239948: ASDM/HTTP enabled with no host restriction"
+            )
 
     # CAT II — Explicit deny-all (ASA STIG V-239954)
     if not parse.find_objects(r"access-list.*deny ip any any"):
-        findings.append("[STIG-CAT-II] V-239954: No explicit deny-all rule — implicit deny produces no audit log entry")
+        findings.append(
+            "[STIG-CAT-II] V-239954: No explicit deny-all rule — implicit deny produces no audit log entry"
+        )
 
     # CAT III — Login banner must be configured (ASA STIG V-239980)
     if not parse.find_objects(r"^banner (login|motd)"):
@@ -1622,25 +1773,34 @@ def check_stig_compliance(parse):
 
     # CAT III — Console timeout (ASA STIG V-239983)
     if not parse.find_objects(r"^console timeout"):
-        findings.append("[STIG-CAT-III] V-239983: No console session timeout configured")
+        findings.append(
+            "[STIG-CAT-III] V-239983: No console session timeout configured"
+        )
 
     return findings
 
 
 # ── DISA STIG — Cisco FTD ────────────────────────────────────────────────────
 
+
 def check_stig_compliance_ftd(parse):
     """DISA STIG checks for Cisco FTD (based on FTD STIG V1R2+)."""
     findings = []
 
     if parse.find_objects(r"^telnet\s"):
-        findings.append("[STIG-CAT-I] FTD-STIG: Telnet management enabled — must use SSH")
+        findings.append(
+            "[STIG-CAT-I] FTD-STIG: Telnet management enabled — must use SSH"
+        )
 
     if parse.find_objects(r"access-list.*permit.*any any"):
-        findings.append("[STIG-CAT-I] FTD-STIG: Any/any permit rule violates least-privilege requirement")
+        findings.append(
+            "[STIG-CAT-I] FTD-STIG: Any/any permit rule violates least-privilege requirement"
+        )
 
     for r in parse.find_objects(r"^snmp-server community"):
-        findings.append("[STIG-CAT-I] FTD-STIG: SNMPv1/v2c community string — must migrate to SNMPv3")
+        findings.append(
+            "[STIG-CAT-I] FTD-STIG: SNMPv1/v2c community string — must migrate to SNMPv3"
+        )
 
     if parse.find_objects(r"^ssh version 1"):
         findings.append("[STIG-CAT-II] FTD-STIG: SSHv1 enabled — enforce SSHv2 only")
@@ -1653,7 +1813,9 @@ def check_stig_compliance_ftd(parse):
 
     for rule in parse.find_objects(r"access-list.*permit"):
         if "log" not in rule.text:
-            findings.append(f"[STIG-CAT-II] FTD-STIG: Permit rule missing log keyword: {rule.text.strip()}")
+            findings.append(
+                f"[STIG-CAT-II] FTD-STIG: Permit rule missing log keyword: {rule.text.strip()}"
+            )
 
     if not parse.find_objects(r"access-list.*deny ip any any"):
         findings.append("[STIG-CAT-II] FTD-STIG: No explicit deny-all rule")
@@ -1666,17 +1828,18 @@ def check_stig_compliance_ftd(parse):
 
 # ── DISA STIG — Palo Alto PAN-OS ─────────────────────────────────────────────
 
+
 def check_stig_compliance_pa(rules):
     """DISA STIG checks for Palo Alto PAN-OS (based on PAN-OS STIG V1R4+)."""
     findings = []
 
     for rule in rules:
-        name     = rule.get("name", "unnamed")
-        src      = [s.text for s in rule.findall(".//source/member")]
-        dst      = [d.text for d in rule.findall(".//destination/member")]
-        app      = [a.text for a in rule.findall(".//application/member")]
-        action   = rule.findtext(".//action") or ""
-        log_end  = rule.findtext(".//log-end") or "yes"
+        name = rule.get("name", "unnamed")
+        src = [s.text for s in rule.findall(".//source/member")]
+        dst = [d.text for d in rule.findall(".//destination/member")]
+        app = [a.text for a in rule.findall(".//application/member")]
+        action = rule.findtext(".//action") or ""
+        log_end = rule.findtext(".//log-end") or "yes"
         disabled = rule.findtext(".//disabled") == "yes"
 
         if disabled:
@@ -1706,6 +1869,7 @@ def check_stig_compliance_pa(rules):
 
 # ── DISA STIG — Fortinet FortiOS ─────────────────────────────────────────────
 
+
 def check_stig_compliance_forti(policies):
     """DISA STIG checks for Fortinet FortiOS (based on FortiOS STIG V1R2+)."""
     findings = []
@@ -1716,15 +1880,21 @@ def check_stig_compliance_forti(policies):
         name = p.get("name") or f"Policy ID {p.get('id')}"
 
         # CAT I — any/any accept (FortiOS STIG V-234161)
-        if (p.get("action") == "accept"
-                and "all" in p.get("srcaddr", [])
-                and "all" in p.get("dstaddr", [])):
+        if (
+            p.get("action") == "accept"
+            and "all" in p.get("srcaddr", [])
+            and "all" in p.get("dstaddr", [])
+        ):
             findings.append(
                 f"[STIG-CAT-I] V-234161: Policy '{name}' accepts all source/destination — violates least privilege"
             )
 
         # CAT II — logging required (FortiOS STIG V-234171)
-        if p.get("action") == "accept" and p.get("logtraffic") not in ("all", "utm", "enable"):
+        if p.get("action") == "accept" and p.get("logtraffic") not in (
+            "all",
+            "utm",
+            "enable",
+        ):
             findings.append(
                 f"[STIG-CAT-II] V-234171: Policy '{name}' — traffic logging not enabled"
             )
@@ -1740,6 +1910,7 @@ def check_stig_compliance_forti(policies):
 
 # ── DISA STIG — pfSense (hardening guidance — no official STIG) ──────────────
 
+
 def check_stig_compliance_pf(rules):
     """Network device hardening checks for pfSense (no official DISA STIG).
 
@@ -1749,8 +1920,8 @@ def check_stig_compliance_pf(rules):
     for r in rules:
         iface = r.get("interface", "?")
         descr = r.get("descr") or r.get("description") or ""
-        src   = r.get("source", "1")
-        dst   = r.get("destination", "1")
+        src = r.get("source", "1")
+        dst = r.get("destination", "1")
 
         # CAT I equivalent — any/any pass
         if r.get("type") == "pass" and src == "1" and dst == "1":
@@ -1775,10 +1946,12 @@ def check_stig_compliance_pf(rules):
 
 # ── DISA STIG — Juniper SRX ──────────────────────────────────────────────────
 
+
 def check_stig_compliance_juniper(data: dict) -> list:
     """DISA STIG checks for Juniper SRX (based on Juniper SRX STIG V1R2+)."""
     import re
-    content  = data.get("content", "")
+
+    content = data.get("content", "")
     policies = data.get("policies", [])
     findings = []
 
@@ -1786,16 +1959,22 @@ def check_stig_compliance_juniper(data: dict) -> list:
 
     # CAT I — Telnet enabled (SRX STIG V-66003)
     if re.search(r"set system services telnet", content):
-        findings.append("[STIG-CAT-I] V-66003: Telnet management service is enabled — must be disabled")
+        findings.append(
+            "[STIG-CAT-I] V-66003: Telnet management service is enabled — must be disabled"
+        )
 
     # CAT I — SNMPv1/v2c community strings (SRX STIG V-66019)
     for comm in re.findall(r"set snmp community (\S+)", content):
-        findings.append(f"[STIG-CAT-I] V-66019: SNMPv1/v2c community '{comm}' — must migrate to SNMPv3")
+        findings.append(
+            f"[STIG-CAT-I] V-66019: SNMPv1/v2c community '{comm}' — must migrate to SNMPv3"
+        )
 
     # CAT I — any/any/any permit (SRX STIG V-65981)
     any_any = [
-        p for p in policies
-        if p.get("action") == "permit" and not p.get("disabled")
+        p
+        for p in policies
+        if p.get("action") == "permit"
+        and not p.get("disabled")
         and all(s.lower() in broad for s in (p.get("src") or ["any"]))
         and all(d.lower() in broad for d in (p.get("dst") or ["any"]))
     ]
@@ -1806,16 +1985,26 @@ def check_stig_compliance_juniper(data: dict) -> list:
 
     # CAT II — NTP (SRX STIG V-66021)
     if not re.search(r"set system ntp", content) and "ntp {" not in content.lower():
-        findings.append("[STIG-CAT-II] V-66021: NTP not configured — audit log timestamps unreliable")
+        findings.append(
+            "[STIG-CAT-II] V-66021: NTP not configured — audit log timestamps unreliable"
+        )
 
     # CAT II — Syslog (SRX STIG V-66023)
-    if not re.search(r"set system syslog", content) and "syslog {" not in content.lower():
-        findings.append("[STIG-CAT-II] V-66023: No remote syslog — audit records must be sent off-device")
+    if (
+        not re.search(r"set system syslog", content)
+        and "syslog {" not in content.lower()
+    ):
+        findings.append(
+            "[STIG-CAT-II] V-66023: No remote syslog — audit records must be sent off-device"
+        )
 
     # CAT II — Deny-all per zone pair (SRX STIG V-65983)
     from .juniper import check_deny_all_juniper
+
     if check_deny_all_juniper(policies):
-        findings.append("[STIG-CAT-II] V-65983: One or more zone pairs lack an explicit deny-all policy")
+        findings.append(
+            "[STIG-CAT-II] V-65983: One or more zone pairs lack an explicit deny-all policy"
+        )
 
     # CAT II — Session logging on permit policies (SRX STIG V-65985)
     for p in policies:
@@ -1826,10 +2015,15 @@ def check_stig_compliance_juniper(data: dict) -> list:
 
     # CAT II — SSH root login (SRX STIG V-66001)
     if re.search(r"set system services ssh root-login allow", content):
-        findings.append("[STIG-CAT-II] V-66001: SSH root login is permitted — must be denied")
+        findings.append(
+            "[STIG-CAT-II] V-66001: SSH root login is permitted — must be denied"
+        )
 
     # CAT III — Login banner (SRX STIG V-66025)
-    if not re.search(r"set system login message", content) and "login {" not in content.lower():
+    if (
+        not re.search(r"set system login message", content)
+        and "login {" not in content.lower()
+    ):
         findings.append("[STIG-CAT-III] V-66025: No login banner configured")
 
     return findings

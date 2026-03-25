@@ -3,12 +3,13 @@
 Handles both enriched finding dicts (severity/category/message/remediation)
 and plain-string findings stored in the archive (e.g. "[HIGH] No deny-all…").
 """
+
 import csv
 import io
 import json
 
-TOOL_NAME     = "Cashel"
-TOOL_VERSION  = "1.2"
+TOOL_NAME = "Cashel"
+TOOL_VERSION = "1.2"
 TOOL_INFO_URI = "https://github.com/Shamrock13/cashel"
 
 
@@ -34,22 +35,24 @@ def _parse_plain(finding) -> tuple[str, str, str, str]:
 
 # ── JSON ─────────────────────────────────────────────────────────────────────
 
+
 def to_json(entry: dict) -> str:
     """Serialize an audit entry to Cashel JSON format."""
     payload = {
-        "tool":      TOOL_NAME,
-        "version":   TOOL_VERSION,
-        "filename":  entry.get("filename", ""),
-        "vendor":    entry.get("vendor", ""),
+        "tool": TOOL_NAME,
+        "version": TOOL_VERSION,
+        "filename": entry.get("filename", ""),
+        "vendor": entry.get("vendor", ""),
         "timestamp": entry.get("timestamp", ""),
-        "tag":       entry.get("tag", ""),
-        "summary":   entry.get("summary", {}),
-        "findings":  entry.get("findings", []),
+        "tag": entry.get("tag", ""),
+        "summary": entry.get("summary", {}),
+        "findings": entry.get("findings", []),
     }
     return json.dumps(payload, indent=2)
 
 
 # ── CSV ──────────────────────────────────────────────────────────────────────
+
 
 def to_csv(entry: dict) -> str:
     """Serialize findings to CSV with columns: severity, category, message, remediation."""
@@ -63,6 +66,7 @@ def to_csv(entry: dict) -> str:
 
 # ── SARIF 2.1.0 ──────────────────────────────────────────────────────────────
 
+
 def to_sarif(entry: dict) -> str:
     """Serialize findings to SARIF 2.1.0 format.
 
@@ -75,21 +79,21 @@ def to_sarif(entry: dict) -> str:
 
     for f in entry.get("findings", []):
         severity, category, message, remediation = _parse_plain(f)
-        category  = category or "general"
-        rule_id   = f"FLK-{category.upper()}"
+        category = category or "general"
+        rule_id = f"FLK-{category.upper()}"
 
         if rule_id not in seen_rules:
             seen_rules[rule_id] = {
-                "id":               rule_id,
-                "name":             category.replace("-", " ").title(),
+                "id": rule_id,
+                "name": category.replace("-", " ").title(),
                 "shortDescription": {"text": f"Cashel {category} check"},
-                "properties":       {"category": category},
+                "properties": {"category": category},
             }
 
         result: dict = {
-            "ruleId":    rule_id,
-            "level":     _sarif_level(severity),
-            "message":   {"text": message},
+            "ruleId": rule_id,
+            "level": _sarif_level(severity),
+            "message": {"text": message},
             "locations": [],
         }
         if remediation:
@@ -97,21 +101,23 @@ def to_sarif(entry: dict) -> str:
         results.append(result)
 
     sarif = {
-        "version":  "2.1.0",
-        "$schema":  (
+        "version": "2.1.0",
+        "$schema": (
             "https://raw.githubusercontent.com/oasis-tcs/sarif-spec"
             "/master/Schemata/sarif-schema-2.1.0.json"
         ),
-        "runs": [{
-            "tool": {
-                "driver": {
-                    "name":            TOOL_NAME,
-                    "version":         TOOL_VERSION,
-                    "informationUri":  TOOL_INFO_URI,
-                    "rules":           list(seen_rules.values()),
-                }
-            },
-            "results": results,
-        }],
+        "runs": [
+            {
+                "tool": {
+                    "driver": {
+                        "name": TOOL_NAME,
+                        "version": TOOL_VERSION,
+                        "informationUri": TOOL_INFO_URI,
+                        "rules": list(seen_rules.values()),
+                    }
+                },
+                "results": results,
+            }
+        ],
     }
     return json.dumps(sarif, indent=2)

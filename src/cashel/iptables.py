@@ -11,22 +11,23 @@ Key differences from stateful firewall vendors:
   - Logging requires an explicit LOG target before the terminal target.
   - nftables uses priority-based hooks; policy is per-chain.
 """
+
 import ipaddress
 import json
 import re
 
 SENSITIVE_PORTS = {
-    22:    "SSH",
-    23:    "Telnet",
-    25:    "SMTP",
-    3389:  "RDP",
-    5900:  "VNC",
-    3306:  "MySQL",
-    5432:  "PostgreSQL",
-    1433:  "MSSQL",
-    6379:  "Redis",
+    22: "SSH",
+    23: "Telnet",
+    25: "SMTP",
+    3389: "RDP",
+    5900: "VNC",
+    3306: "MySQL",
+    5432: "PostgreSQL",
+    1433: "MSSQL",
+    6379: "Redis",
     27017: "MongoDB",
-    9200:  "Elasticsearch",
+    9200: "Elasticsearch",
     11211: "Memcached",
 }
 
@@ -34,8 +35,12 @@ _INTERNET_SRCS = {"0.0.0.0/0", "::/0", "any"}
 
 
 def _f(severity, category, message, remediation=""):
-    return {"severity": severity, "category": category,
-            "message": message, "remediation": remediation}
+    return {
+        "severity": severity,
+        "category": category,
+        "message": message,
+        "remediation": remediation,
+    }
 
 
 def _is_any_source(src: str) -> bool:
@@ -79,7 +84,7 @@ def _parse_iptables_rule(line: str) -> dict | None:
     if not m:
         return None
     chain = m.group(1)
-    rest  = m.group(2)
+    rest = m.group(2)
 
     def _extract(flags, default=""):
         for flag in flags:
@@ -107,13 +112,17 @@ def _parse_iptables_rule(line: str) -> dict | None:
     dst = _extract(["-d", "--destination"], "0.0.0.0/0")
 
     # destination port(s)
-    dport = _extract_multiport(["--dport", "--dports", "--destination-port", "--destination-ports"])
+    dport = _extract_multiport(
+        ["--dport", "--dports", "--destination-port", "--destination-ports"]
+    )
 
     # source port(s)
-    sport = _extract_multiport(["--sport", "--sports", "--source-port", "--source-ports"])
+    sport = _extract_multiport(
+        ["--sport", "--sports", "--source-port", "--source-ports"]
+    )
 
     # in/out interface
-    in_iface  = _extract(["-i", "--in-interface"])
+    in_iface = _extract(["-i", "--in-interface"])
     out_iface = _extract(["-o", "--out-interface"])
 
     # icmp type
@@ -124,18 +133,18 @@ def _parse_iptables_rule(line: str) -> dict | None:
     state = (state_m.group(1) or state_m.group(2)) if state_m else ""
 
     return {
-        "chain":     chain,
-        "target":    target,
-        "protocol":  proto,
-        "src":       src,
-        "dst":       dst,
-        "dport":     dport,
-        "sport":     sport,
-        "in_iface":  in_iface,
+        "chain": chain,
+        "target": target,
+        "protocol": proto,
+        "src": src,
+        "dst": dst,
+        "dport": dport,
+        "sport": sport,
+        "in_iface": in_iface,
         "out_iface": out_iface,
         "icmp_type": icmp_type,
-        "state":     state,
-        "raw":       line.strip(),
+        "state": state,
+        "raw": line.strip(),
     }
 
 
@@ -155,7 +164,10 @@ def parse_iptables(filepath: str) -> tuple[dict, str | None]:
         return {}, f"Failed to read iptables file: {exc}"
 
     if not re.search(r"^\*\w+|^-A\s+\w+", content, re.MULTILINE):
-        return {}, "Unrecognized format: expected iptables-save output (lines starting with '*' or '-A')."
+        return (
+            {},
+            "Unrecognized format: expected iptables-save output (lines starting with '*' or '-A').",
+        )
 
     is_ipv6 = bool(re.search(r"ip6tables|ip6", content, re.IGNORECASE))
 
@@ -187,6 +199,7 @@ def parse_iptables(filepath: str) -> tuple[dict, str | None]:
 
 # ── iptables checks ───────────────────────────────────────────────────────────
 
+
 def check_default_policy_iptables(data: dict) -> list[dict]:
     """Flag INPUT or FORWARD chains with a default ACCEPT policy."""
     findings = []
@@ -195,12 +208,15 @@ def check_default_policy_iptables(data: dict) -> list[dict]:
     for chain in ("INPUT", "FORWARD"):
         pol = policy.get(chain, "").upper()
         if pol == "ACCEPT":
-            findings.append(_f(
-                "HIGH", "hygiene",
-                f"[HIGH] iptables filter chain '{chain}' has default policy ACCEPT — all unmatched traffic is permitted.",
-                f"Set a default DROP policy: 'iptables -P {chain} DROP'. "
-                "Explicit ACCEPT rules should be used only for required traffic.",
-            ))
+            findings.append(
+                _f(
+                    "HIGH",
+                    "hygiene",
+                    f"[HIGH] iptables filter chain '{chain}' has default policy ACCEPT — all unmatched traffic is permitted.",
+                    f"Set a default DROP policy: 'iptables -P {chain} DROP'. "
+                    "Explicit ACCEPT rules should be used only for required traffic.",
+                )
+            )
     return findings
 
 
@@ -209,23 +225,30 @@ def check_any_any_accept_iptables(data: dict) -> list[dict]:
     findings = []
     rules = data.get("tables", {}).get("filter", {}).get("rules", [])
     for r in rules:
-        if (r["chain"] == "INPUT"
-                and r["target"] == "ACCEPT"
-                and not r["dport"]
-                and not r["sport"]
-                and _is_any_source(r["src"])
-                and r["protocol"] in ("", "all")):
+        if (
+            r["chain"] == "INPUT"
+            and r["target"] == "ACCEPT"
+            and not r["dport"]
+            and not r["sport"]
+            and _is_any_source(r["src"])
+            and r["protocol"] in ("", "all")
+        ):
             # skip loopback and established/related
             if r["in_iface"] == "lo":
                 continue
-            if r["state"] and any(s in r["state"].upper() for s in ("ESTABLISHED", "RELATED")):
+            if r["state"] and any(
+                s in r["state"].upper() for s in ("ESTABLISHED", "RELATED")
+            ):
                 continue
-            findings.append(_f(
-                "HIGH", "exposure",
-                f"[HIGH] iptables INPUT rule allows ALL traffic from any source: {r['raw']}",
-                "Remove or replace broad ACCEPT rules with specific protocol/port/source restrictions. "
-                "Use 'iptables -A INPUT -s <trusted-cidr> -p <proto> --dport <port> -j ACCEPT'.",
-            ))
+            findings.append(
+                _f(
+                    "HIGH",
+                    "exposure",
+                    f"[HIGH] iptables INPUT rule allows ALL traffic from any source: {r['raw']}",
+                    "Remove or replace broad ACCEPT rules with specific protocol/port/source restrictions. "
+                    "Use 'iptables -A INPUT -s <trusted-cidr> -p <proto> --dport <port> -j ACCEPT'.",
+                )
+            )
     return findings
 
 
@@ -240,18 +263,23 @@ def check_internet_ingress_iptables(data: dict) -> list[dict]:
             continue
         if r["in_iface"] == "lo":
             continue
-        if r["state"] and any(s in r["state"].upper() for s in ("ESTABLISHED", "RELATED")):
+        if r["state"] and any(
+            s in r["state"].upper() for s in ("ESTABLISHED", "RELATED")
+        ):
             continue
         dport = r.get("dport", "")
         if dport:
             for port, svc in _port_in_sensitive(dport):
-                findings.append(_f(
-                    "HIGH", "exposure",
-                    f"[HIGH] iptables: {svc} (TCP/{port}) open to 0.0.0.0/0: {r['raw']}",
-                    f"Restrict '{svc}' access to known source CIDRs: "
-                    f"'iptables -A INPUT -s <trusted-cidr> -p tcp --dport {port} -j ACCEPT'. "
-                    "Remove or restrict the broad rule.",
-                ))
+                findings.append(
+                    _f(
+                        "HIGH",
+                        "exposure",
+                        f"[HIGH] iptables: {svc} (TCP/{port}) open to 0.0.0.0/0: {r['raw']}",
+                        f"Restrict '{svc}' access to known source CIDRs: "
+                        f"'iptables -A INPUT -s <trusted-cidr> -p tcp --dport {port} -j ACCEPT'. "
+                        "Remove or restrict the broad rule.",
+                    )
+                )
     return findings
 
 
@@ -260,19 +288,26 @@ def check_forward_chain_iptables(data: dict) -> list[dict]:
     findings = []
     rules = data.get("tables", {}).get("filter", {}).get("rules", [])
     for r in rules:
-        if (r["chain"] == "FORWARD"
-                and r["target"] == "ACCEPT"
-                and not r["dport"]
-                and _is_any_source(r["src"])
-                and r["protocol"] in ("", "all")):
-            if r["state"] and any(s in r["state"].upper() for s in ("ESTABLISHED", "RELATED")):
+        if (
+            r["chain"] == "FORWARD"
+            and r["target"] == "ACCEPT"
+            and not r["dport"]
+            and _is_any_source(r["src"])
+            and r["protocol"] in ("", "all")
+        ):
+            if r["state"] and any(
+                s in r["state"].upper() for s in ("ESTABLISHED", "RELATED")
+            ):
                 continue
-            findings.append(_f(
-                "MEDIUM", "exposure",
-                f"[MEDIUM] iptables: FORWARD chain has unrestricted ACCEPT — host may be routing traffic: {r['raw']}",
-                "Restrict FORWARD rules to specific source/destination pairs. "
-                "If the host is not a router, set 'iptables -P FORWARD DROP' and remove FORWARD ACCEPT rules.",
-            ))
+            findings.append(
+                _f(
+                    "MEDIUM",
+                    "exposure",
+                    f"[MEDIUM] iptables: FORWARD chain has unrestricted ACCEPT — host may be routing traffic: {r['raw']}",
+                    "Restrict FORWARD rules to specific source/destination pairs. "
+                    "If the host is not a router, set 'iptables -P FORWARD DROP' and remove FORWARD ACCEPT rules.",
+                )
+            )
     return findings
 
 
@@ -283,13 +318,16 @@ def check_missing_logging_iptables(data: dict) -> list[dict]:
     input_rules = [r for r in rules if r["chain"] == "INPUT"]
     has_log = any(r["target"] == "LOG" for r in input_rules)
     if not has_log and any(r["target"] == "ACCEPT" for r in input_rules):
-        return [_f(
-            "MEDIUM", "logging",
-            "[MEDIUM] iptables: No LOG target found in INPUT chain — accepted traffic is not logged.",
-            "Add LOG rules before ACCEPT targets: "
-            "'iptables -A INPUT -j LOG --log-prefix \"[ACCEPT] \" --log-level 4'. "
-            "Without logging, permitted traffic cannot be audited.",
-        )]
+        return [
+            _f(
+                "MEDIUM",
+                "logging",
+                "[MEDIUM] iptables: No LOG target found in INPUT chain — accepted traffic is not logged.",
+                "Add LOG rules before ACCEPT targets: "
+                "'iptables -A INPUT -j LOG --log-prefix \"[ACCEPT] \" --log-level 4'. "
+                "Without logging, permitted traffic cannot be audited.",
+            )
+        ]
     return []
 
 
@@ -298,19 +336,24 @@ def check_icmp_unrestricted_iptables(data: dict) -> list[dict]:
     findings = []
     rules = data.get("tables", {}).get("filter", {}).get("rules", [])
     for r in rules:
-        if (r["chain"] == "INPUT"
-                and r["target"] == "ACCEPT"
-                and r["protocol"] in ("icmp", "icmpv6", "ipv6-icmp")
-                and _is_any_source(r["src"])):
+        if (
+            r["chain"] == "INPUT"
+            and r["target"] == "ACCEPT"
+            and r["protocol"] in ("icmp", "icmpv6", "ipv6-icmp")
+            and _is_any_source(r["src"])
+        ):
             has_limit = re.search(r"-m\s+limit|--limit\b", r["raw"])
             if not has_limit:
-                findings.append(_f(
-                    "MEDIUM", "exposure",
-                    f"[MEDIUM] iptables: Unrestricted ICMP ACCEPT from 0.0.0.0/0 with no rate-limit: {r['raw']}",
-                    "Add rate-limiting: 'iptables -A INPUT -p icmp --icmp-type echo-request "
-                    "-m limit --limit 10/sec -j ACCEPT'. "
-                    "Unrestricted ICMP can be abused for reconnaissance or flood attacks.",
-                ))
+                findings.append(
+                    _f(
+                        "MEDIUM",
+                        "exposure",
+                        f"[MEDIUM] iptables: Unrestricted ICMP ACCEPT from 0.0.0.0/0 with no rate-limit: {r['raw']}",
+                        "Add rate-limiting: 'iptables -A INPUT -p icmp --icmp-type echo-request "
+                        "-m limit --limit 10/sec -j ACCEPT'. "
+                        "Unrestricted ICMP can be abused for reconnaissance or flood attacks.",
+                    )
+                )
     return findings
 
 
@@ -345,28 +388,32 @@ def _parse_nftables_json(content: str) -> tuple[list[dict], str | None]:
 
     entries = blob if isinstance(blob, list) else blob.get("nftables", [])
     chains: list[dict] = []
-    rules:  list[dict] = []
+    rules: list[dict] = []
 
     for item in entries:
         if "chain" in item:
             c = item["chain"]
-            chains.append({
-                "family": c.get("family", ""),
-                "table":  c.get("table", ""),
-                "name":   c.get("name", ""),
-                "hook":   c.get("hook", ""),
-                "policy": c.get("policy", ""),
-                "type":   c.get("type", ""),
-            })
+            chains.append(
+                {
+                    "family": c.get("family", ""),
+                    "table": c.get("table", ""),
+                    "name": c.get("name", ""),
+                    "hook": c.get("hook", ""),
+                    "policy": c.get("policy", ""),
+                    "type": c.get("type", ""),
+                }
+            )
         if "rule" in item:
             r = item["rule"]
-            rules.append({
-                "family": r.get("family", ""),
-                "table":  r.get("table", ""),
-                "chain":  r.get("chain", ""),
-                "expr":   r.get("expr", []),
-                "raw":    str(r.get("expr", "")),
-            })
+            rules.append(
+                {
+                    "family": r.get("family", ""),
+                    "table": r.get("table", ""),
+                    "chain": r.get("chain", ""),
+                    "expr": r.get("expr", []),
+                    "raw": str(r.get("expr", "")),
+                }
+            )
     return [{"chains": chains, "rules": rules}], None
 
 
@@ -387,7 +434,7 @@ def _parse_nftables_text(content: str) -> list[dict]:
             if m:
                 current_table = {
                     "family": m.group(1),
-                    "name":   m.group(2),
+                    "name": m.group(2),
                     "chains": {},
                 }
                 tables.append(current_table)
@@ -397,11 +444,11 @@ def _parse_nftables_text(content: str) -> list[dict]:
             m = re.match(r"chain\s+(\w+)", stripped)
             if m and current_table:
                 current_chain = {
-                    "name":   m.group(1),
-                    "hook":   "",
+                    "name": m.group(1),
+                    "hook": "",
                     "policy": "",
-                    "type":   "",
-                    "rules":  [],
+                    "type": "",
+                    "rules": [],
                 }
                 current_table["chains"][m.group(1)] = current_chain
 
@@ -454,17 +501,24 @@ def parse_nftables(filepath: str) -> tuple[list, str | None]:
 
     # Fallback to text format
     if not re.search(r"\btable\b|\bchain\b", content):
-        return [], ("Unrecognized format: expected 'nft list ruleset' text output "
-                    "or 'nft -j list ruleset' JSON.")
+        return [], (
+            "Unrecognized format: expected 'nft list ruleset' text output "
+            "or 'nft -j list ruleset' JSON."
+        )
     return _parse_nftables_text(content), None
 
 
 # ── nftables checks ───────────────────────────────────────────────────────────
 
+
 def _nft_is_json_format(tables: list) -> bool:
     """Detect whether tables came from JSON parse (single-item list with 'chains' key)."""
-    return bool(tables and isinstance(tables[0], dict) and "chains" in tables[0] and
-                isinstance(tables[0]["chains"], list))
+    return bool(
+        tables
+        and isinstance(tables[0], dict)
+        and "chains" in tables[0]
+        and isinstance(tables[0]["chains"], list)
+    )
 
 
 def check_default_policy_nftables(tables: list) -> list[dict]:
@@ -472,26 +526,38 @@ def check_default_policy_nftables(tables: list) -> list[dict]:
     findings = []
     if _nft_is_json_format(tables):
         for chain in tables[0].get("chains", []):
-            if chain.get("hook") in ("input", "forward") and chain.get("policy", "").lower() == "accept":
-                findings.append(_f(
-                    "HIGH", "hygiene",
-                    f"[HIGH] nftables: chain '{chain['name']}' (hook={chain['hook']}) "
-                    f"has default policy 'accept' — all unmatched traffic is permitted.",
-                    f"Set 'policy drop' on the {chain['hook']} chain. "
-                    "Use explicit 'accept' statements only for required traffic.",
-                ))
+            if (
+                chain.get("hook") in ("input", "forward")
+                and chain.get("policy", "").lower() == "accept"
+            ):
+                findings.append(
+                    _f(
+                        "HIGH",
+                        "hygiene",
+                        f"[HIGH] nftables: chain '{chain['name']}' (hook={chain['hook']}) "
+                        f"has default policy 'accept' — all unmatched traffic is permitted.",
+                        f"Set 'policy drop' on the {chain['hook']} chain. "
+                        "Use explicit 'accept' statements only for required traffic.",
+                    )
+                )
         return findings
 
     for tbl in tables:
         for cname, chain in tbl.get("chains", {}).items():
-            if chain.get("hook") in ("input", "forward") and chain.get("policy", "").lower() == "accept":
-                findings.append(_f(
-                    "HIGH", "hygiene",
-                    f"[HIGH] nftables table '{tbl['name']}': chain '{cname}' "
-                    f"(hook={chain['hook']}) has default policy 'accept'.",
-                    f"Change to 'policy drop;' inside the '{cname}' chain. "
-                    "Only explicitly needed traffic should be accepted.",
-                ))
+            if (
+                chain.get("hook") in ("input", "forward")
+                and chain.get("policy", "").lower() == "accept"
+            ):
+                findings.append(
+                    _f(
+                        "HIGH",
+                        "hygiene",
+                        f"[HIGH] nftables table '{tbl['name']}': chain '{cname}' "
+                        f"(hook={chain['hook']}) has default policy 'accept'.",
+                        f"Change to 'policy drop;' inside the '{cname}' chain. "
+                        "Only explicitly needed traffic should be accepted.",
+                    )
+                )
     return findings
 
 
@@ -534,13 +600,16 @@ def check_internet_ingress_nftables(tables: list) -> list[dict]:
                     continue
                 hits = _nft_rule_sensitive_ports(rule)
                 for port, svc in hits:
-                    findings.append(_f(
-                        "HIGH", "exposure",
-                        f"[HIGH] nftables table '{tbl['name']}' chain '{cname}': "
-                        f"{svc} (TCP/{port}) accepted with no source restriction: {rule}",
-                        f"Add a source restriction: 'ip saddr <trusted-cidr> tcp dport {port} accept'. "
-                        "Unrestricted access to sensitive ports exposes the host to the internet.",
-                    ))
+                    findings.append(
+                        _f(
+                            "HIGH",
+                            "exposure",
+                            f"[HIGH] nftables table '{tbl['name']}' chain '{cname}': "
+                            f"{svc} (TCP/{port}) accepted with no source restriction: {rule}",
+                            f"Add a source restriction: 'ip saddr <trusted-cidr> tcp dport {port} accept'. "
+                            "Unrestricted access to sensitive ports exposes the host to the internet.",
+                        )
+                    )
     return findings
 
 
@@ -558,13 +627,16 @@ def check_any_any_accept_nftables(tables: list) -> list[dict]:
                 rl = rule.strip().lower()
                 # bare "accept" or "counter accept" with no match expressions
                 if re.match(r"^(counter\s+)?accept\s*$", rl):
-                    findings.append(_f(
-                        "HIGH", "exposure",
-                        f"[HIGH] nftables table '{tbl['name']}' chain '{cname}': "
-                        f"unconditional 'accept' — all traffic is permitted: {rule}",
-                        "Replace the bare 'accept' with specific match conditions. "
-                        "Every accept statement should include protocol, port, and source restrictions.",
-                    ))
+                    findings.append(
+                        _f(
+                            "HIGH",
+                            "exposure",
+                            f"[HIGH] nftables table '{tbl['name']}' chain '{cname}': "
+                            f"unconditional 'accept' — all traffic is permitted: {rule}",
+                            "Replace the bare 'accept' with specific match conditions. "
+                            "Every accept statement should include protocol, port, and source restrictions.",
+                        )
+                    )
     return findings
 
 
@@ -579,17 +651,20 @@ def check_missing_logging_nftables(tables: list) -> list[dict]:
             if chain.get("hook") != "input":
                 continue
             rules = chain.get("rules", [])
-            has_log    = any("log" in r.lower() for r in rules)
+            has_log = any("log" in r.lower() for r in rules)
             has_accept = any("accept" in r.lower() for r in rules)
             if has_accept and not has_log:
-                findings.append(_f(
-                    "MEDIUM", "logging",
-                    f"[MEDIUM] nftables table '{tbl['name']}' chain '{cname}': "
-                    "no 'log' statement found — accepted traffic is not logged.",
-                    "Add log statements before accept rules: "
-                    "'log prefix \"[ACCEPT] \" level info'. "
-                    "Without logging, accepted traffic cannot be audited.",
-                ))
+                findings.append(
+                    _f(
+                        "MEDIUM",
+                        "logging",
+                        f"[MEDIUM] nftables table '{tbl['name']}' chain '{cname}': "
+                        "no 'log' statement found — accepted traffic is not logged.",
+                        "Add log statements before accept rules: "
+                        "'log prefix \"[ACCEPT] \" level info'. "
+                        "Without logging, accepted traffic cannot be audited.",
+                    )
+                )
     return findings
 
 
@@ -605,16 +680,22 @@ def check_icmp_unrestricted_nftables(tables: list) -> list[dict]:
                 continue
             for rule in chain.get("rules", []):
                 rl = rule.lower()
-                if ("icmp" in rl and "accept" in rl
-                        and "limit" not in rl
-                        and not re.search(r"saddr", rl)):
-                    findings.append(_f(
-                        "MEDIUM", "exposure",
-                        f"[MEDIUM] nftables table '{tbl['name']}' chain '{cname}': "
-                        f"ICMP accepted without rate-limiting or source restriction: {rule}",
-                        "Add rate-limiting: 'icmp type echo-request limit rate 10/second accept'. "
-                        "Unrestricted ICMP can facilitate reconnaissance and flood attacks.",
-                    ))
+                if (
+                    "icmp" in rl
+                    and "accept" in rl
+                    and "limit" not in rl
+                    and not re.search(r"saddr", rl)
+                ):
+                    findings.append(
+                        _f(
+                            "MEDIUM",
+                            "exposure",
+                            f"[MEDIUM] nftables table '{tbl['name']}' chain '{cname}': "
+                            f"ICMP accepted without rate-limiting or source restriction: {rule}",
+                            "Add rate-limiting: 'icmp type echo-request limit rate 10/second accept'. "
+                            "Unrestricted ICMP can facilitate reconnaissance and flood attacks.",
+                        )
+                    )
     return findings
 
 

@@ -10,11 +10,17 @@ AWS Security Groups are intentionally excluded: SG rules have no evaluation
 order (all matching rules apply, most-permissive wins), so shadow analysis
 does not apply.
 """
+
 import re
 
 
 def _f(severity, category, message, remediation=""):
-    return {"severity": severity, "category": category, "message": message, "remediation": remediation}
+    return {
+        "severity": severity,
+        "category": category,
+        "message": message,
+        "remediation": remediation,
+    }
 
 
 def _covers(broad, narrow):
@@ -32,6 +38,7 @@ def _covers(broad, narrow):
 
 # ── Palo Alto ────────────────────────────────────────────────────────────────
 
+
 def check_shadow_rules_pa(rules):
     """Detect shadowed rules in a Palo Alto rulebase.
 
@@ -42,11 +49,11 @@ def check_shadow_rules_pa(rules):
     active = []  # list of (name, src, dst, app, svc)
 
     for rule in rules:
-        name     = rule.get("name", "unnamed")
-        src      = [s.text or "" for s in rule.findall(".//source/member")]
-        dst      = [d.text or "" for d in rule.findall(".//destination/member")]
-        app      = [a.text or "" for a in rule.findall(".//application/member")]
-        svc      = [s.text or "" for s in rule.findall(".//service/member")]
+        name = rule.get("name", "unnamed")
+        src = [s.text or "" for s in rule.findall(".//source/member")]
+        dst = [d.text or "" for d in rule.findall(".//destination/member")]
+        app = [a.text or "" for a in rule.findall(".//application/member")]
+        svc = [s.text or "" for s in rule.findall(".//service/member")]
         disabled = rule.findtext(".//disabled") == "yes"
 
         if disabled:
@@ -58,13 +65,16 @@ def check_shadow_rules_pa(rules):
                 and _covers(e_dst, dst)
                 and (_covers(e_app, app) or _covers(e_svc, svc))
             ):
-                findings.append(_f(
-                    "HIGH", "redundancy",
-                    f"[HIGH] Rule '{name}' is shadowed by earlier rule '{e_name}' — it will never match",
-                    f"Rule '{e_name}' appears before '{name}' and covers a superset of its "
-                    f"source/destination/application scope. Either remove '{name}' if it is "
-                    f"obsolete, or move it above '{e_name}' so it is evaluated first.",
-                ))
+                findings.append(
+                    _f(
+                        "HIGH",
+                        "redundancy",
+                        f"[HIGH] Rule '{name}' is shadowed by earlier rule '{e_name}' — it will never match",
+                        f"Rule '{e_name}' appears before '{name}' and covers a superset of its "
+                        f"source/destination/application scope. Either remove '{name}' if it is "
+                        f"obsolete, or move it above '{e_name}' so it is evaluated first.",
+                    )
+                )
                 break
 
         active.append((name, src, dst, app, svc))
@@ -73,6 +83,7 @@ def check_shadow_rules_pa(rules):
 
 
 # ── Fortinet ────────────────────────────────────────────────────────────────
+
 
 def check_shadow_rules_forti(policies):
     """Detect shadowed policies in a FortiGate policy list.
@@ -88,19 +99,22 @@ def check_shadow_rules_forti(policies):
             continue
 
         name = p.get("name") or f"Policy ID {p.get('id')}"
-        src  = p.get("srcaddr", [])
-        dst  = p.get("dstaddr", [])
-        svc  = p.get("service", [])
+        src = p.get("srcaddr", [])
+        dst = p.get("dstaddr", [])
+        svc = p.get("service", [])
 
         for e_name, e_src, e_dst, e_svc in active:
             if _covers(e_src, src) and _covers(e_dst, dst) and _covers(e_svc, svc):
-                findings.append(_f(
-                    "HIGH", "redundancy",
-                    f"[HIGH] Policy '{name}' is shadowed by earlier policy '{e_name}' — it will never match",
-                    f"Policy '{e_name}' precedes '{name}' and covers a superset of its "
-                    f"source/destination/service scope. Remove '{name}' if it is obsolete, "
-                    f"or reorder it above '{e_name}' so it is evaluated first.",
-                ))
+                findings.append(
+                    _f(
+                        "HIGH",
+                        "redundancy",
+                        f"[HIGH] Policy '{name}' is shadowed by earlier policy '{e_name}' — it will never match",
+                        f"Policy '{e_name}' precedes '{name}' and covers a superset of its "
+                        f"source/destination/service scope. Remove '{name}' if it is obsolete, "
+                        f"or reorder it above '{e_name}' so it is evaluated first.",
+                    )
+                )
                 break
 
         active.append((name, src, dst, svc))
@@ -109,6 +123,7 @@ def check_shadow_rules_forti(policies):
 
 
 # ── pfSense ──────────────────────────────────────────────────────────────────
+
 
 def check_shadow_rules_pfsense(rules):
     """Detect shadowed rules in a pfSense ruleset.
@@ -128,26 +143,29 @@ def check_shadow_rules_pfsense(rules):
         active = []  # list of (name, src, dst, proto)
 
         for r in intf_rules:
-            name  = r.get("descr") or "unnamed"
-            src   = r.get("source", "")
-            dst   = r.get("destination", "")
+            name = r.get("descr") or "unnamed"
+            src = r.get("source", "")
+            dst = r.get("destination", "")
             proto = (r.get("protocol") or "any").lower()
 
             for e_name, e_src, e_dst, e_proto in active:
-                src_covered   = (e_src == "1") or (e_src == src)
-                dst_covered   = (e_dst == "1") or (e_dst == dst)
+                src_covered = (e_src == "1") or (e_src == src)
+                dst_covered = (e_dst == "1") or (e_dst == dst)
                 proto_covered = (e_proto == "any") or (e_proto == proto)
 
                 if src_covered and dst_covered and proto_covered:
                     intf_label = intf or "unknown"
-                    findings.append(_f(
-                        "HIGH", "redundancy",
-                        f"[HIGH] pfSense rule '{name}' (interface: {intf_label}) is shadowed by "
-                        f"earlier rule '{e_name}' — it will never match",
-                        f"Rule '{e_name}' precedes '{name}' on interface '{intf_label}' and "
-                        f"covers a superset of its source/destination/protocol scope. "
-                        f"Remove or reorder '{name}' to ensure it is evaluated as intended.",
-                    ))
+                    findings.append(
+                        _f(
+                            "HIGH",
+                            "redundancy",
+                            f"[HIGH] pfSense rule '{name}' (interface: {intf_label}) is shadowed by "
+                            f"earlier rule '{e_name}' — it will never match",
+                            f"Rule '{e_name}' precedes '{name}' on interface '{intf_label}' and "
+                            f"covers a superset of its source/destination/protocol scope. "
+                            f"Remove or reorder '{name}' to ensure it is evaluated as intended.",
+                        )
+                    )
                     break
 
             active.append((name, src, dst, proto))
@@ -173,18 +191,18 @@ def _parse_asa_rule(text):
     if not m:
         return None
     acl_name = m.group(1)
-    action   = m.group(2).lower()
-    proto    = m.group(3).lower()
-    rest     = m.group(4).split()
-    src_any  = bool(rest) and rest[0].lower() == "any"
-    dst_any  = "any" in [t.lower() for t in rest[1:]]
+    action = m.group(2).lower()
+    proto = m.group(3).lower()
+    rest = m.group(4).split()
+    src_any = bool(rest) and rest[0].lower() == "any"
+    dst_any = "any" in [t.lower() for t in rest[1:]]
     return {
-        "acl":     acl_name,
-        "action":  action,
-        "proto":   proto,
+        "acl": acl_name,
+        "action": action,
+        "proto": proto,
         "src_any": src_any,
         "dst_any": dst_any,
-        "raw":     text.strip(),
+        "raw": text.strip(),
     }
 
 
@@ -209,16 +227,19 @@ def check_shadow_rules_asa(parse):
         for i, rule in enumerate(rules):
             if rule["src_any"] and rule["dst_any"] and rule["proto"] in ("ip", "any"):
                 # Every entry after position i in this ACL is unreachable
-                for shadowed in rules[i + 1:]:
-                    findings.append(_f(
-                        "HIGH", "redundancy",
-                        f"[HIGH] ACL '{acl_name}': rule '{shadowed['raw']}' is unreachable — "
-                        f"shadowed by earlier '{rule['action']} {rule['proto']} any any'",
-                        f"The '{rule['action']} {rule['proto']} any any' entry in ACL "
-                        f"'{acl_name}' matches all traffic, making every subsequent entry "
-                        f"unreachable. Move specific rules above the broad any-any entry, "
-                        f"or remove them if they are no longer needed.",
-                    ))
+                for shadowed in rules[i + 1 :]:
+                    findings.append(
+                        _f(
+                            "HIGH",
+                            "redundancy",
+                            f"[HIGH] ACL '{acl_name}': rule '{shadowed['raw']}' is unreachable — "
+                            f"shadowed by earlier '{rule['action']} {rule['proto']} any any'",
+                            f"The '{rule['action']} {rule['proto']} any any' entry in ACL "
+                            f"'{acl_name}' matches all traffic, making every subsequent entry "
+                            f"unreachable. Move specific rules above the broad any-any entry, "
+                            f"or remove them if they are no longer needed.",
+                        )
+                    )
                 break  # Only report the first shadowing rule per ACL to avoid noise
 
     return findings
@@ -234,7 +255,7 @@ def _azure_src_any(props):
 
 
 def _azure_port_any(props):
-    port  = props.get("destinationPortRange", "")
+    port = props.get("destinationPortRange", "")
     multi = props.get("destinationPortRanges", [])
     return port == "*" or (not port and not multi)
 
@@ -249,12 +270,13 @@ def check_shadow_rules_azure(nsgs):
     findings = []
 
     for nsg in nsgs:
-        nsg_name  = nsg.get("name", "unnamed")
+        nsg_name = nsg.get("name", "unnamed")
         all_rules = nsg.get("securityRules", [])
 
         for direction in ("Inbound", "Outbound"):
             dir_rules = [
-                r for r in all_rules
+                r
+                for r in all_rules
                 if (r.get("properties", r)).get("direction") == direction
             ]
             sorted_rules = sorted(
@@ -265,12 +287,12 @@ def check_shadow_rules_azure(nsgs):
             active = []  # (name, priority, src_any, port_any, proto)
 
             for rule in sorted_rules:
-                props    = rule.get("properties", rule)
-                name     = rule.get("name", "unnamed")
+                props = rule.get("properties", rule)
+                name = rule.get("name", "unnamed")
                 priority = props.get("priority", "?")
-                src_any  = _azure_src_any(props)
+                src_any = _azure_src_any(props)
                 port_any = _azure_port_any(props)
-                proto    = props.get("protocol", "*")
+                proto = props.get("protocol", "*")
 
                 for e_name, e_prio, e_src_any, e_port_any, e_proto in active:
                     proto_covered = e_proto in ("*", proto)
@@ -280,14 +302,17 @@ def check_shadow_rules_azure(nsgs):
                         and (e_port_any or not port_any)
                         and proto_covered
                     ):
-                        findings.append(_f(
-                            "HIGH", "redundancy",
-                            f"[HIGH] NSG '{nsg_name}' {direction} rule '{name}' (priority {priority}) "
-                            f"is shadowed by rule '{e_name}' (priority {e_prio}) — it will never be evaluated",
-                            f"Rule '{e_name}' has a higher priority (lower number) and covers the "
-                            f"same or broader scope. Remove '{name}' if it is redundant, or adjust "
-                            f"its scope to handle traffic not already processed by '{e_name}'.",
-                        ))
+                        findings.append(
+                            _f(
+                                "HIGH",
+                                "redundancy",
+                                f"[HIGH] NSG '{nsg_name}' {direction} rule '{name}' (priority {priority}) "
+                                f"is shadowed by rule '{e_name}' (priority {e_prio}) — it will never be evaluated",
+                                f"Rule '{e_name}' has a higher priority (lower number) and covers the "
+                                f"same or broader scope. Remove '{name}' if it is redundant, or adjust "
+                                f"its scope to handle traffic not already processed by '{e_name}'.",
+                            )
+                        )
                         break
 
                 active.append((name, priority, src_any, port_any, proto))
@@ -320,25 +345,24 @@ def check_shadow_rules_juniper(policies: list) -> list:
         active: list[tuple] = []  # list of (name, src, dst, app, action)
 
         for p in pollist:
-            name   = p.get("name", "unnamed")
-            src    = [s.lower() for s in (p.get("src") or ["any"])]
-            dst    = [d.lower() for d in (p.get("dst") or ["any"])]
-            app    = [a.lower() for a in (p.get("app") or ["any"])]
+            name = p.get("name", "unnamed")
+            src = [s.lower() for s in (p.get("src") or ["any"])]
+            dst = [d.lower() for d in (p.get("dst") or ["any"])]
+            app = [a.lower() for a in (p.get("app") or ["any"])]
 
             for e_name, e_src, e_dst, e_app, _ in active:
-                if (
-                    _covers(e_src, src)
-                    and _covers(e_dst, dst)
-                    and _covers(e_app, app)
-                ):
-                    findings.append(_f(
-                        "HIGH", "redundancy",
-                        f"[HIGH] Zone pair {fz}→{tz}: policy '{name}' is shadowed by earlier policy "
-                        f"'{e_name}' — it will never be evaluated.",
-                        f"Review policies in from-zone {fz} to-zone {tz}.  Either remove '{name}' "
-                        f"if it is redundant, or reorder it before '{e_name}', or narrow the scope "
-                        f"of '{e_name}' so that '{name}' can be reached.",
-                    ))
+                if _covers(e_src, src) and _covers(e_dst, dst) and _covers(e_app, app):
+                    findings.append(
+                        _f(
+                            "HIGH",
+                            "redundancy",
+                            f"[HIGH] Zone pair {fz}→{tz}: policy '{name}' is shadowed by earlier policy "
+                            f"'{e_name}' — it will never be evaluated.",
+                            f"Review policies in from-zone {fz} to-zone {tz}.  Either remove '{name}' "
+                            f"if it is redundant, or reorder it before '{e_name}', or narrow the scope "
+                            f"of '{e_name}' so that '{name}' can be reached.",
+                        )
+                    )
                     break
 
             active.append((name, src, dst, app, p.get("action")))
@@ -347,6 +371,7 @@ def check_shadow_rules_juniper(policies: list) -> list:
 
 
 # ── Dispatch ─────────────────────────────────────────────────────────────────
+
 
 def run_rule_quality_checks(vendor: str, parse, extra_data) -> list:
     """Run rule quality (shadow detection) checks for the given vendor.

@@ -7,23 +7,33 @@ Handles two Juniper configuration styles:
 Returns normalised policy dicts compatible with the rest of the Cashel
 audit pipeline plus system-level findings from management-plane checks.
 """
+
 import re
 
 # Applications Juniper ships as insecure defaults
 _INSECURE_APPS = {
-    "junos-telnet", "telnet",
-    "junos-ftp",    "ftp",
-    "junos-tftp",   "tftp",
+    "junos-telnet",
+    "telnet",
+    "junos-ftp",
+    "ftp",
+    "junos-tftp",
+    "tftp",
     "junos-snmp-agentx",
 }
 _BROAD_ADDRS = {"any", "any-ipv4", "any-ipv6"}
 
 
 def _f(severity, category, message, remediation=""):
-    return {"severity": severity, "category": category, "message": message, "remediation": remediation}
+    return {
+        "severity": severity,
+        "category": category,
+        "message": message,
+        "remediation": remediation,
+    }
 
 
 # ── Config-style detection ────────────────────────────────────────────────────
+
 
 def _is_set_style(content: str) -> bool:
     return bool(re.search(r"^\s*set security", content, re.MULTILINE))
@@ -52,24 +62,24 @@ def _parse_set_style(content: str) -> list[dict]:
             key = (fz, tz, name)
             if key not in policies:
                 policies[key] = {
-                    "name":      name,
+                    "name": name,
                     "from_zone": fz,
-                    "to_zone":   tz,
-                    "src":       [],
-                    "dst":       [],
-                    "app":       [],
-                    "action":    None,
-                    "log":       False,
-                    "disabled":  False,
+                    "to_zone": tz,
+                    "src": [],
+                    "dst": [],
+                    "app": [],
+                    "action": None,
+                    "log": False,
+                    "disabled": False,
                 }
             p = policies[key]
 
             if rest.startswith("match source-address "):
-                p["src"].append(rest[len("match source-address "):].strip())
+                p["src"].append(rest[len("match source-address ") :].strip())
             elif rest.startswith("match destination-address "):
-                p["dst"].append(rest[len("match destination-address "):].strip())
+                p["dst"].append(rest[len("match destination-address ") :].strip())
             elif rest.startswith("match application "):
-                p["app"].append(rest[len("match application "):].strip())
+                p["app"].append(rest[len("match application ") :].strip())
             elif rest.startswith("then reject"):
                 p["action"] = "reject"
             elif rest.startswith("then deny"):
@@ -92,6 +102,7 @@ def _parse_set_style(content: str) -> list[dict]:
 
 # ── Hierarchical (brace) style parser ────────────────────────────────────────
 
+
 def _parse_hierarchical(content: str) -> list[dict]:
     """Parse brace-style Juniper config into normalised policy dicts.
 
@@ -108,7 +119,7 @@ def _parse_hierarchical(content: str) -> list[dict]:
     for raw_line in content.splitlines():
         line = raw_line.strip().rstrip(";")
 
-        opens  = raw_line.count("{")
+        opens = raw_line.count("{")
         closes = raw_line.count("}")
         depth += opens - closes
 
@@ -138,15 +149,15 @@ def _parse_hierarchical(content: str) -> list[dict]:
             current_name = m.group(1)
             inactive = "inactive:" in line
             current_policy = {
-                "name":      current_name,
+                "name": current_name,
                 "from_zone": current_fz,
-                "to_zone":   current_tz,
-                "src":       [],
-                "dst":       [],
-                "app":       [],
-                "action":    None,
-                "log":       False,
-                "disabled":  inactive,
+                "to_zone": current_tz,
+                "src": [],
+                "dst": [],
+                "app": [],
+                "action": None,
+                "log": False,
+                "disabled": inactive,
             }
             in_match = in_then = False
             continue
@@ -191,6 +202,7 @@ def _parse_hierarchical(content: str) -> list[dict]:
 
 # ── Public parser ─────────────────────────────────────────────────────────────
 
+
 def parse_juniper(filepath: str) -> tuple[list[dict], str | None]:
     """Parse a Juniper SRX config file.
 
@@ -207,10 +219,11 @@ def parse_juniper(filepath: str) -> tuple[list[dict], str | None]:
     else:
         policies = _parse_hierarchical(content)
 
-    return policies, content   # return content so caller can do system checks
+    return policies, content  # return content so caller can do system checks
 
 
 # ── Policy-level checks ───────────────────────────────────────────────────────
+
 
 def check_any_any_juniper(policies: list[dict]) -> list[dict]:
     """Flag permit rules that allow any source, any destination, any application."""
@@ -220,15 +233,21 @@ def check_any_any_juniper(policies: list[dict]) -> list[dict]:
             continue
         src_broad = all(s.lower() in _BROAD_ADDRS for s in (p["src"] or ["any"]))
         dst_broad = all(d.lower() in _BROAD_ADDRS for d in (p["dst"] or ["any"]))
-        app_any   = any(a.lower() in ("any", "any-ipv4", "any-ipv6", "junos-any") for a in (p["app"] or ["any"]))
+        app_any = any(
+            a.lower() in ("any", "any-ipv4", "any-ipv6", "junos-any")
+            for a in (p["app"] or ["any"])
+        )
         if src_broad and dst_broad and app_any:
             label = f"{p['from_zone']}→{p['to_zone']} policy '{p['name']}'"
-            findings.append(_f(
-                "HIGH", "exposure",
-                f"[HIGH] {label}: permits any source, any destination, any application.",
-                f"Restrict source-address, destination-address, and application in policy '{p['name']}'. "
-                "Apply least-privilege — allow only the specific zones, addresses, and applications needed.",
-            ))
+            findings.append(
+                _f(
+                    "HIGH",
+                    "exposure",
+                    f"[HIGH] {label}: permits any source, any destination, any application.",
+                    f"Restrict source-address, destination-address, and application in policy '{p['name']}'. "
+                    "Apply least-privilege — allow only the specific zones, addresses, and applications needed.",
+                )
+            )
     return findings
 
 
@@ -239,12 +258,15 @@ def check_missing_log_juniper(policies: list[dict]) -> list[dict]:
         if p.get("disabled") or p.get("action") != "permit" or p.get("log"):
             continue
         label = f"{p['from_zone']}→{p['to_zone']} policy '{p['name']}'"
-        findings.append(_f(
-            "MEDIUM", "logging",
-            f"[MEDIUM] {label}: permit policy has no session logging enabled.",
-            f"Add 'then permit log session-close' (set style) or a 'log {{ session-close; }}' block "
-            f"under 'then permit' in policy '{p['name']}' to enable traffic logging.",
-        ))
+        findings.append(
+            _f(
+                "MEDIUM",
+                "logging",
+                f"[MEDIUM] {label}: permit policy has no session logging enabled.",
+                f"Add 'then permit log session-close' (set style) or a 'log {{ session-close; }}' block "
+                f"under 'then permit' in policy '{p['name']}' to enable traffic logging.",
+            )
+        )
     return findings
 
 
@@ -258,13 +280,16 @@ def check_insecure_apps_juniper(policies: list[dict]) -> list[dict]:
         if not bad:
             continue
         label = f"{p['from_zone']}→{p['to_zone']} policy '{p['name']}'"
-        findings.append(_f(
-            "HIGH", "protocol",
-            f"[HIGH] {label}: permits insecure application(s): {', '.join(bad)}.",
-            "Replace cleartext protocols with encrypted equivalents: "
-            "use SSH instead of Telnet, SFTP/SCP instead of FTP, and SNMPv3 instead of SNMP. "
-            f"Remove or restrict the application term in policy '{p['name']}'.",
-        ))
+        findings.append(
+            _f(
+                "HIGH",
+                "protocol",
+                f"[HIGH] {label}: permits insecure application(s): {', '.join(bad)}.",
+                "Replace cleartext protocols with encrypted equivalents: "
+                "use SSH instead of Telnet, SFTP/SCP instead of FTP, and SNMPv3 instead of SNMP. "
+                f"Remove or restrict the application term in policy '{p['name']}'.",
+            )
+        )
     return findings
 
 
@@ -283,20 +308,26 @@ def check_deny_all_juniper(policies: list[dict]) -> list[dict]:
         last = pollist[-1]
         src_any = all(s.lower() in _BROAD_ADDRS for s in (last["src"] or ["any"]))
         dst_any = all(d.lower() in _BROAD_ADDRS for d in (last["dst"] or ["any"]))
-        app_any = any(a.lower() in ("any", "junos-any") for a in (last["app"] or ["any"]))
+        app_any = any(
+            a.lower() in ("any", "junos-any") for a in (last["app"] or ["any"])
+        )
         is_deny = last.get("action") in ("deny", "reject")
         if not (src_any and dst_any and app_any and is_deny):
-            findings.append(_f(
-                "HIGH", "hygiene",
-                f"[HIGH] Zone pair {fz}→{tz}: no explicit deny-all catch-all policy at end of rule list.",
-                f"Add a final policy under from-zone {fz} to-zone {tz} that matches "
-                "source-address any, destination-address any, application any "
-                "with action deny to ensure a documented, auditable default-deny posture.",
-            ))
+            findings.append(
+                _f(
+                    "HIGH",
+                    "hygiene",
+                    f"[HIGH] Zone pair {fz}→{tz}: no explicit deny-all catch-all policy at end of rule list.",
+                    f"Add a final policy under from-zone {fz} to-zone {tz} that matches "
+                    "source-address any, destination-address any, application any "
+                    "with action deny to ensure a documented, auditable default-deny posture.",
+                )
+            )
     return findings
 
 
 # ── System-level checks ───────────────────────────────────────────────────────
+
 
 def check_system_juniper(content: str) -> list[dict]:
     """Checks against the raw config text for management-plane weaknesses."""
@@ -304,96 +335,114 @@ def check_system_juniper(content: str) -> list[dict]:
     cl = content.lower()
 
     # Telnet enabled on management plane
-    has_telnet = (
-        bool(re.search(r"set system services telnet", content))
-        or ("services {" in content and re.search(r"\btelnet;", content))
+    has_telnet = bool(re.search(r"set system services telnet", content)) or (
+        "services {" in content and re.search(r"\btelnet;", content)
     )
     if has_telnet:
-        findings.append(_f(
-            "HIGH", "management",
-            "[HIGH] Telnet management service is enabled.",
-            "Disable Telnet: 'delete system services telnet' (set style) or remove the "
-            "telnet stanza from 'system { services { ... } }'. Use SSH exclusively.",
-        ))
+        findings.append(
+            _f(
+                "HIGH",
+                "management",
+                "[HIGH] Telnet management service is enabled.",
+                "Disable Telnet: 'delete system services telnet' (set style) or remove the "
+                "telnet stanza from 'system { services { ... } }'. Use SSH exclusively.",
+            )
+        )
 
     # SSH not explicitly configured
-    has_ssh = (
-        bool(re.search(r"set system services ssh", content))
-        or ("services {" in content and re.search(r"\bssh\s*\{", content))
+    has_ssh = bool(re.search(r"set system services ssh", content)) or (
+        "services {" in content and re.search(r"\bssh\s*\{", content)
     )
     if not has_ssh:
-        findings.append(_f(
-            "MEDIUM", "management",
-            "[MEDIUM] SSH management service not explicitly configured.",
-            "Enable SSH: 'set system services ssh' and optionally enforce "
-            "'set system services ssh root-login deny' and protocol-version v2.",
-        ))
+        findings.append(
+            _f(
+                "MEDIUM",
+                "management",
+                "[MEDIUM] SSH management service not explicitly configured.",
+                "Enable SSH: 'set system services ssh' and optionally enforce "
+                "'set system services ssh root-login deny' and protocol-version v2.",
+            )
+        )
 
     # No NTP configured
-    has_ntp = (
-        bool(re.search(r"set system ntp", content))
-        or "ntp {" in cl
-    )
+    has_ntp = bool(re.search(r"set system ntp", content)) or "ntp {" in cl
     if not has_ntp:
-        findings.append(_f(
-            "MEDIUM", "hygiene",
-            "[MEDIUM] No NTP server configured.",
-            "Add at least one NTP server: 'set system ntp server <IP>'. "
-            "Accurate timestamps are required for log correlation and compliance.",
-        ))
+        findings.append(
+            _f(
+                "MEDIUM",
+                "hygiene",
+                "[MEDIUM] No NTP server configured.",
+                "Add at least one NTP server: 'set system ntp server <IP>'. "
+                "Accurate timestamps are required for log correlation and compliance.",
+            )
+        )
 
     # No syslog configured
-    has_syslog = (
-        bool(re.search(r"set system syslog", content))
-        or "syslog {" in cl
-    )
+    has_syslog = bool(re.search(r"set system syslog", content)) or "syslog {" in cl
     if not has_syslog:
-        findings.append(_f(
-            "HIGH", "logging",
-            "[HIGH] No syslog configuration found.",
-            "Configure remote syslog: 'set system syslog host <IP> any any'. "
-            "Without remote logging, audit trails are lost if the device is compromised.",
-        ))
+        findings.append(
+            _f(
+                "HIGH",
+                "logging",
+                "[HIGH] No syslog configuration found.",
+                "Configure remote syslog: 'set system syslog host <IP> any any'. "
+                "Without remote logging, audit trails are lost if the device is compromised.",
+            )
+        )
 
     # Weak SNMP (v1/v2c community)
     snmp_community = re.findall(r"set snmp community (\S+)", content)
     if snmp_community:
         for comm in snmp_community:
-            findings.append(_f(
-                "HIGH", "protocol",
-                f"[HIGH] SNMPv1/v2c community string '{comm}' configured.",
-                "Migrate to SNMPv3 with authentication and privacy: "
-                "'set snmp v3 usm local-engine user <name> authentication-sha ...' "
-                "and remove all 'set snmp community' statements.",
-            ))
+            findings.append(
+                _f(
+                    "HIGH",
+                    "protocol",
+                    f"[HIGH] SNMPv1/v2c community string '{comm}' configured.",
+                    "Migrate to SNMPv3 with authentication and privacy: "
+                    "'set snmp v3 usm local-engine user <name> authentication-sha ...' "
+                    "and remove all 'set snmp community' statements.",
+                )
+            )
 
     # Root login over SSH permitted
     if re.search(r"set system services ssh root-login allow", content):
-        findings.append(_f(
-            "HIGH", "management",
-            "[HIGH] SSH root login is explicitly allowed.",
-            "Disable root SSH login: 'set system services ssh root-login deny'. "
-            "Use named admin accounts with appropriate privileges instead.",
-        ))
+        findings.append(
+            _f(
+                "HIGH",
+                "management",
+                "[HIGH] SSH root login is explicitly allowed.",
+                "Disable root SSH login: 'set system services ssh root-login deny'. "
+                "Use named admin accounts with appropriate privileges instead.",
+            )
+        )
 
     # No zone screens (SYN-flood / DoS protection)
     has_screens = (
-        bool(re.search(r"set security zones security-zone \S+ host-inbound-traffic", content))
+        bool(
+            re.search(
+                r"set security zones security-zone \S+ host-inbound-traffic", content
+            )
+        )
         or bool(re.search(r"set security screen", content))
         or "screen {" in cl
     )
     if not has_screens:
-        findings.append(_f(
-            "MEDIUM", "exposure",
-            "[MEDIUM] No security screen (DoS protection) configuration found.",
-            "Configure zone screens to protect against SYN-flood and other DoS attacks: "
-            "'set security screen ids-option <name> icmp flood' and apply to relevant zones.",
-        ))
+        findings.append(
+            _f(
+                "MEDIUM",
+                "exposure",
+                "[MEDIUM] No security screen (DoS protection) configuration found.",
+                "Configure zone screens to protect against SYN-flood and other DoS attacks: "
+                "'set security screen ids-option <name> icmp flood' and apply to relevant zones.",
+            )
+        )
 
     return findings
 
 
 # ── Top-level auditor ─────────────────────────────────────────────────────────
+
 
 def audit_juniper(filepath: str) -> tuple[list[dict], list[dict]]:
     """Full audit of a Juniper SRX config file.

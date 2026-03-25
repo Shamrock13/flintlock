@@ -1,4 +1,5 @@
 """Live SSH connector — pull running configs from network devices."""
+
 import os
 import time
 import uuid
@@ -6,12 +7,13 @@ import tempfile
 
 try:
     import paramiko  # type: ignore[import-untyped]
+
     PARAMIKO_AVAILABLE = True
 except ImportError:
     PARAMIKO_AVAILABLE = False
 
-RECV_TIMEOUT = 30    # seconds to wait for device output
-RECV_CHUNK   = 65536
+RECV_TIMEOUT = 30  # seconds to wait for device output
+RECV_CHUNK = 65536
 
 
 def _require_paramiko():
@@ -42,10 +44,16 @@ def _read_until_idle(channel, timeout=RECV_TIMEOUT, idle_secs=1.5):
     return output.decode("utf-8", errors="ignore")
 
 
-def _make_client(host, port, username, password, timeout,
-                  host_key_policy: str = "warn",
-                  pem_key_path: str | None = None,
-                  pem_passphrase: str | None = None):
+def _make_client(
+    host,
+    port,
+    username,
+    password,
+    timeout,
+    host_key_policy: str = "warn",
+    pem_key_path: str | None = None,
+    pem_passphrase: str | None = None,
+):
     """Create and connect a Paramiko SSH client.
 
     *host_key_policy* controls how unknown host keys are handled:
@@ -70,8 +78,8 @@ def _make_client(host, port, username, password, timeout,
     except FileNotFoundError:
         pass
     _policy_map = {
-        "strict":   paramiko.RejectPolicy,
-        "warn":     paramiko.WarningPolicy,
+        "strict": paramiko.RejectPolicy,
+        "warn": paramiko.WarningPolicy,
         "auto_add": paramiko.AutoAddPolicy,
     }
     policy_cls = _policy_map.get(host_key_policy, paramiko.WarningPolicy)
@@ -110,11 +118,28 @@ def _make_client(host, port, username, password, timeout,
 
 # ── Cisco ASA ─────────────────────────────────────────────────────────────────
 
-def _pull_asa(host, port, username, password, timeout, host_key_policy="warn",
-              pem_key_path=None, pem_passphrase=None):
+
+def _pull_asa(
+    host,
+    port,
+    username,
+    password,
+    timeout,
+    host_key_policy="warn",
+    pem_key_path=None,
+    pem_passphrase=None,
+):
     _require_paramiko()
-    client = _make_client(host, port, username, password, timeout, host_key_policy,
-                          pem_key_path, pem_passphrase)
+    client = _make_client(
+        host,
+        port,
+        username,
+        password,
+        timeout,
+        host_key_policy,
+        pem_key_path,
+        pem_passphrase,
+    )
     try:
         ch = client.invoke_shell()
         time.sleep(1)
@@ -130,11 +155,28 @@ def _pull_asa(host, port, username, password, timeout, host_key_policy="warn",
 
 # ── Fortinet ──────────────────────────────────────────────────────────────────
 
-def _pull_fortinet(host, port, username, password, timeout, host_key_policy="warn",
-                   pem_key_path=None, pem_passphrase=None):
+
+def _pull_fortinet(
+    host,
+    port,
+    username,
+    password,
+    timeout,
+    host_key_policy="warn",
+    pem_key_path=None,
+    pem_passphrase=None,
+):
     _require_paramiko()
-    client = _make_client(host, port, username, password, timeout, host_key_policy,
-                          pem_key_path, pem_passphrase)
+    client = _make_client(
+        host,
+        port,
+        username,
+        password,
+        timeout,
+        host_key_policy,
+        pem_key_path,
+        pem_passphrase,
+    )
     try:
         ch = client.invoke_shell()
         time.sleep(1)
@@ -150,12 +192,29 @@ def _pull_fortinet(host, port, username, password, timeout, host_key_policy="war
 
 # ── Palo Alto Networks ────────────────────────────────────────────────────────
 
-def _pull_paloalto(host, port, username, password, timeout, host_key_policy="warn",
-                   pem_key_path=None, pem_passphrase=None):
+
+def _pull_paloalto(
+    host,
+    port,
+    username,
+    password,
+    timeout,
+    host_key_policy="warn",
+    pem_key_path=None,
+    pem_passphrase=None,
+):
     """Pull running config via PA CLI SSH command."""
     _require_paramiko()
-    client = _make_client(host, port, username, password, timeout, host_key_policy,
-                          pem_key_path, pem_passphrase)
+    client = _make_client(
+        host,
+        port,
+        username,
+        password,
+        timeout,
+        host_key_policy,
+        pem_key_path,
+        pem_passphrase,
+    )
     try:
         stdin, stdout, stderr = client.exec_command(
             "show config running", timeout=timeout
@@ -171,29 +230,63 @@ def _pull_paloalto(host, port, username, password, timeout, host_key_policy="war
 # ── Cisco FTD ─────────────────────────────────────────────────────────────────
 # FTD LINA CLI accepts the same commands as ASA for pulling the running config.
 
-def _pull_ftd(host, port, username, password, timeout, host_key_policy="warn",
-              pem_key_path=None, pem_passphrase=None):
+
+def _pull_ftd(
+    host,
+    port,
+    username,
+    password,
+    timeout,
+    host_key_policy="warn",
+    pem_key_path=None,
+    pem_passphrase=None,
+):
     """Pull FTD running config via LINA CLI (same as ASA)."""
-    return _pull_asa(host, port, username, password, timeout, host_key_policy,
-                     pem_key_path, pem_passphrase)
+    return _pull_asa(
+        host,
+        port,
+        username,
+        password,
+        timeout,
+        host_key_policy,
+        pem_key_path,
+        pem_passphrase,
+    )
 
 
 # ── Juniper SRX ───────────────────────────────────────────────────────────────
 
-def _pull_juniper(host, port, username, password, timeout, host_key_policy="warn",
-                  pem_key_path=None, pem_passphrase=None):
+
+def _pull_juniper(
+    host,
+    port,
+    username,
+    password,
+    timeout,
+    host_key_policy="warn",
+    pem_key_path=None,
+    pem_passphrase=None,
+):
     """Pull Juniper SRX config in set-format via Junos CLI SSH shell.
 
     Disables the screen-length pager first so the full config is returned
     without interactive ``---more---`` prompts.
     """
     _require_paramiko()
-    client = _make_client(host, port, username, password, timeout, host_key_policy,
-                          pem_key_path, pem_passphrase)
+    client = _make_client(
+        host,
+        port,
+        username,
+        password,
+        timeout,
+        host_key_policy,
+        pem_key_path,
+        pem_passphrase,
+    )
     try:
         ch = client.invoke_shell()
         time.sleep(2)
-        ch.recv(RECV_CHUNK)                    # flush banner / login output
+        ch.recv(RECV_CHUNK)  # flush banner / login output
         ch.send("set cli screen-length 0\n")
         time.sleep(0.5)
         ch.recv(RECV_CHUNK)
@@ -205,16 +298,33 @@ def _pull_juniper(host, port, username, password, timeout, host_key_policy="warn
 
 # ── pfSense ───────────────────────────────────────────────────────────────────
 
-def _pull_pfsense(host, port, username, password, timeout, host_key_policy="warn",
-                  pem_key_path=None, pem_passphrase=None):
+
+def _pull_pfsense(
+    host,
+    port,
+    username,
+    password,
+    timeout,
+    host_key_policy="warn",
+    pem_key_path=None,
+    pem_passphrase=None,
+):
     """Pull pfSense config.xml via SSH exec_command.
 
     Requires the SSH user to have shell access (not just the menu).
     The config file is at /conf/config.xml on all modern pfSense releases.
     """
     _require_paramiko()
-    client = _make_client(host, port, username, password, timeout, host_key_policy,
-                          pem_key_path, pem_passphrase)
+    client = _make_client(
+        host,
+        port,
+        username,
+        password,
+        timeout,
+        host_key_policy,
+        pem_key_path,
+        pem_passphrase,
+    )
     try:
         stdin, stdout, stderr = client.exec_command(
             "cat /conf/config.xml", timeout=timeout
@@ -227,16 +337,33 @@ def _pull_pfsense(host, port, username, password, timeout, host_key_policy="warn
 
 # ── iptables (Linux) ──────────────────────────────────────────────────────────
 
-def _pull_iptables(host, port, username, password, timeout, host_key_policy="warn",
-                   pem_key_path=None, pem_passphrase=None):
+
+def _pull_iptables(
+    host,
+    port,
+    username,
+    password,
+    timeout,
+    host_key_policy="warn",
+    pem_key_path=None,
+    pem_passphrase=None,
+):
     """Pull iptables rules via SSH using iptables-save.
 
     Tries the direct command first; falls back to sudo if the account is not root.
     The connecting user must have password-less sudo or run as root.
     """
     _require_paramiko()
-    client = _make_client(host, port, username, password, timeout, host_key_policy,
-                          pem_key_path, pem_passphrase)
+    client = _make_client(
+        host,
+        port,
+        username,
+        password,
+        timeout,
+        host_key_policy,
+        pem_key_path,
+        pem_passphrase,
+    )
     try:
         stdin, stdout, stderr = client.exec_command(
             "iptables-save 2>/dev/null || sudo iptables-save 2>/dev/null",
@@ -250,15 +377,32 @@ def _pull_iptables(host, port, username, password, timeout, host_key_policy="war
 
 # ── nftables (Linux) ──────────────────────────────────────────────────────────
 
-def _pull_nftables(host, port, username, password, timeout, host_key_policy="warn",
-                   pem_key_path=None, pem_passphrase=None):
+
+def _pull_nftables(
+    host,
+    port,
+    username,
+    password,
+    timeout,
+    host_key_policy="warn",
+    pem_key_path=None,
+    pem_passphrase=None,
+):
     """Pull nftables ruleset via SSH using nft list ruleset.
 
     Tries the direct command first; falls back to sudo if needed.
     """
     _require_paramiko()
-    client = _make_client(host, port, username, password, timeout, host_key_policy,
-                          pem_key_path, pem_passphrase)
+    client = _make_client(
+        host,
+        port,
+        username,
+        password,
+        timeout,
+        host_key_policy,
+        pem_key_path,
+        pem_passphrase,
+    )
     try:
         stdin, stdout, stderr = client.exec_command(
             "nft list ruleset 2>/dev/null || sudo nft list ruleset 2>/dev/null",
@@ -273,31 +417,39 @@ def _pull_nftables(host, port, username, password, timeout, host_key_policy="war
 # ── Main entrypoint ───────────────────────────────────────────────────────────
 
 _SUFFIXES = {
-    "asa":      ".txt",
-    "ftd":      ".txt",
+    "asa": ".txt",
+    "ftd": ".txt",
     "fortinet": ".txt",
     "iptables": ".txt",
-    "juniper":  ".txt",
+    "juniper": ".txt",
     "nftables": ".txt",
     "paloalto": ".xml",
-    "pfsense":  ".xml",
+    "pfsense": ".xml",
 }
 _PULLERS = {
-    "asa":      _pull_asa,
-    "ftd":      _pull_ftd,
+    "asa": _pull_asa,
+    "ftd": _pull_ftd,
     "fortinet": _pull_fortinet,
     "iptables": _pull_iptables,
-    "juniper":  _pull_juniper,
+    "juniper": _pull_juniper,
     "nftables": _pull_nftables,
     "paloalto": _pull_paloalto,
-    "pfsense":  _pull_pfsense,
+    "pfsense": _pull_pfsense,
 }
 
 
-def connect_and_pull(vendor, host, port, username, password, timeout=30,
-                     upload_folder=None, host_key_policy: str = "warn",
-                     pem_key_path: str | None = None,
-                     pem_passphrase: str | None = None):
+def connect_and_pull(
+    vendor,
+    host,
+    port,
+    username,
+    password,
+    timeout=30,
+    upload_folder=None,
+    host_key_policy: str = "warn",
+    pem_key_path: str | None = None,
+    pem_passphrase: str | None = None,
+):
     """
     Connect to a live device, pull its running config, and save to a temp file.
 
@@ -311,8 +463,16 @@ def connect_and_pull(vendor, host, port, username, password, timeout=30,
     if puller is None:
         raise ValueError(f"Live SSH not supported for vendor: {vendor}")
 
-    content = puller(host, int(port), username, password, int(timeout),
-                     host_key_policy, pem_key_path, pem_passphrase)
+    content = puller(
+        host,
+        int(port),
+        username,
+        password,
+        int(timeout),
+        host_key_policy,
+        pem_key_path,
+        pem_passphrase,
+    )
 
     if not content or len(content.strip()) < 50:
         raise RuntimeError(

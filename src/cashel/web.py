@@ -10,8 +10,16 @@ import uuid
 from defusedxml import ElementTree as ET
 from pathlib import Path
 from flask import (
-    Flask, Blueprint, render_template, request, jsonify,
-    send_file, session, redirect, url_for, g,
+    Flask,
+    Blueprint,
+    render_template,
+    request,
+    jsonify,
+    send_file,
+    session,
+    redirect,
+    url_for,
+    g,
 )
 from flask_wtf.csrf import CSRFProtect
 from flask_limiter import Limiter
@@ -21,32 +29,47 @@ from .license import check_license, activate_license, deactivate_license, mask_k
 from .ftd import is_ftd_config
 from .reporter import generate_report
 from .audit_engine import (
-    _findings_to_strings, _wrap_compliance,
-    _sort_findings, _build_summary,
-    run_vendor_audit, run_compliance_checks,
+    _findings_to_strings,
+    _wrap_compliance,
+    _sort_findings,
+    _build_summary,
+    run_vendor_audit,
+    run_compliance_checks,
 )
 from .diff import diff_configs
 from .archive import save_audit, list_archive, get_entry, delete_entry, compare_entries
 from .export import to_json, to_csv, to_sarif
 from .activity_log import (
-    log_activity, list_activity, delete_activity_entry, clear_activity,
-    ACTION_FILE_AUDIT, ACTION_SSH_CONNECT, ACTION_CONFIG_DIFF,
+    log_activity,
+    list_activity,
+    delete_activity_entry,
+    clear_activity,
+    ACTION_FILE_AUDIT,
+    ACTION_SSH_CONNECT,
+    ACTION_CONFIG_DIFF,
 )
 from .settings import get_settings, save_settings, save_api_key
 from .schedule_store import (
-    list_schedules, get_schedule, create_schedule,
-    update_schedule, delete_schedule, ScheduleValidationError,
+    list_schedules,
+    get_schedule,
+    create_schedule,
+    update_schedule,
+    delete_schedule,
+    ScheduleValidationError,
 )
 from .scheduler_runner import (
-    start_scheduler, stop_scheduler, reload_job,
-    run_now as scheduler_run_now, scheduler_available,
+    start_scheduler,
+    stop_scheduler,
+    reload_job,
+    run_now as scheduler_run_now,
+    scheduler_available,
 )
 from .syslog_handler import configure_syslog
 
-UPLOAD_FOLDER    = os.environ.get("UPLOAD_FOLDER",    "/tmp/cashel_uploads")
-REPORTS_FOLDER   = os.environ.get("REPORTS_FOLDER",   "/tmp/cashel_reports")
-ARCHIVE_FOLDER   = os.environ.get("ARCHIVE_FOLDER",   "/tmp/cashel_archive")
-ACTIVITY_FOLDER  = os.environ.get("ACTIVITY_FOLDER",  "/tmp/cashel_activity")
+UPLOAD_FOLDER = os.environ.get("UPLOAD_FOLDER", "/tmp/cashel_uploads")
+REPORTS_FOLDER = os.environ.get("REPORTS_FOLDER", "/tmp/cashel_reports")
+ARCHIVE_FOLDER = os.environ.get("ARCHIVE_FOLDER", "/tmp/cashel_archive")
+ACTIVITY_FOLDER = os.environ.get("ACTIVITY_FOLDER", "/tmp/cashel_activity")
 
 for _d in (UPLOAD_FOLDER, REPORTS_FOLDER, ARCHIVE_FOLDER, ACTIVITY_FOLDER):
     os.makedirs(_d, exist_ok=True)
@@ -54,11 +77,13 @@ for _d in (UPLOAD_FOLDER, REPORTS_FOLDER, ARCHIVE_FOLDER, ACTIVITY_FOLDER):
 # Settings folder is created lazily by settings.py on first save
 
 app = Flask(__name__, template_folder="templates", static_folder="static")
-app.config["SECRET_KEY"]              = os.environ.get("CASHEL_SECRET", "change-me-in-production")
-app.config["MAX_CONTENT_LENGTH"]      = 50 * 1024 * 1024   # 50 MB total request cap
+app.config["SECRET_KEY"] = os.environ.get("CASHEL_SECRET", "change-me-in-production")
+app.config["MAX_CONTENT_LENGTH"] = 50 * 1024 * 1024  # 50 MB total request cap
 app.config["SESSION_COOKIE_HTTPONLY"] = True
 app.config["SESSION_COOKIE_SAMESITE"] = "Lax"
-app.config["SESSION_COOKIE_SECURE"]   = os.environ.get("CASHEL_SECURE_COOKIES", "false").lower() == "true"
+app.config["SESSION_COOKIE_SECURE"] = (
+    os.environ.get("CASHEL_SECURE_COOKIES", "false").lower() == "true"
+)
 
 csrf = CSRFProtect(app)
 
@@ -70,7 +95,7 @@ limiter = Limiter(
 )
 
 _start_time = time.time()
-_MAX_FILE_BYTES = 5 * 1024 * 1024   # 5 MB per-file limit enforced in routes
+_MAX_FILE_BYTES = 5 * 1024 * 1024  # 5 MB per-file limit enforced in routes
 
 # ── REST API blueprint (CSRF-exempt; auth via X-API-Key) ──────────────────────
 api_bp = Blueprint("api_v1", __name__, url_prefix="/api/v1")
@@ -78,6 +103,7 @@ csrf.exempt(api_bp)
 
 
 # ── CSP nonce ─────────────────────────────────────────────────────────────────
+
 
 @app.before_request
 def _assign_csp_nonce():
@@ -88,13 +114,14 @@ def _assign_csp_nonce():
 # HSTS is intentionally omitted — enable at the reverse-proxy layer when
 # deploying with TLS.
 
+
 @app.after_request
 def _add_security_headers(response):
     nonce = getattr(g, "csp_nonce", "")
-    response.headers.setdefault("X-Frame-Options",        "DENY")
+    response.headers.setdefault("X-Frame-Options", "DENY")
     response.headers.setdefault("X-Content-Type-Options", "nosniff")
-    response.headers.setdefault("X-XSS-Protection",       "1; mode=block")
-    response.headers.setdefault("Referrer-Policy",        "strict-origin-when-cross-origin")
+    response.headers.setdefault("X-XSS-Protection", "1; mode=block")
+    response.headers.setdefault("Referrer-Policy", "strict-origin-when-cross-origin")
     response.headers.setdefault(
         "Permissions-Policy",
         "geolocation=(), microphone=(), camera=()",
@@ -115,14 +142,22 @@ def _add_security_headers(response):
 
 # ── Error handlers ────────────────────────────────────────────────────────────
 
+
 @app.errorhandler(413)
 def request_too_large(_e):
-    return jsonify({"error": "Upload too large. Maximum file size is 5 MB per file."}), 413
+    return jsonify(
+        {"error": "Upload too large. Maximum file size is 5 MB per file."}
+    ), 413
 
 
 @app.errorhandler(429)
 def rate_limit_exceeded(e):
-    return jsonify({"error": "Rate limit exceeded. Please slow down.", "retry_after": str(getattr(e, "retry_after", ""))}), 429
+    return jsonify(
+        {
+            "error": "Rate limit exceeded. Please slow down.",
+            "retry_after": str(getattr(e, "retry_after", "")),
+        }
+    ), 429
 
 
 # ── Authentication middleware ─────────────────────────────────────────────────
@@ -140,17 +175,16 @@ def _require_auth():
         return
 
     # API key auth (header or query param) — used by CLI/CI clients
-    api_key_header = (
-        request.headers.get("X-API-Key") or
-        request.args.get("api_key")
-    )
+    api_key_header = request.headers.get("X-API-Key") or request.args.get("api_key")
     if api_key_header:
         stored = settings.get("api_key", "")
         if stored and secrets.compare_digest(api_key_header, stored):
             g.auth_method = "api_key"
             return
         if request.path.startswith("/api/"):
-            return jsonify({"ok": False, "data": None, "error": "Invalid API key."}), 401
+            return jsonify(
+                {"ok": False, "data": None, "error": "Invalid API key."}
+            ), 401
         return jsonify({"error": "Invalid API key."}), 401
 
     # Session auth (browser)
@@ -164,7 +198,9 @@ def _require_auth():
 
     # Not authenticated
     if request.path.startswith("/api/"):
-        return jsonify({"ok": False, "data": None, "error": "Authentication required."}), 401
+        return jsonify(
+            {"ok": False, "data": None, "error": "Authentication required."}
+        ), 401
     next_url = request.url if request.method == "GET" else None
     return redirect(url_for("login", next=next_url))
 
@@ -188,17 +224,17 @@ def _err(exc: Exception, generic_msg: str = "An internal error occurred.") -> st
 
 
 VENDOR_DISPLAY = {
-    "asa":      "Cisco",
-    "ftd":      "Cisco",
-    "cisco":    "Cisco",
+    "asa": "Cisco",
+    "ftd": "Cisco",
+    "cisco": "Cisco",
     "paloalto": "Palo Alto Networks",
     "fortinet": "Fortinet",
-    "pfsense":  "pfSense",
-    "aws":      "AWS Security Group",
-    "azure":    "Azure NSG",
-    "gcp":      "GCP VPC Firewall",
+    "pfsense": "pfSense",
+    "aws": "AWS Security Group",
+    "azure": "Azure NSG",
+    "gcp": "GCP VPC Firewall",
     "iptables": "iptables",
-    "juniper":  "Juniper SRX",
+    "juniper": "Juniper SRX",
     "nftables": "nftables",
 }
 
@@ -207,18 +243,27 @@ ALL_VENDORS = set(VENDOR_DISPLAY)
 
 # ── Vendor auto-detection ─────────────────────────────────────────────────────
 
+
 def detect_vendor(content: str, filename: str) -> str | None:
     """Infer firewall vendor from file content and filename."""
     filename_lower = filename.lower()
-    content_lower  = content.lower()
-    stripped       = content.strip()
+    content_lower = content.lower()
+    stripped = content.strip()
 
     # JSON-based: AWS, Azure, or GCP
-    if stripped.startswith("{") or stripped.startswith("[") or filename_lower.endswith(".json"):
+    if (
+        stripped.startswith("{")
+        or stripped.startswith("[")
+        or filename_lower.endswith(".json")
+    ):
         try:
             data = json.loads(content[:8192])  # partial parse for detection
             if isinstance(data, dict):
-                if "SecurityGroups" in data or "GroupId" in data or "IpPermissions" in data:
+                if (
+                    "SecurityGroups" in data
+                    or "GroupId" in data
+                    or "IpPermissions" in data
+                ):
                     return "aws"
                 if "securityRules" in data or "defaultSecurityRules" in data:
                     return "azure"
@@ -226,10 +271,16 @@ def detect_vendor(content: str, filename: str) -> str | None:
                     # Could be az network nsg list output
                     if data["value"] and "securityRules" in data["value"][0]:
                         return "azure"
-                if "items" in data and isinstance(data["items"], list) and data["items"]:
+                if (
+                    "items" in data
+                    and isinstance(data["items"], list)
+                    and data["items"]
+                ):
                     first = data["items"][0]
-                    if "direction" in first and "IPProtocol" not in first and (
-                        "allowed" in first or "denied" in first
+                    if (
+                        "direction" in first
+                        and "IPProtocol" not in first
+                        and ("allowed" in first or "denied" in first)
                     ):
                         return "gcp"
                 if "direction" in data and ("allowed" in data or "denied" in data):
@@ -247,9 +298,14 @@ def detect_vendor(content: str, filename: str) -> str | None:
 
     # XML-based: pfSense or Palo Alto
     if stripped.startswith("<") or filename_lower.endswith(".xml"):
-        if "<pfsense>" in content_lower or ("<filter>" in content_lower and "<rule>" in content_lower):
+        if "<pfsense>" in content_lower or (
+            "<filter>" in content_lower and "<rule>" in content_lower
+        ):
             return "pfsense"
-        if any(k in content_lower for k in ("<devices>", "<vsys>", "<security>", "<rulebase>")):
+        if any(
+            k in content_lower
+            for k in ("<devices>", "<vsys>", "<security>", "<rulebase>")
+        ):
             return "paloalto"
 
     # Text-based: Fortinet
@@ -259,13 +315,21 @@ def detect_vendor(content: str, filename: str) -> str | None:
         return "fortinet"
 
     # Text-based: Cisco FTD (check before ASA — FTD has ASA-style ACLs too)
-    if any(k in content_lower for k in ("access-control-policy", "firepower threat defense",
-                                         "firepower-module", "intrusion-policy")):
+    if any(
+        k in content_lower
+        for k in (
+            "access-control-policy",
+            "firepower threat defense",
+            "firepower-module",
+            "intrusion-policy",
+        )
+    ):
         return "ftd"
 
     # Text-based: Juniper SRX ("set" style or hierarchical brace style)
     if re.search(r"set security policies from-zone", content) or (
-        "from-zone" in content_lower and "to-zone" in content_lower
+        "from-zone" in content_lower
+        and "to-zone" in content_lower
         and ("security {" in content or "security{" in content)
     ):
         return "juniper"
@@ -279,7 +343,9 @@ def detect_vendor(content: str, filename: str) -> str | None:
         try:
             data = json.loads(content[:8192])
             nft_entries = data if isinstance(data, list) else data.get("nftables", [])
-            if isinstance(nft_entries, list) and any("chain" in e or "rule" in e for e in nft_entries):
+            if isinstance(nft_entries, list) and any(
+                "chain" in e or "rule" in e for e in nft_entries
+            ):
                 return "nftables"
         except Exception:
             pass
@@ -289,47 +355,88 @@ def detect_vendor(content: str, filename: str) -> str | None:
         return "iptables"
 
     # Text-based: Cisco ASA
-    if "access-list" in content_lower and any(k in content_lower for k in ("permit", "deny")):
+    if "access-list" in content_lower and any(
+        k in content_lower for k in ("permit", "deny")
+    ):
         return "asa"
 
     return None
 
 
-def validate_vendor_format(content: str, filename: str, vendor: str) -> tuple[bool, str]:
+def validate_vendor_format(
+    content: str, filename: str, vendor: str
+) -> tuple[bool, str]:
     """Return (is_valid, error_message). Ensures the file actually matches the vendor format."""
     content_lower = content.lower()
-    is_xml  = content.strip().startswith("<") or filename.lower().endswith(".xml")
-    is_json = content.strip().startswith(("{", "[")) or filename.lower().endswith(".json")
+    is_xml = content.strip().startswith("<") or filename.lower().endswith(".xml")
+    is_json = content.strip().startswith(("{", "[")) or filename.lower().endswith(
+        ".json"
+    )
 
     if vendor == "ftd":
         if is_xml or is_json:
-            return False, "Cisco FTD LINA configs are text-based, but this file appears to be XML or JSON."
+            return (
+                False,
+                "Cisco FTD LINA configs are text-based, but this file appears to be XML or JSON.",
+            )
         # FTD configs may or may not have access-list; require at least some Cisco CLI content
-        if not any(k in content_lower for k in ("access-list", "access-control-policy",
-                                                  "threat-detection", "intrusion-policy",
-                                                  "interface", "firepower")):
-            return False, "No recognizable Cisco FTD configuration markers found. Check vendor selection."
+        if not any(
+            k in content_lower
+            for k in (
+                "access-list",
+                "access-control-policy",
+                "threat-detection",
+                "intrusion-policy",
+                "interface",
+                "firepower",
+            )
+        ):
+            return (
+                False,
+                "No recognizable Cisco FTD configuration markers found. Check vendor selection.",
+            )
 
     elif vendor == "asa":
         if is_xml or is_json:
-            return False, "Cisco configs are text-based, but this file appears to be XML or JSON."
+            return (
+                False,
+                "Cisco configs are text-based, but this file appears to be XML or JSON.",
+            )
         # If the file actually looks like FTD, upgrade silently
         if is_ftd_config(content):
             return True, ""  # will be re-routed to ftd in run_audit
         if "access-list" not in content_lower:
-            return False, "No Cisco access-list statements found. Check vendor selection."
+            return (
+                False,
+                "No Cisco access-list statements found. Check vendor selection.",
+            )
 
     elif vendor == "paloalto":
         if not is_xml:
             return False, "Palo Alto configs are XML-based, but this file is not XML."
-        if not any(m in content_lower for m in ("<devices>", "<vsys>", "<security>", "<rulebase>")):
-            return False, "This XML does not contain Palo Alto Networks configuration markers."
+        if not any(
+            m in content_lower
+            for m in ("<devices>", "<vsys>", "<security>", "<rulebase>")
+        ):
+            return (
+                False,
+                "This XML does not contain Palo Alto Networks configuration markers.",
+            )
 
     elif vendor == "fortinet":
         if is_xml or is_json:
-            return False, "Fortinet configs are text-based, but this file appears to be XML or JSON."
-        if not any(m in content_lower for m in ("config firewall policy", "set srcintf", "set dstintf")):
-            return False, "No Fortinet firewall policy statements found. Check vendor selection."
+            return (
+                False,
+                "Fortinet configs are text-based, but this file appears to be XML or JSON.",
+            )
+        if not any(
+            m in content_lower
+            for m in ("config firewall policy", "set srcintf", "set dstintf")
+        ):
+            return (
+                False,
+                "No Fortinet firewall policy statements found. Check vendor selection.",
+            )
 
     elif vendor == "pfsense":
         if not is_xml:
@@ -339,7 +446,10 @@ def validate_vendor_format(content: str, filename: str, vendor: str) -> tuple[bo
 
     elif vendor == "aws":
         if not is_json:
-            return False, "AWS Security Group exports are JSON. Please upload a .json file."
+            return (
+                False,
+                "AWS Security Group exports are JSON. Please upload a .json file.",
+            )
 
     elif vendor == "azure":
         if not is_json:
@@ -347,22 +457,42 @@ def validate_vendor_format(content: str, filename: str, vendor: str) -> tuple[bo
 
     elif vendor == "juniper":
         if is_xml or is_json:
-            return False, "Juniper SRX configs are text-based, but this file appears to be XML or JSON."
-        if not any(m in content_lower for m in (
-            "set security", "from-zone", "to-zone", "security-zone", "security {"
-        )):
-            return False, "No Juniper SRX security configuration markers found. Check vendor selection."
+            return (
+                False,
+                "Juniper SRX configs are text-based, but this file appears to be XML or JSON.",
+            )
+        if not any(
+            m in content_lower
+            for m in (
+                "set security",
+                "from-zone",
+                "to-zone",
+                "security-zone",
+                "security {",
+            )
+        ):
+            return (
+                False,
+                "No Juniper SRX security configuration markers found. Check vendor selection.",
+            )
 
     elif vendor == "gcp":
         if not is_json:
-            return False, "GCP VPC firewall exports are JSON. Please upload a .json file."
+            return (
+                False,
+                "GCP VPC firewall exports are JSON. Please upload a .json file.",
+            )
         try:
             parsed = json.loads(content[:8192])
-            items = parsed if isinstance(parsed, list) else parsed.get("items", [parsed])
+            items = (
+                parsed if isinstance(parsed, list) else parsed.get("items", [parsed])
+            )
             if not items or not isinstance(items[0], dict):
                 raise ValueError("empty")
             first = items[0]
-            if "direction" not in first or ("allowed" not in first and "denied" not in first):
+            if "direction" not in first or (
+                "allowed" not in first and "denied" not in first
+            ):
                 return False, (
                     "This JSON does not contain GCP VPC firewall rule markers "
                     "('direction', 'allowed'/'denied'). Check vendor selection."
@@ -374,25 +504,33 @@ def validate_vendor_format(content: str, filename: str, vendor: str) -> tuple[bo
         if is_xml:
             return False, "iptables-save files are text-based, not XML."
         if not re.search(r"^\*\w+$|^-A\s+\w+", content, re.MULTILINE):
-            return False, ("No iptables-save markers found (expected '*filter' or '-A INPUT ...'). "
-                           "Export with 'iptables-save > rules.txt'.")
+            return False, (
+                "No iptables-save markers found (expected '*filter' or '-A INPUT ...'). "
+                "Export with 'iptables-save > rules.txt'."
+            )
 
     elif vendor == "nftables":
         # Accept either nft text or JSON
-        is_nft_text = bool(re.search(r"\btable\s+\w+\s+\w+\s*\{|\bchain\s+\w+\s*\{", content))
+        is_nft_text = bool(
+            re.search(r"\btable\s+\w+\s+\w+\s*\{|\bchain\s+\w+\s*\{", content)
+        )
         is_nft_json = False
         if is_json:
             try:
                 data = json.loads(content[:8192])
-                nft_entries = data if isinstance(data, list) else data.get("nftables", [])
+                nft_entries = (
+                    data if isinstance(data, list) else data.get("nftables", [])
+                )
                 is_nft_json = isinstance(nft_entries, list) and any(
                     "chain" in e or "rule" in e for e in nft_entries
                 )
             except Exception:
                 pass
         if not is_nft_text and not is_nft_json:
-            return False, ("No nftables markers found. "
-                           "Export with 'nft list ruleset' or 'nft -j list ruleset'.")
+            return False, (
+                "No nftables markers found. "
+                "Export with 'nft list ruleset' or 'nft -j list ruleset'."
+            )
 
     else:
         return False, f"Unknown vendor: {vendor}"
@@ -401,6 +539,7 @@ def validate_vendor_format(content: str, filename: str, vendor: str) -> tuple[bo
 
 
 # ── Hostname extraction ───────────────────────────────────────────────────────
+
 
 def extract_hostname(vendor: str, content: str) -> str | None:
     """Try to extract the device hostname from a config file."""
@@ -428,7 +567,9 @@ def extract_hostname(vendor: str, content: str) -> str | None:
 
         if vendor == "aws":
             data = json.loads(content)
-            groups = data if isinstance(data, list) else data.get("SecurityGroups", [data])
+            groups = (
+                data if isinstance(data, list) else data.get("SecurityGroups", [data])
+            )
             if groups:
                 for t in groups[0].get("Tags", []):
                     if t.get("Key") == "Name":
@@ -448,6 +589,7 @@ def extract_hostname(vendor: str, content: str) -> str | None:
 
 # ── Routes ────────────────────────────────────────────────────────────────────
 
+
 @app.route("/health")
 def health():
     """Container health/readiness probe — always public."""
@@ -457,13 +599,15 @@ def health():
         _version = "dev"
     entries = list_archive()
     last_audit = entries[0]["timestamp"] if entries else None
-    return jsonify({
-        "ok":               True,
-        "version":          _version,
-        "uptime_seconds":   round(time.time() - _start_time),
-        "scheduler_running": scheduler_available(),
-        "last_audit_at":    last_audit,
-    })
+    return jsonify(
+        {
+            "ok": True,
+            "version": _version,
+            "uptime_seconds": round(time.time() - _start_time),
+            "scheduler_running": scheduler_available(),
+            "last_audit_at": last_audit,
+        }
+    )
 
 
 @app.route("/login", methods=["GET"])
@@ -477,17 +621,19 @@ def login():
 def login_post():
     key = request.form.get("api_key", "")
     settings = get_settings()
-    stored   = settings.get("api_key", "")
+    stored = settings.get("api_key", "")
     if stored and secrets.compare_digest(key, stored):
         session.clear()
         session["authenticated"] = True
-        session["last_seen"]     = time.time()
+        session["last_seen"] = time.time()
         next_url = request.args.get("next", "")
         # Guard against open-redirect: only accept relative paths
         if next_url and next_url.startswith("/") and not next_url.startswith("//"):
             return redirect(next_url)
         return redirect(url_for("index"))
-    return render_template("login.html", error="Invalid API key. Please try again."), 401
+    return render_template(
+        "login.html", error="Invalid API key. Please try again."
+    ), 401
 
 
 @app.route("/logout", methods=["POST"])
@@ -510,11 +656,11 @@ def run_audit():
     if "config" not in request.files or request.files["config"].filename == "":
         return jsonify({"error": "No config file uploaded"}), 400
 
-    vendor       = request.form.get("vendor", "auto").strip().lower()
-    compliance   = request.form.get("compliance", "").strip().lower() or None
+    vendor = request.form.get("vendor", "auto").strip().lower()
+    compliance = request.form.get("compliance", "").strip().lower() or None
     generate_pdf = request.form.get("report") == "1"
-    archive_it   = request.form.get("archive") == "1"
-    tag          = request.form.get("tag", "").strip() or None
+    archive_it = request.form.get("archive") == "1"
+    tag = request.form.get("tag", "").strip() or None
 
     # Early vendor allowlist check — reject unknown values before touching disk.
     if vendor not in ("auto", *ALL_VENDORS):
@@ -522,6 +668,7 @@ def run_audit():
 
     # Early compliance allowlist check.
     from .schedule_store import VALID_FRAMEWORKS
+
     if compliance and compliance not in VALID_FRAMEWORKS:
         return jsonify({"error": f"Unknown compliance framework '{compliance}'."}), 400
 
@@ -546,7 +693,9 @@ def run_audit():
 
     if vendor not in ALL_VENDORS:
         os.remove(temp_path)
-        return jsonify({"error": "Could not determine vendor. Please select one manually."}), 400
+        return jsonify(
+            {"error": "Could not determine vendor. Please select one manually."}
+        ), 400
 
     # Resolve "cisco" (user-facing) or re-route "asa" to "ftd" if file is FTD
     if vendor in ("cisco", "asa"):
@@ -557,7 +706,11 @@ def run_audit():
     is_valid, validation_msg = validate_vendor_format(sample, upload.filename, vendor)
     if not is_valid:
         os.remove(temp_path)
-        return jsonify({"error": f"Wrong vendor selected ({VENDOR_DISPLAY.get(vendor, vendor)}): {validation_msg}"}), 400
+        return jsonify(
+            {
+                "error": f"Wrong vendor selected ({VENDOR_DISPLAY.get(vendor, vendor)}): {validation_msg}"
+            }
+        ), 400
 
     try:
         findings, parse, extra_data = run_vendor_audit(vendor, temp_path)
@@ -578,44 +731,76 @@ def run_audit():
                 findings += [_wrap_compliance(c) for c in raw]
 
         findings = _sort_findings(findings)
-        summary  = _build_summary(findings)
+        summary = _build_summary(findings)
 
         report_filename = None
         if generate_pdf:
             report_name = f"cashel_report_{uuid.uuid4().hex[:8]}.pdf"
             report_path = os.path.join(REPORTS_FOLDER, report_name)
-            generate_report(_findings_to_strings(findings), upload.filename, vendor, compliance, output_path=report_path, summary=summary)
+            generate_report(
+                _findings_to_strings(findings),
+                upload.filename,
+                vendor,
+                compliance,
+                output_path=report_path,
+                summary=summary,
+            )
             report_filename = report_name
 
         # Optional archive save (store plain strings)
         archive_id = None
         if archive_it:
             archive_id, _ = save_audit(
-                upload.filename, vendor, _findings_to_strings(findings), summary, config_path=temp_path, tag=tag
+                upload.filename,
+                vendor,
+                _findings_to_strings(findings),
+                summary,
+                config_path=temp_path,
+                tag=tag,
             )
 
         # Always log activity
         log_activity(
-            ACTION_FILE_AUDIT, upload.filename, vendor=vendor, success=True,
-            details={"total": summary.get("total", 0), "high": summary.get("high", 0),
-                     "archived": archive_id is not None},
+            ACTION_FILE_AUDIT,
+            upload.filename,
+            vendor=vendor,
+            success=True,
+            details={
+                "total": summary.get("total", 0),
+                "high": summary.get("high", 0),
+                "archived": archive_id is not None,
+            },
         )
 
-        return jsonify({
-            "findings":           _findings_to_strings(findings),
-            "enriched_findings":  findings,
-            "summary":            summary,
-            "report":             report_filename,
-            "license_warning":    license_warning,
-            "detected_vendor":    vendor,
-            "detected_hostname":  detected_hostname,
-            "archive_id":         archive_id,
-        })
+        return jsonify(
+            {
+                "findings": _findings_to_strings(findings),
+                "enriched_findings": findings,
+                "summary": summary,
+                "report": report_filename,
+                "license_warning": license_warning,
+                "detected_vendor": vendor,
+                "detected_hostname": detected_hostname,
+                "archive_id": archive_id,
+            }
+        )
 
     except Exception as e:
-        log_activity(ACTION_FILE_AUDIT, upload.filename, vendor=vendor or "unknown",
-                     success=False, error=str(e))
-        return jsonify({"error": _err(e, "Audit failed. Check your configuration file and vendor selection.")}), 500
+        log_activity(
+            ACTION_FILE_AUDIT,
+            upload.filename,
+            vendor=vendor or "unknown",
+            success=False,
+            error=str(e),
+        )
+        return jsonify(
+            {
+                "error": _err(
+                    e,
+                    "Audit failed. Check your configuration file and vendor selection.",
+                )
+            }
+        ), 500
     finally:
         if os.path.exists(temp_path):
             os.remove(temp_path)
@@ -623,12 +808,18 @@ def run_audit():
 
 # ── Config diff ───────────────────────────────────────────────────────────────
 
+
 @app.route("/diff", methods=["POST"])
 @limiter.limit("30/minute")
 def run_diff():
     if "config_a" not in request.files or "config_b" not in request.files:
-        return jsonify({"error": "Two config files required (config_a and config_b)"}), 400
-    if request.files["config_a"].filename == "" or request.files["config_b"].filename == "":
+        return jsonify(
+            {"error": "Two config files required (config_a and config_b)"}
+        ), 400
+    if (
+        request.files["config_a"].filename == ""
+        or request.files["config_b"].filename == ""
+    ):
         return jsonify({"error": "Both config files must be selected"}), 400
 
     vendor = request.form.get("vendor", "auto").strip().lower()
@@ -657,26 +848,44 @@ def run_diff():
                 vendor = "ftd" if is_ftd_config(sample) else "asa"
 
         if vendor not in ALL_VENDORS:
-            return jsonify({"error": "Could not determine vendor. Please select one manually."}), 400
+            return jsonify(
+                {"error": "Could not determine vendor. Please select one manually."}
+            ), 400
 
         result = diff_configs(vendor, path_a, path_b)
-        result["vendor"]     = vendor
+        result["vendor"] = vendor
         result["filename_a"] = upload_a.filename
         result["filename_b"] = upload_b.filename
 
-        log_activity(ACTION_CONFIG_DIFF,
-                     f"{upload_a.filename} → {upload_b.filename}",
-                     vendor=vendor, success=True,
-                     details={"added": len(result.get("added", [])),
-                               "removed": len(result.get("removed", [])),
-                               "unchanged": len(result.get("unchanged", []))})
+        log_activity(
+            ACTION_CONFIG_DIFF,
+            f"{upload_a.filename} → {upload_b.filename}",
+            vendor=vendor,
+            success=True,
+            details={
+                "added": len(result.get("added", [])),
+                "removed": len(result.get("removed", [])),
+                "unchanged": len(result.get("unchanged", [])),
+            },
+        )
         return jsonify(result)
 
     except Exception as e:
-        log_activity(ACTION_CONFIG_DIFF,
-                     f"{upload_a.filename} → {upload_b.filename}",
-                     vendor=vendor or "unknown", success=False, error=str(e))
-        return jsonify({"error": _err(e, "Audit failed. Check your configuration file and vendor selection.")}), 500
+        log_activity(
+            ACTION_CONFIG_DIFF,
+            f"{upload_a.filename} → {upload_b.filename}",
+            vendor=vendor or "unknown",
+            success=False,
+            error=str(e),
+        )
+        return jsonify(
+            {
+                "error": _err(
+                    e,
+                    "Audit failed. Check your configuration file and vendor selection.",
+                )
+            }
+        ), 500
     finally:
         for p in (path_a, path_b):
             if os.path.exists(p):
@@ -685,28 +894,33 @@ def run_diff():
 
 # ── Live SSH connect ──────────────────────────────────────────────────────────
 
+
 @app.route("/connect", methods=["POST"])
 @limiter.limit("10/minute")
 def live_connect():
-    host       = request.form.get("host", "").strip()
-    port       = request.form.get("port", "22").strip() or "22"
-    username   = request.form.get("username", "").strip()
-    password   = request.form.get("password", "")
-    vendor     = request.form.get("vendor", "").strip().lower()
+    host = request.form.get("host", "").strip()
+    port = request.form.get("port", "22").strip() or "22"
+    username = request.form.get("username", "").strip()
+    password = request.form.get("password", "")
+    vendor = request.form.get("vendor", "").strip().lower()
     compliance = request.form.get("compliance", "").strip().lower() or None
-    tag        = request.form.get("tag", "").strip() or None
+    tag = request.form.get("tag", "").strip() or None
 
     if not host or not username or not vendor:
         return jsonify({"error": "host, username, and vendor are required"}), 400
     if vendor not in ("asa", "ftd", "cisco", "fortinet", "paloalto"):
-        return jsonify({"error": f"Live SSH not supported for vendor '{vendor}'. Supported: Cisco, Fortinet, Palo Alto Networks"}), 400
+        return jsonify(
+            {
+                "error": f"Live SSH not supported for vendor '{vendor}'. Supported: Cisco, Fortinet, Palo Alto Networks"
+            }
+        ), 400
     if vendor == "cisco":
         vendor = "asa"
 
     # PEM key-based auth (optional)
-    pem_key_path   = None
+    pem_key_path = None
     pem_passphrase = request.form.get("pem_passphrase", "") or None
-    pem_upload     = request.files.get("pem_key")
+    pem_upload = request.files.get("pem_key")
     if pem_upload and pem_upload.filename:
         pem_path = os.path.join(UPLOAD_FOLDER, f"cashel_pem_{uuid.uuid4().hex}.pem")
         pem_upload.save(pem_path)
@@ -720,17 +934,29 @@ def live_connect():
 
     try:
         from .ssh_connector import connect_and_pull
+
         _settings = get_settings()
         temp_path, _ = connect_and_pull(
-            vendor, host, port, username, password,
-            timeout=30, upload_folder=UPLOAD_FOLDER,
+            vendor,
+            host,
+            port,
+            username,
+            password,
+            timeout=30,
+            upload_folder=UPLOAD_FOLDER,
             host_key_policy=_settings.get("ssh_host_key_policy", "warn"),
             pem_key_path=pem_key_path,
             pem_passphrase=pem_passphrase,
         )
     except Exception as e:
-        log_activity(ACTION_SSH_CONNECT, label, vendor=vendor, success=False, error=str(e),
-                     details={"host": host, "port": port})
+        log_activity(
+            ACTION_SSH_CONNECT,
+            label,
+            vendor=vendor,
+            success=False,
+            error=str(e),
+            details={"host": host, "port": port},
+        )
         return jsonify({"error": f"Connection failed: {e}"}), 500
     finally:
         if pem_key_path and os.path.exists(pem_key_path):
@@ -746,35 +972,67 @@ def live_connect():
                 findings += [_wrap_compliance(c) for c in raw]
 
         findings = _sort_findings(findings)
-        summary  = _build_summary(findings)
+        summary = _build_summary(findings)
 
         # Save successful SSH audits to Audit History (store plain strings)
-        archive_id, _ = save_audit(label, vendor, _findings_to_strings(findings), summary, config_path=temp_path, tag=tag)
+        archive_id, _ = save_audit(
+            label,
+            vendor,
+            _findings_to_strings(findings),
+            summary,
+            config_path=temp_path,
+            tag=tag,
+        )
 
         # Log successful activity
-        log_activity(ACTION_SSH_CONNECT, label, vendor=vendor, success=True,
-                     details={"host": host, "port": port,
-                              "total": summary.get("total", 0), "high": summary.get("high", 0)})
+        log_activity(
+            ACTION_SSH_CONNECT,
+            label,
+            vendor=vendor,
+            success=True,
+            details={
+                "host": host,
+                "port": port,
+                "total": summary.get("total", 0),
+                "high": summary.get("high", 0),
+            },
+        )
 
-        return jsonify({
-            "findings":          _findings_to_strings(findings),
-            "enriched_findings": findings,
-            "summary":           summary,
-            "detected_vendor":   vendor,
-            "host":              host,
-            "archive_id":        archive_id,
-        })
+        return jsonify(
+            {
+                "findings": _findings_to_strings(findings),
+                "enriched_findings": findings,
+                "summary": summary,
+                "detected_vendor": vendor,
+                "host": host,
+                "archive_id": archive_id,
+            }
+        )
 
     except Exception as e:
-        log_activity(ACTION_SSH_CONNECT, label, vendor=vendor, success=False, error=str(e),
-                     details={"host": host, "port": port})
-        return jsonify({"error": _err(e, "Audit failed. Check your configuration file and vendor selection.")}), 500
+        log_activity(
+            ACTION_SSH_CONNECT,
+            label,
+            vendor=vendor,
+            success=False,
+            error=str(e),
+            details={"host": host, "port": port},
+        )
+        return jsonify(
+            {
+                "error": _err(
+                    e,
+                    "Audit failed. Check your configuration file and vendor selection.",
+                )
+            }
+        ), 500
     finally:
         if "temp_path" in dir() and os.path.exists(temp_path):
             os.remove(temp_path)
 
 
 # ── Archive API ───────────────────────────────────────────────────────────────
+
 
 @app.route("/archive", methods=["GET"])
 def archive_list():
@@ -786,10 +1044,10 @@ def archive_save():
     """Manually save the most recent audit result to the archive."""
     data = request.get_json(silent=True) or {}
     filename = data.get("filename", "unknown")
-    vendor   = data.get("vendor", "unknown")
+    vendor = data.get("vendor", "unknown")
     findings = data.get("findings", [])
-    summary  = data.get("summary", {})
-    tag      = data.get("tag")
+    summary = data.get("summary", {})
+    tag = data.get("tag")
     if not findings and not summary:
         return jsonify({"error": "No audit data to save"}), 400
     entry_id, entry = save_audit(filename, vendor, findings, summary, tag=tag)
@@ -817,7 +1075,8 @@ def archive_export(entry_id):
     Query param: fmt = json | csv | sarif  (default: json)
     """
     from flask import Response
-    fmt   = request.args.get("fmt", "json").lower()
+
+    fmt = request.args.get("fmt", "json").lower()
     entry = get_entry(entry_id)
     if not entry:
         return jsonify({"error": "Not found"}), 404
@@ -831,7 +1090,9 @@ def archive_export(entry_id):
     elif fmt == "sarif":
         content, mime, ext = to_sarif(entry), "application/json", "sarif"
     else:
-        return jsonify({"error": f"Unknown format '{fmt}'. Use json, csv, or sarif."}), 400
+        return jsonify(
+            {"error": f"Unknown format '{fmt}'. Use json, csv, or sarif."}
+        ), 400
 
     return Response(
         content,
@@ -847,18 +1108,20 @@ def archive_trends():
     series = []
     for e in entries:
         s = e.get("summary", {})
-        series.append({
-            "id":        e["id"],
-            "filename":  e["filename"],
-            "vendor":    e.get("vendor", ""),
-            "timestamp": e.get("timestamp", ""),
-            "score":     s.get("score"),
-            "high":      s.get("high", 0),
-            "medium":    s.get("medium", 0),
-            "total":     s.get("total", 0),
-            "tag":       e.get("tag"),
-            "version":   e.get("version", 1),
-        })
+        series.append(
+            {
+                "id": e["id"],
+                "filename": e["filename"],
+                "vendor": e.get("vendor", ""),
+                "timestamp": e.get("timestamp", ""),
+                "score": s.get("score"),
+                "high": s.get("high", 0),
+                "medium": s.get("medium", 0),
+                "total": s.get("total", 0),
+                "tag": e.get("tag"),
+                "version": e.get("version", 1),
+            }
+        )
     series.sort(key=lambda x: x["timestamp"])
     return jsonify(series)
 
@@ -877,6 +1140,7 @@ def archive_compare():
 
 
 # ── Activity Log API ──────────────────────────────────────────────────────────
+
 
 @app.route("/activity", methods=["GET"])
 def activity_list():
@@ -898,6 +1162,7 @@ def activity_clear():
 
 # ── Bulk audit ────────────────────────────────────────────────────────────────
 
+
 @app.route("/bulk_audit", methods=["POST"])
 @limiter.limit("10/minute")
 def bulk_audit():
@@ -912,14 +1177,15 @@ def bulk_audit():
         return jsonify({"error": "No config files uploaded"}), 400
 
     vendor_override = request.form.get("vendor", "auto").strip().lower()
-    compliance      = request.form.get("compliance", "").strip().lower() or None
-    archive_it      = request.form.get("archive") == "1"
-    tag_prefix      = request.form.get("tag", "").strip() or None
+    compliance = request.form.get("compliance", "").strip().lower() or None
+    archive_it = request.form.get("archive") == "1"
+    tag_prefix = request.form.get("tag", "").strip() or None
 
     # Early allowlist checks before processing any files.
     if vendor_override not in ("auto", *ALL_VENDORS):
         return jsonify({"error": f"Unknown vendor '{vendor_override}'."}), 400
     from .schedule_store import VALID_FRAMEWORKS
+
     if compliance and compliance not in VALID_FRAMEWORKS:
         return jsonify({"error": f"Unknown compliance framework '{compliance}'."}), 400
 
@@ -929,13 +1195,20 @@ def bulk_audit():
         if upload.filename == "":
             continue
 
-        suffix    = Path(upload.filename).suffix or ".txt"
+        suffix = Path(upload.filename).suffix or ".txt"
         temp_name = f"{uuid.uuid4()}{suffix}"
         temp_path = os.path.join(UPLOAD_FOLDER, temp_name)
         upload.save(temp_path)
 
-        result_entry = {"filename": upload.filename, "status": "error", "findings": [],
-                        "summary": {}, "vendor": None, "archive_id": None, "error": None}
+        result_entry = {
+            "filename": upload.filename,
+            "status": "error",
+            "findings": [],
+            "summary": {},
+            "vendor": None,
+            "archive_id": None,
+            "error": None,
+        }
 
         try:
             with open(temp_path, "r", errors="ignore") as f:
@@ -953,7 +1226,9 @@ def bulk_audit():
             if vendor == "asa" and is_ftd_config(sample):
                 vendor = "ftd"
 
-            is_valid, validation_msg = validate_vendor_format(sample, upload.filename, vendor)
+            is_valid, validation_msg = validate_vendor_format(
+                sample, upload.filename, vendor
+            )
             if not is_valid:
                 result_entry["error"] = validation_msg
                 results.append(result_entry)
@@ -961,42 +1236,69 @@ def bulk_audit():
 
             findings, parse, extra_data = run_vendor_audit(vendor, temp_path)
 
-            if compliance and vendor not in ("aws", "azure", "gcp", "iptables", "nftables"):
+            if compliance and vendor not in (
+                "aws",
+                "azure",
+                "gcp",
+                "iptables",
+                "nftables",
+            ):
                 licensed, _ = check_license()
                 if licensed:
                     raw = run_compliance_checks(vendor, compliance, parse, extra_data)
                     findings += [_wrap_compliance(c) for c in raw]
 
             findings = _sort_findings(findings)
-            summary  = _build_summary(findings)
+            summary = _build_summary(findings)
 
             archive_id = None
             if archive_it:
-                tag = f"{tag_prefix}/{upload.filename}" if tag_prefix else upload.filename
+                tag = (
+                    f"{tag_prefix}/{upload.filename}" if tag_prefix else upload.filename
+                )
                 archive_id, _ = save_audit(
-                    upload.filename, vendor, _findings_to_strings(findings),
-                    summary, config_path=temp_path, tag=tag,
+                    upload.filename,
+                    vendor,
+                    _findings_to_strings(findings),
+                    summary,
+                    config_path=temp_path,
+                    tag=tag,
                 )
 
             log_activity(
-                ACTION_FILE_AUDIT, upload.filename, vendor=vendor, success=True,
-                details={"bulk": True, "total": summary.get("total", 0),
-                         "high": summary.get("high", 0), "archived": archive_id is not None},
+                ACTION_FILE_AUDIT,
+                upload.filename,
+                vendor=vendor,
+                success=True,
+                details={
+                    "bulk": True,
+                    "total": summary.get("total", 0),
+                    "high": summary.get("high", 0),
+                    "archived": archive_id is not None,
+                },
             )
 
-            result_entry.update({
-                "status":          "ok",
-                "vendor":          vendor,
-                "findings":        _findings_to_strings(findings),
-                "enriched_findings": findings,
-                "summary":         summary,
-                "archive_id":      archive_id,
-            })
+            result_entry.update(
+                {
+                    "status": "ok",
+                    "vendor": vendor,
+                    "findings": _findings_to_strings(findings),
+                    "enriched_findings": findings,
+                    "summary": summary,
+                    "archive_id": archive_id,
+                }
+            )
 
         except Exception as e:
             result_entry["error"] = str(e)
-            log_activity(ACTION_FILE_AUDIT, upload.filename, vendor=vendor_override,
-                         success=False, error=str(e), details={"bulk": True})
+            log_activity(
+                ACTION_FILE_AUDIT,
+                upload.filename,
+                vendor=vendor_override,
+                success=False,
+                error=str(e),
+                details={"bulk": True},
+            )
         finally:
             if os.path.exists(temp_path):
                 os.remove(temp_path)
@@ -1007,6 +1309,7 @@ def bulk_audit():
 
 
 # ── Scheduled audits API ───────────────────────────────────────────────────────
+
 
 @app.route("/schedules", methods=["GET"])
 def schedules_list():
@@ -1072,6 +1375,7 @@ def schedules_status():
 
 # ── Reports / License ─────────────────────────────────────────────────────────
 
+
 @app.route("/reports", methods=["GET"])
 def reports_list():
     """List all saved PDF reports."""
@@ -1079,11 +1383,13 @@ def reports_list():
     for fname in sorted(os.listdir(REPORTS_FOLDER), reverse=True):
         if fname.endswith(".pdf"):
             path = os.path.join(REPORTS_FOLDER, fname)
-            reports.append({
-                "filename": fname,
-                "size":     os.path.getsize(path),
-                "mtime":    os.path.getmtime(path),
-            })
+            reports.append(
+                {
+                    "filename": fname,
+                    "size": os.path.getsize(path),
+                    "mtime": os.path.getmtime(path),
+                }
+            )
     return jsonify(reports)
 
 
@@ -1129,13 +1435,16 @@ def license_status():
 
 # ── Settings API ──────────────────────────────────────────────────────────────
 
+
 @app.route("/settings", methods=["GET"])
 def settings_get():
     s = get_settings()
     # Never expose the plaintext API key over the wire — return masked hint only
     raw_key = s.pop("api_key", "")
     s["api_key_set"] = bool(raw_key)
-    s["api_key_hint"] = ("csh_…" + raw_key[-4:]) if len(raw_key) >= 4 else ("set" if raw_key else "")
+    s["api_key_hint"] = (
+        ("csh_…" + raw_key[-4:]) if len(raw_key) >= 4 else ("set" if raw_key else "")
+    )
     return jsonify(s)
 
 
@@ -1154,7 +1463,7 @@ def settings_generate_api_key():
     """Generate a new random API key, store it encrypted, and return it once in plaintext.
     The caller must copy and store the key immediately — it cannot be retrieved again.
     """
-    new_key  = "csh_" + secrets.token_urlsafe(32)
+    new_key = "csh_" + secrets.token_urlsafe(32)
     save_api_key(new_key)
     hint = ("csh_…" + new_key[-4:]) if len(new_key) >= 4 else ""
     return jsonify({"ok": True, "api_key": new_key, "api_key_hint": hint})
@@ -1171,28 +1480,34 @@ def settings_test_smtp():
     import ssl
     from email.mime.text import MIMEText
 
-    data          = request.get_json(silent=True) or {}
-    smtp_host     = (data.get("smtp_host") or "").strip()
-    smtp_port     = int(data.get("smtp_port") or 587)
-    smtp_user     = (data.get("smtp_user") or "").strip()
+    data = request.get_json(silent=True) or {}
+    smtp_host = (data.get("smtp_host") or "").strip()
+    smtp_port = int(data.get("smtp_port") or 587)
+    smtp_user = (data.get("smtp_user") or "").strip()
     smtp_password = data.get("smtp_password") or ""
-    smtp_from     = (data.get("smtp_from") or smtp_user or "").strip()
-    smtp_tls      = bool(data.get("smtp_tls", True))
-    to_address    = (data.get("to_address") or smtp_from or smtp_user or "").strip()
+    smtp_from = (data.get("smtp_from") or smtp_user or "").strip()
+    smtp_tls = bool(data.get("smtp_tls", True))
+    to_address = (data.get("to_address") or smtp_from or smtp_user or "").strip()
 
     if not smtp_host:
         return jsonify({"ok": False, "message": "SMTP host is required."}), 400
     if not to_address:
-        return jsonify({"ok": False, "message": "Could not determine a recipient address — set smtp_from or smtp_user."}), 400
+        return jsonify(
+            {
+                "ok": False,
+                "message": "Could not determine a recipient address — set smtp_from or smtp_user.",
+            }
+        ), 400
 
     msg = MIMEText(
         "This is a test message from Cashel.\n\n"
         "If you received this, your SMTP settings are configured correctly.",
-        "plain", "utf-8",
+        "plain",
+        "utf-8",
     )
     msg["Subject"] = "[Cashel] SMTP test"
-    msg["From"]    = smtp_from or to_address
-    msg["To"]      = to_address
+    msg["From"] = smtp_from or to_address
+    msg["To"] = to_address
 
     try:
         context = ssl.create_default_context()
@@ -1202,11 +1517,23 @@ def settings_test_smtp():
             if smtp_user:
                 server.login(smtp_user, smtp_password)
             server.sendmail(smtp_from or to_address, [to_address], msg.as_string())
-        return jsonify({"ok": True, "message": f"Test email sent successfully to {to_address}."})
+        return jsonify(
+            {"ok": True, "message": f"Test email sent successfully to {to_address}."}
+        )
     except smtplib.SMTPAuthenticationError:
-        return jsonify({"ok": False, "message": "Authentication failed — check username and password."})
+        return jsonify(
+            {
+                "ok": False,
+                "message": "Authentication failed — check username and password.",
+            }
+        )
     except smtplib.SMTPConnectError as exc:
-        return jsonify({"ok": False, "message": f"Could not connect to {smtp_host}:{smtp_port} — {exc}"})
+        return jsonify(
+            {
+                "ok": False,
+                "message": f"Could not connect to {smtp_host}:{smtp_port} — {exc}",
+            }
+        )
     except smtplib.SMTPException as exc:
         return jsonify({"ok": False, "message": f"SMTP error: {exc}"})
     except OSError as exc:
@@ -1216,6 +1543,7 @@ def settings_test_smtp():
 # ── REST API v1 (CI/CD integration) ───────────────────────────────────────────
 # Blueprint registered above; CSRF exempt — authenticated via X-API-Key header.
 # All responses use the envelope: {"ok": bool, "data": ..., "error": str|null}
+
 
 def _api_ok(data):
     return jsonify({"ok": True, "data": data, "error": None})
@@ -1232,15 +1560,16 @@ def api_audit():
     if "config" not in request.files or not request.files["config"].filename:
         return _api_err("config file is required")
 
-    vendor     = request.form.get("vendor", "auto").strip().lower()
+    vendor = request.form.get("vendor", "auto").strip().lower()
     compliance = request.form.get("compliance", "").strip().lower() or None
     archive_it = request.form.get("archive", "1") == "1"
-    tag        = request.form.get("tag", "").strip() or None
+    tag = request.form.get("tag", "").strip() or None
 
     if vendor not in ("auto", *ALL_VENDORS):
         return _api_err(f"Unknown vendor '{vendor}'.")
 
     from .schedule_store import VALID_FRAMEWORKS
+
     if compliance and compliance not in VALID_FRAMEWORKS:
         return _api_err(f"Unknown compliance framework '{compliance}'.")
 
@@ -1250,7 +1579,7 @@ def api_audit():
         return _api_err("File exceeds the 5 MB per-file limit.", 413)
     upload.seek(0)
 
-    suffix    = Path(upload.filename).suffix or ".txt"
+    suffix = Path(upload.filename).suffix or ".txt"
     temp_path = os.path.join(UPLOAD_FOLDER, f"{uuid.uuid4()}{suffix}")
     upload.save(temp_path)
 
@@ -1261,7 +1590,9 @@ def api_audit():
             detected = detect_vendor(sample, upload.filename)
             if vendor == "auto":
                 if not detected:
-                    return _api_err("Could not auto-detect vendor. Specify vendor explicitly.")
+                    return _api_err(
+                        "Could not auto-detect vendor. Specify vendor explicitly."
+                    )
                 vendor = detected
             elif vendor == "cisco":
                 vendor = "ftd" if is_ftd_config(sample) else "asa"
@@ -1277,22 +1608,28 @@ def api_audit():
                 findings += [_wrap_compliance(c) for c in raw]
 
         findings = _sort_findings(findings)
-        summary  = _build_summary(findings)
+        summary = _build_summary(findings)
         archive_id = None
         if archive_it:
             archive_id, _ = save_audit(
-                upload.filename, vendor, _findings_to_strings(findings),
-                summary, config_path=temp_path, tag=tag,
+                upload.filename,
+                vendor,
+                _findings_to_strings(findings),
+                summary,
+                config_path=temp_path,
+                tag=tag,
             )
 
-        return _api_ok({
-            "archive_id":        archive_id,
-            "vendor":            vendor,
-            "summary":           summary,
-            "findings":          _findings_to_strings(findings),
-            "enriched_findings": findings,
-            "detected_hostname": extract_hostname(vendor, sample),
-        })
+        return _api_ok(
+            {
+                "archive_id": archive_id,
+                "vendor": vendor,
+                "summary": summary,
+                "findings": _findings_to_strings(findings),
+                "enriched_findings": findings,
+                "detected_hostname": extract_hostname(vendor, sample),
+            }
+        )
     except Exception as e:
         return _api_err(_err(e, "Audit failed."), 500)
     finally:
@@ -1313,11 +1650,11 @@ def api_audit_get(entry_id):
 def api_history():
     """GET /api/v1/history — list audit history (metadata only, no findings)."""
     try:
-        limit  = min(int(request.args.get("limit", 50)), 500)
+        limit = min(int(request.args.get("limit", 50)), 500)
     except (ValueError, TypeError):
-        limit  = 50
+        limit = 50
     vendor_filter = request.args.get("vendor", "").strip().lower() or None
-    tag_filter    = request.args.get("tag", "").strip() or None
+    tag_filter = request.args.get("tag", "").strip() or None
 
     entries = list_archive()
     if vendor_filter:
@@ -1356,8 +1693,14 @@ def api_diff():
 
         if vendor in ("auto", "cisco"):
             detected = detect_vendor(sample_a, request.files["config_a"].filename)
-            vendor   = detected if vendor == "auto" and detected else (
-                ("ftd" if is_ftd_config(sample_a) else "asa") if vendor == "cisco" else (detected or "asa")
+            vendor = (
+                detected
+                if vendor == "auto" and detected
+                else (
+                    ("ftd" if is_ftd_config(sample_a) else "asa")
+                    if vendor == "cisco"
+                    else (detected or "asa")
+                )
             )
         elif vendor == "asa" and is_ftd_config(sample_a):
             vendor = "ftd"
