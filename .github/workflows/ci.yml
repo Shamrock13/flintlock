@@ -1,0 +1,54 @@
+name: CI
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+
+      - name: Install dependencies
+        run: pip install -e ".[dev]" 2>/dev/null || pip install -e . && pip install ruff mypy pytest
+
+      - name: Ruff lint
+        run: ruff check src/ tests/
+
+      - name: Ruff format check
+        run: ruff format --check src/ tests/
+
+      - name: mypy type check
+        run: mypy src/cashel/ --ignore-missing-imports
+
+      - name: XML safety check
+        run: |
+          if grep -r "xml.etree" src/cashel/ --include="*.py"; then
+            echo "ERROR: Use defusedxml instead of xml.etree"
+            exit 1
+          fi
+
+      - name: Dependency sync check
+        run: |
+          python -c "
+          import re
+          reqs = open('requirements.txt').read()
+          toml = open('pyproject.toml').read()
+          deps = re.findall(r'^([a-zA-Z0-9_-]+)', reqs, re.MULTILINE)
+          missing = [d for d in deps if d.lower() not in toml.lower()]
+          if missing:
+              print('Missing from pyproject.toml:', missing)
+              exit(1)
+          "
+
+      - name: Run tests
+        run: pytest tests/ -v
