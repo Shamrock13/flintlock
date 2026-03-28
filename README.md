@@ -2,6 +2,8 @@
 
 **Cashel** is a firewall configuration auditing tool with a web UI and CLI. It detects security misconfigurations, generates scored severity reports, compares configs across time, connects directly to live devices via SSH, and runs automated scheduled audits with alerting. Deployable in minutes via Docker Compose.
 
+**Try the live demo:** [cashel-demo.sham.cloud](https://cashel-demo.sham.cloud)
+
 [![GitHub Sponsors](https://img.shields.io/badge/Sponsor-%E2%9D%A4-ea4aaa?logo=github-sponsors&logoColor=white)](https://github.com/sponsors/Shamrock13)
 [![Ko-fi](https://img.shields.io/badge/Ko--fi-Support%20Cashel-FF5E5B?logo=ko-fi&logoColor=white)](https://ko-fi.com/shamrock13)
 
@@ -237,9 +239,9 @@ The `examples/` directory contains sample configurations for all supported vendo
 - [x] Syslog forwarding for SIEM integration
 - [x] Web UI with file upload and inline results
 - [x] XXE injection protection (defusedxml)
-- [ ] API key authentication with session management
-- [ ] Multi-factor SSH authentication (key-based)
-- [ ] REST API for CI/CD pipeline integration
+- [x] API key authentication with session management
+- [x] Multi-factor SSH authentication (PEM key support)
+- [x] REST API for CI/CD pipeline integration
 
 ---
 
