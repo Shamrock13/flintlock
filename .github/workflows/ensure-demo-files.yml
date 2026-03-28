@@ -1,0 +1,97 @@
+# Cashel Demo — Self-healing guard for demo-only files
+#
+# Problem: public-repo syncs (git merge upstream/main) can carry over commits
+# that deleted demo-only files (Dockerfile.demo, demo_samples/, etc.) because
+# those files are gitignored in the public repo.  This workflow detects that
+# situation after every push to main and automatically restores any missing
+# files from the most recent git commit that contained them, then pushes a
+# fix commit so the Render build never sees a broken state.
+#
+# The workflow file itself lives only in the private repo so public syncs
+# cannot delete it.
+
+name: Ensure Demo Files
+
+on:
+  push:
+    branches: [main]
+
+permissions:
+  contents: write
+
+jobs:
+  restore:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Check for missing demo-only files
+        id: check
+        run: |
+          missing=false
+          files=(
+            "Dockerfile.demo"
+            "DEMO_SETUP.md"
+            ".github/workflows/demo-deploy.yml"
+            "src/cashel/demo_samples/cisco_asa.txt"
+            "src/cashel/demo_samples/palo_alto.xml"
+            "src/cashel/demo_samples/fortinet_fortigate.txt"
+            "src/cashel/demo_samples/aws_security_groups.json"
+          )
+          for f in "${files[@]}"; do
+            if [ ! -f "$f" ]; then
+              echo "MISSING: $f"
+              missing=true
+            fi
+          done
+          echo "missing=$missing" >> "$GITHUB_OUTPUT"
+
+      - name: Restore from git history
+        if: steps.check.outputs.missing == 'true'
+        run: |
+          files=(
+            "Dockerfile.demo"
+            "DEMO_SETUP.md"
+            ".github/workflows/demo-deploy.yml"
+            "src/cashel/demo_samples/cisco_asa.txt"
+            "src/cashel/demo_samples/palo_alto.xml"
+            "src/cashel/demo_samples/fortinet_fortigate.txt"
+            "src/cashel/demo_samples/aws_security_groups.json"
+          )
+          for f in "${files[@]}"; do
+            if [ ! -f "$f" ]; then
+              # Find the commit that deleted the file, then take its parent —
+              # that parent is the last commit where the file still existed.
+              del_commit=$(git log --all --diff-filter=D --format="%H" -- "$f" | head -1)
+              if [ -n "$del_commit" ]; then
+                parent=$(git log --format="%P" -1 "$del_commit" | awk '{print $1}')
+                if [ -n "$parent" ]; then
+                  mkdir -p "$(dirname "$f")"
+                  git show "$parent:$f" > "$f"
+                  echo "Restored $f from $parent (parent of $del_commit)"
+                else
+                  echo "WARNING: could not find parent of $del_commit for $f"
+                fi
+              else
+                echo "WARNING: no deletion commit found for $f — cannot restore"
+              fi
+            fi
+          done
+
+      - name: Commit and push restored files
+        if: steps.check.outputs.missing == 'true'
+        run: |
+          git config user.name  "Cashel Demo Bot"
+          git config user.email "demo-bot@sham.cloud"
+          git add -f \
+            Dockerfile.demo \
+            DEMO_SETUP.md \
+            .github/workflows/demo-deploy.yml \
+            src/cashel/demo_samples/ \
+            2>/dev/null || true
+          git diff --cached --quiet && echo "Nothing to commit" && exit 0
+          git commit -m "Chore: auto-restore demo-only files removed by public-repo sync [skip ci]"
+          git push
