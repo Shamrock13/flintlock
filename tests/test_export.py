@@ -12,7 +12,7 @@ import sys
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "src"))
 
-from cashel.export import to_json, to_csv, to_sarif
+from cashel.export import to_json, to_csv, to_sarif, TOOL_VERSION
 
 # ── Shared fixtures ───────────────────────────────────────────────────────────
 
@@ -151,7 +151,7 @@ def test_sarif_tool_metadata():
     out = json.loads(to_sarif(ENTRY_ENRICHED))
     drv = out["runs"][0]["tool"]["driver"]
     assert drv["name"] == "Cashel"
-    assert drv["version"] == "1.2"
+    assert drv["version"] == TOOL_VERSION
 
 
 def test_sarif_result_levels_enriched():

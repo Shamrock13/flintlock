@@ -25,7 +25,13 @@ from flask_wtf.csrf import CSRFProtect
 from flask_limiter import Limiter
 from flask_limiter.util import get_remote_address
 
-from .license import check_license, activate_license, deactivate_license, mask_key, DEMO_MODE
+from .license import (
+    check_license,
+    activate_license,
+    deactivate_license,
+    mask_key,
+    DEMO_MODE,
+)
 from .ftd import is_ftd_config
 from .reporter import generate_report
 from .audit_engine import (
@@ -697,7 +703,12 @@ def demo_configs():
         return jsonify({"error": "Not available outside demo mode."}), 404
     return jsonify(
         [
-            {"id": k, "label": v["label"], "vendor": v["vendor"], "description": v["description"]}
+            {
+                "id": k,
+                "label": v["label"],
+                "vendor": v["vendor"],
+                "description": v["description"],
+            }
             for k, v in _DEMO_CONFIGS.items()
         ]
     )
