@@ -658,11 +658,43 @@ def index():
     licensed, license_info = check_license()
     if licensed:
         license_info = mask_key(license_info)
+    # Pre-serialize sample lists so the template renders cards server-side,
+    # avoiding the async fetch that caused "Loading samples…" to get stuck.
+    demo_configs = (
+        [
+            {
+                "id": k,
+                "label": v["label"],
+                "vendor": v["vendor"],
+                "description": v["description"],
+            }
+            for k, v in _DEMO_CONFIGS.items()
+        ]
+        if DEMO_MODE
+        else []
+    )
+    demo_comparisons = (
+        [
+            {
+                "id": k,
+                "label": v["label"],
+                "vendor": v["vendor"],
+                "description": v["description"],
+                "label_a": v["label_a"],
+                "label_b": v["label_b"],
+            }
+            for k, v in _DEMO_COMPARISON_PAIRS.items()
+        ]
+        if DEMO_MODE
+        else []
+    )
     return render_template(
         "index.html",
         licensed=licensed,
         license_info=license_info,
         demo_mode=DEMO_MODE,
+        demo_configs=demo_configs,
+        demo_comparisons=demo_comparisons,
     )
 
 

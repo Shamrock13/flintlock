@@ -126,12 +126,19 @@
         <h2 class="card-title">Try a Sample Config</h2>
         <p class="card-subtitle">Select a pre-loaded config to see a real audit &mdash; no upload needed.</p>
         <div class="demo-config-grid" id="demoConfigGrid">
-          <div class="demo-loading">Loading samples&hellip;</div>
+          {% for cfg in demo_configs %}
+          <button type="button" class="demo-config-card"
+                  data-id="{{ cfg.id }}" data-vendor="{{ cfg.vendor }}">
+            <span class="demo-config-label">{{ cfg.label }}</span>
+            <span class="demo-config-desc">{{ cfg.description }}</span>
+            <span class="demo-config-action">Load &amp; Audit &rarr;</span>
+          </button>
+          {% endfor %}
         </div>
       </div>
       {% endif %}
 
-      <div class="card">
+      <div class="card{% if demo_mode %} hidden{% endif %}">
         <h2 class="card-title">Run Audit</h2>
         <form id="auditForm" enctype="multipart/form-data">
           <div class="form-grid">
@@ -229,7 +236,27 @@
 
       <!-- ── Bulk mode ── -->
       <div id="audit-mode-bulk" class="hidden">
-      <div class="card">
+
+      {% if demo_mode %}
+      <div class="card demo-picker-card">
+        <h2 class="card-title">Sample Bulk Audit</h2>
+        <p class="card-subtitle">Run all four sample configs at once &mdash; no upload needed.</p>
+        <div class="demo-config-grid" id="demoBulkGrid">
+          {% for cfg in demo_configs %}
+          <div class="demo-config-card demo-config-preview">
+            <span class="demo-config-label">{{ cfg.label }}</span>
+            <span class="demo-config-desc">{{ cfg.description }}</span>
+          </div>
+          {% endfor %}
+        </div>
+        <button type="button" class="btn-primary" id="demoBulkBtn" style="margin-top:1.25rem">
+          <span id="demoBulkText">Run Sample Bulk Audit</span>
+          <span id="demoBulkSpinner" class="spinner hidden"></span>
+        </button>
+      </div>
+      {% endif %}
+
+      <div class="card{% if demo_mode %} hidden{% endif %}">
         <h2 class="card-title">Bulk Audit</h2>
         <p class="card-desc">Upload multiple firewall configs at once. Each file is audited independently and results are shown side-by-side.</p>
         <form id="bulkForm" enctype="multipart/form-data">
@@ -298,7 +325,15 @@
         <h2 class="card-title">Sample Comparisons</h2>
         <p class="card-subtitle">Select a pre-loaded before/after pair to see a real config diff &mdash; no upload needed.</p>
         <div class="demo-config-grid" id="demoCompareGrid">
-          <div class="demo-loading">Loading samples&hellip;</div>
+          {% for pair in demo_comparisons %}
+          <button type="button" class="demo-config-card"
+                  data-id="{{ pair.id }}" data-vendor="{{ pair.vendor }}"
+                  data-label-a="{{ pair.label_a }}" data-label-b="{{ pair.label_b }}">
+            <span class="demo-config-label">{{ pair.label }}</span>
+            <span class="demo-config-desc">{{ pair.description }}</span>
+            <span class="demo-config-action">Compare &rarr;</span>
+          </button>
+          {% endfor %}
         </div>
       </div>
       {% endif %}
@@ -2506,121 +2541,122 @@
   loadSettings();
 
   {% if demo_mode %}
-  // ── Demo mode: comparison picker (diff tab) ───────────────────────────────
-  (function () {
-    const grid = document.getElementById("demoCompareGrid");
-    if (!grid) return;
+  // ── Demo mode: audit single-file picker (cards already in DOM) ──────────────
+  document.querySelectorAll("#demoConfigGrid .demo-config-card").forEach(btn => {
+    btn.addEventListener("click", async function () {
+      document.querySelectorAll("#demoConfigGrid .demo-config-card")
+              .forEach(c => c.classList.remove("demo-config-selected"));
+      this.classList.add("demo-config-selected");
 
-    fetch("/demo/comparisons")
-      .then(r => r.json())
-      .then(pairs => {
-        grid.innerHTML = "";
-        pairs.forEach(pair => {
-          const card = document.createElement("button");
-          card.type = "button";
-          card.className = "demo-config-card";
-          card.dataset.id = pair.id;
-          card.innerHTML = `
-            <span class="demo-config-label">${pair.label}</span>
-            <span class="demo-config-desc">${pair.description}</span>
-            <span class="demo-config-action">Compare &rarr;</span>
-          `;
-          card.addEventListener("click", () => runDemoComparison(pair));
-          grid.appendChild(card);
-        });
-      })
-      .catch(() => {
-        grid.innerHTML = '<p class="demo-error">Could not load sample comparisons.</p>';
-      });
-
-    async function runDemoComparison(pair) {
-      document.querySelectorAll("#demoCompareGrid .demo-config-card").forEach(c => c.classList.remove("demo-config-selected"));
-      const btn = document.querySelector(`#demoCompareGrid .demo-config-card[data-id="${pair.id}"]`);
-      if (btn) btn.classList.add("demo-config-selected");
-
-      const diffResults = document.getElementById("diffResults");
-      diffResults.classList.remove("hidden");
-      document.getElementById("diffSummary").innerHTML = `<p class="text-muted">Running comparison\u2026</p>`;
-      document.getElementById("diffAdded").innerHTML = "";
-      document.getElementById("diffRemoved").innerHTML = "";
-      document.getElementById("diffUnchanged").innerHTML = "";
-
+      const id     = this.dataset.id;
+      const vendor = this.dataset.vendor;
+      const label  = this.querySelector(".demo-config-label").textContent;
       try {
-        const res = await fetch(`/demo/compare/${pair.id}`);
-        const data = await res.json();
-        if (data.error) {
-          document.getElementById("diffSummary").innerHTML = `<div class="alert alert-error">${escHtml(data.error)}</div>`;
-          return;
-        }
-        const tag = document.getElementById("diffVendorTag");
-        tag.textContent = (VENDOR_LABELS[data.vendor] || data.vendor) + " \u2014 " + escHtml(pair.label_a) + " vs " + escHtml(pair.label_b);
-        tag.classList.remove("hidden");
-        renderDiff(data);
-        diffResults.scrollIntoView({ behavior: "smooth", block: "start" });
-      } catch (err) {
-        document.getElementById("diffSummary").innerHTML = `<div class="alert alert-error">Comparison failed: ${escHtml(err.message)}</div>`;
-      }
-    }
-  })();
-
-  // ── Demo mode: sample config picker (audit tab) ───────────────────────────
-  (function () {
-    const grid = document.getElementById("demoConfigGrid");
-    if (!grid) return;
-
-    fetch("/demo/configs")
-      .then(r => r.json())
-      .then(configs => {
-        grid.innerHTML = "";
-        configs.forEach(cfg => {
-          const card = document.createElement("button");
-          card.type = "button";
-          card.className = "demo-config-card";
-          card.dataset.id = cfg.id;
-          card.dataset.vendor = cfg.vendor;
-          card.innerHTML = `
-            <span class="demo-config-label">${cfg.label}</span>
-            <span class="demo-config-desc">${cfg.description}</span>
-            <span class="demo-config-action">Load &amp; Audit &rarr;</span>
-          `;
-          card.addEventListener("click", () => loadDemoConfig(cfg));
-          grid.appendChild(card);
-        });
-      })
-      .catch(() => {
-        grid.innerHTML = '<p class="demo-error">Could not load sample configs.</p>';
-      });
-
-    async function loadDemoConfig(cfg) {
-      document.querySelectorAll(".demo-config-card").forEach(c => c.classList.remove("demo-config-selected"));
-      const btn = document.querySelector(`.demo-config-card[data-id="${cfg.id}"]`);
-      if (btn) btn.classList.add("demo-config-selected");
-
-      try {
-        const resp = await fetch(`/demo/load/${cfg.id}`);
-        if (!resp.ok) throw new Error("fetch failed");
+        const resp = await fetch(`/demo/load/${id}`);
+        if (!resp.ok) throw new Error("Server returned " + resp.status);
         const blob = await resp.blob();
-        const ext = cfg.vendor === "aws" ? ".json" : cfg.vendor === "paloalto" ? ".xml" : ".txt";
-        const file = new File([blob], cfg.label.replace(/[^a-z0-9.]/gi, "_") + ext, { type: "text/plain" });
-        const dt = new DataTransfer();
+        const ext  = vendor === "aws" ? ".json" : vendor === "paloalto" ? ".xml" : ".txt";
+        const file = new File([blob], label.replace(/[^a-z0-9.]/gi, "_") + ext, { type: "text/plain" });
+        const dt   = new DataTransfer();
         dt.items.add(file);
         const configInput = document.getElementById("config");
         configInput.files = dt.files;
         configInput.dispatchEvent(new Event("change"));
 
         const vendorSel = document.getElementById("vendor");
-        if (vendorSel) vendorSel.value = cfg.vendor;
+        if (vendorSel) vendorSel.value = vendor;
 
         const tagInput = document.getElementById("deviceTag");
-        if (tagInput && !tagInput.value) tagInput.value = cfg.label.split(" \u2014")[0];
+        if (tagInput && !tagInput.value) tagInput.value = label.split(" \u2014")[0];
 
         document.getElementById("auditForm").scrollIntoView({ behavior: "smooth", block: "start" });
         setTimeout(() => document.getElementById("submitBtn").click(), 400);
       } catch (err) {
         alert("Could not load demo config: " + err.message);
       }
-    }
-  })();
+    });
+  });
+
+  // ── Demo mode: compare picker (cards already in DOM) ─────────────────────
+  document.querySelectorAll("#demoCompareGrid .demo-config-card").forEach(btn => {
+    btn.addEventListener("click", async function () {
+      document.querySelectorAll("#demoCompareGrid .demo-config-card")
+              .forEach(c => c.classList.remove("demo-config-selected"));
+      this.classList.add("demo-config-selected");
+
+      const id      = this.dataset.id;
+      const vendor  = this.dataset.vendor;
+      const labelA  = this.dataset.labelA;
+      const labelB  = this.dataset.labelB;
+
+      const diffResults = document.getElementById("diffResults");
+      diffResults.classList.remove("hidden");
+      document.getElementById("diffSummary").innerHTML   = `<p class="text-muted">Running comparison\u2026</p>`;
+      document.getElementById("diffAdded").innerHTML     = "";
+      document.getElementById("diffRemoved").innerHTML   = "";
+      document.getElementById("diffUnchanged").innerHTML = "";
+
+      try {
+        const res  = await fetch(`/demo/compare/${id}`);
+        const data = await res.json();
+        if (data.error) {
+          document.getElementById("diffSummary").innerHTML = `<div class="alert alert-error">${escHtml(data.error)}</div>`;
+          return;
+        }
+        const tag = document.getElementById("diffVendorTag");
+        tag.textContent = (VENDOR_LABELS[vendor] || vendor) + " \u2014 " + escHtml(labelA) + " vs " + escHtml(labelB);
+        tag.classList.remove("hidden");
+        renderDiff(data);
+        diffResults.scrollIntoView({ behavior: "smooth", block: "start" });
+      } catch (err) {
+        document.getElementById("diffSummary").innerHTML = `<div class="alert alert-error">Comparison failed: ${escHtml(err.message)}</div>`;
+      }
+    });
+  });
+
+  // ── Demo mode: bulk sample audit ─────────────────────────────────────────
+  const demoBulkBtn = document.getElementById("demoBulkBtn");
+  if (demoBulkBtn) {
+    demoBulkBtn.addEventListener("click", async function () {
+      this.disabled = true;
+      document.getElementById("demoBulkText").textContent    = "Loading samples\u2026";
+      document.getElementById("demoBulkSpinner").classList.remove("hidden");
+
+      // Collect all demo config ids from the preview cards
+      const ids = [...document.querySelectorAll("#demoBulkGrid .demo-config-card")]
+                    .map(c => c.dataset.id).filter(Boolean);
+      try {
+        const formData = new FormData();
+        for (const id of ids) {
+          const resp = await fetch(`/demo/load/${id}`);
+          if (!resp.ok) throw new Error(`Failed to load ${id}`);
+          const blob  = await resp.blob();
+          // determine extension from the content-type / id heuristic
+          const ext   = id === "aws" ? ".json" : id === "palo_alto" ? ".xml" : ".txt";
+          formData.append("configs[]", new File([blob], id + ext, { type: "text/plain" }));
+        }
+        formData.append("vendor", "auto");
+
+        document.getElementById("demoBulkText").textContent = "Running audit\u2026";
+        const res  = await fetch("/bulk_audit", { method: "POST", body: formData });
+        const data = await res.json();
+        if (data.error) {
+          document.getElementById("bulkResults").classList.remove("hidden");
+          document.getElementById("bulkResultsList").innerHTML =
+            `<div class="alert alert-error">${escHtml(data.error)}</div>`;
+        } else {
+          renderBulkResults(data);
+        }
+        document.getElementById("bulkResults").scrollIntoView({ behavior: "smooth", block: "start" });
+      } catch (err) {
+        alert("Bulk sample audit failed: " + err.message);
+      } finally {
+        this.disabled = false;
+        document.getElementById("demoBulkText").textContent = "Run Sample Bulk Audit";
+        document.getElementById("demoBulkSpinner").classList.add("hidden");
+      }
+    });
+  }
   {% endif %}
 
   </script>
