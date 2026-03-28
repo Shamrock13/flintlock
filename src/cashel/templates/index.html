@@ -138,7 +138,7 @@
       </div>
       {% endif %}
 
-      <div class="card{% if demo_mode %} hidden{% endif %}">
+      <div class="card">
         <h2 class="card-title">Run Audit</h2>
         <form id="auditForm" enctype="multipart/form-data">
           <div class="form-grid">
@@ -256,7 +256,7 @@
       </div>
       {% endif %}
 
-      <div class="card{% if demo_mode %} hidden{% endif %}">
+      <div class="card">
         <h2 class="card-title">Bulk Audit</h2>
         <p class="card-desc">Upload multiple firewall configs at once. Each file is audited independently and results are shown side-by-side.</p>
         <form id="bulkForm" enctype="multipart/form-data">
@@ -338,7 +338,7 @@
       </div>
       {% endif %}
 
-      <div class="card{% if demo_mode %} hidden{% endif %}" id="diffUploadCard">
+      <div class="card" id="diffUploadCard">
         <h2 class="card-title">Compare Configs</h2>
         <p class="card-desc">Upload two firewall configs of the same vendor to see added, removed, and unchanged rules.</p>
         <form id="diffForm" enctype="multipart/form-data">
@@ -1479,6 +1479,7 @@
 
   document.getElementById("auditForm").addEventListener("submit", async function (e) {
     e.preventDefault();
+    if (DEMO_MODE) { showAuditError("File uploads are not available in demo mode. Use the sample configs above."); return; }
     setLoading("submitBtn", "submitText", "submitSpinner", "Running\u2026", true);
     try {
       const res  = await fetch("/audit", { method: "POST", body: new FormData(this) });
@@ -1637,6 +1638,11 @@
 
   document.getElementById("diffForm").addEventListener("submit", async function (e) {
     e.preventDefault();
+    if (DEMO_MODE) {
+      document.getElementById("diffResults").classList.remove("hidden");
+      document.getElementById("diffSummary").innerHTML = `<div class="alert alert-error">File uploads are not available in demo mode. Use the sample comparisons above.</div>`;
+      return;
+    }
     setLoading("diffBtn", "diffText", "diffSpinner", "Comparing\u2026", true);
     try {
       const res  = await fetch("/diff", { method: "POST", body: new FormData(this) });
@@ -2097,6 +2103,11 @@
 
   document.getElementById("bulkForm").addEventListener("submit", async function (e) {
     e.preventDefault();
+    if (DEMO_MODE) {
+      document.getElementById("bulkResults").classList.remove("hidden");
+      document.getElementById("bulkResults").innerHTML = `<div class="alert alert-error">File uploads are not available in demo mode. Use the sample bulk audit above.</div>`;
+      return;
+    }
     setLoading("bulkBtn", "bulkText", "bulkSpinner", "Running\u2026", true);
     document.getElementById("bulkResults").classList.add("hidden");
     try {
@@ -2493,6 +2504,7 @@
     if (revealBtn) { revealBtn.textContent = "Show"; document.getElementById("authNewKeyVal").type = "password"; }
   }
 
+  {% if not demo_mode %}
   document.getElementById("btnDismissKey").addEventListener("click", _maskApiKeyBox);
 
   document.getElementById("btnRevealKey").addEventListener("click", function () {
@@ -2543,6 +2555,7 @@
       this.disabled = false;
     }
   });
+  {% endif %}
 
   // Load settings on startup and apply defaults to the audit form
   loadSettings();
