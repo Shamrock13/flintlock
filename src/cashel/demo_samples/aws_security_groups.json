@@ -1,0 +1,315 @@
+{
+  "SecurityGroups": [
+    {
+      "Description": "Edge web tier — public-facing HTTP/HTTPS",
+      "GroupId": "sg-0a1b2c3d4e5f60001",
+      "GroupName": "sg-web-tier-public",
+      "OwnerId": "123456789012",
+      "VpcId": "vpc-0123456789abcdef0",
+      "Tags": [
+        { "Key": "Name",        "Value": "sg-web-tier-public" },
+        { "Key": "Environment", "Value": "production" },
+        { "Key": "Team",        "Value": "platform-engineering" }
+      ],
+      "IpPermissions": [
+        {
+          "FromPort": 80,
+          "ToPort": 80,
+          "IpProtocol": "tcp",
+          "IpRanges": [
+            { "CidrIp": "0.0.0.0/0", "Description": "Public HTTP inbound" }
+          ],
+          "Ipv6Ranges": [
+            { "CidrIpv6": "::/0", "Description": "Public HTTP inbound IPv6" }
+          ],
+          "PrefixListIds": [],
+          "UserIdGroupPairs": []
+        },
+        {
+          "FromPort": 443,
+          "ToPort": 443,
+          "IpProtocol": "tcp",
+          "IpRanges": [
+            { "CidrIp": "0.0.0.0/0", "Description": "Public HTTPS inbound" }
+          ],
+          "Ipv6Ranges": [
+            { "CidrIpv6": "::/0", "Description": "Public HTTPS inbound IPv6" }
+          ],
+          "PrefixListIds": [],
+          "UserIdGroupPairs": []
+        },
+        {
+          "FromPort": 22,
+          "ToPort": 22,
+          "IpProtocol": "tcp",
+          "IpRanges": [
+            { "CidrIp": "10.70.99.0/24", "Description": "SSH from management subnet only" }
+          ],
+          "Ipv6Ranges": [],
+          "PrefixListIds": [],
+          "UserIdGroupPairs": []
+        },
+        {
+          "FromPort": 9100,
+          "ToPort": 9100,
+          "IpProtocol": "tcp",
+          "IpRanges": [
+            { "CidrIp": "10.70.99.0/24", "Description": "Prometheus node exporter — internal only" }
+          ],
+          "Ipv6Ranges": [],
+          "PrefixListIds": [],
+          "UserIdGroupPairs": []
+        }
+      ],
+      "IpPermissionsEgress": [
+        {
+          "FromPort": -1,
+          "ToPort": -1,
+          "IpProtocol": "-1",
+          "IpRanges": [
+            { "CidrIp": "0.0.0.0/0", "Description": "Allow all egress" }
+          ],
+          "Ipv6Ranges": [],
+          "PrefixListIds": [],
+          "UserIdGroupPairs": []
+        }
+      ]
+    },
+
+    {
+      "Description": "Application tier — receives traffic from web tier SG only",
+      "GroupId": "sg-0a1b2c3d4e5f60002",
+      "GroupName": "sg-app-tier",
+      "OwnerId": "123456789012",
+      "VpcId": "vpc-0123456789abcdef0",
+      "Tags": [
+        { "Key": "Name",        "Value": "sg-app-tier" },
+        { "Key": "Environment", "Value": "production" },
+        { "Key": "Team",        "Value": "platform-engineering" }
+      ],
+      "IpPermissions": [
+        {
+          "FromPort": 8080,
+          "ToPort": 8080,
+          "IpProtocol": "tcp",
+          "IpRanges": [],
+          "Ipv6Ranges": [],
+          "PrefixListIds": [],
+          "UserIdGroupPairs": [
+            {
+              "GroupId": "sg-0a1b2c3d4e5f60001",
+              "Description": "Traffic from web tier SG only"
+            }
+          ]
+        },
+        {
+          "FromPort": 22,
+          "ToPort": 22,
+          "IpProtocol": "tcp",
+          "IpRanges": [
+            { "CidrIp": "10.70.99.0/24", "Description": "SSH from management subnet" }
+          ],
+          "Ipv6Ranges": [],
+          "PrefixListIds": [],
+          "UserIdGroupPairs": []
+        }
+      ],
+      "IpPermissionsEgress": [
+        {
+          "FromPort": 1433,
+          "ToPort": 1433,
+          "IpProtocol": "tcp",
+          "IpRanges": [],
+          "Ipv6Ranges": [],
+          "PrefixListIds": [],
+          "UserIdGroupPairs": [
+            {
+              "GroupId": "sg-0a1b2c3d4e5f60003",
+              "Description": "SQL Server egress to db tier"
+            }
+          ]
+        },
+        {
+          "FromPort": 443,
+          "ToPort": 443,
+          "IpProtocol": "tcp",
+          "IpRanges": [
+            { "CidrIp": "0.0.0.0/0", "Description": "HTTPS egress for API calls" }
+          ],
+          "Ipv6Ranges": [],
+          "PrefixListIds": [],
+          "UserIdGroupPairs": []
+        },
+        {
+          "FromPort": 53,
+          "ToPort": 53,
+          "IpProtocol": "udp",
+          "IpRanges": [
+            { "CidrIp": "0.0.0.0/0", "Description": "DNS egress" }
+          ],
+          "Ipv6Ranges": [],
+          "PrefixListIds": [],
+          "UserIdGroupPairs": []
+        }
+      ]
+    },
+
+    {
+      "Description": "Database tier — accepts traffic from app tier SG only",
+      "GroupId": "sg-0a1b2c3d4e5f60003",
+      "GroupName": "sg-db-tier",
+      "OwnerId": "123456789012",
+      "VpcId": "vpc-0123456789abcdef0",
+      "Tags": [
+        { "Key": "Name",        "Value": "sg-db-tier" },
+        { "Key": "Environment", "Value": "production" },
+        { "Key": "Team",        "Value": "data-engineering" }
+      ],
+      "IpPermissions": [
+        {
+          "FromPort": 1433,
+          "ToPort": 1433,
+          "IpProtocol": "tcp",
+          "IpRanges": [],
+          "Ipv6Ranges": [],
+          "PrefixListIds": [],
+          "UserIdGroupPairs": [
+            {
+              "GroupId": "sg-0a1b2c3d4e5f60002",
+              "Description": "MSSQL from app tier SG only"
+            }
+          ]
+        },
+        {
+          "FromPort": 5432,
+          "ToPort": 5432,
+          "IpProtocol": "tcp",
+          "IpRanges": [],
+          "Ipv6Ranges": [],
+          "PrefixListIds": [],
+          "UserIdGroupPairs": [
+            {
+              "GroupId": "sg-0a1b2c3d4e5f60002",
+              "Description": "PostgreSQL from app tier SG only"
+            }
+          ]
+        }
+      ],
+      "IpPermissionsEgress": [
+        {
+          "FromPort": -1,
+          "ToPort": -1,
+          "IpProtocol": "-1",
+          "IpRanges": [
+            { "CidrIp": "0.0.0.0/0" }
+          ],
+          "Ipv6Ranges": [],
+          "PrefixListIds": [],
+          "UserIdGroupPairs": []
+        }
+      ]
+    },
+
+    {
+      "Description": "Default security group — FINDING: has active rules — AUDIT WILL FLAG THIS",
+      "GroupId": "sg-0a1b2c3d4e5f60004",
+      "GroupName": "default",
+      "OwnerId": "123456789012",
+      "VpcId": "vpc-0123456789abcdef0",
+      "Tags": [
+        { "Key": "Name", "Value": "default" }
+      ],
+      "IpPermissions": [
+        {
+          "FromPort": -1,
+          "ToPort": -1,
+          "IpProtocol": "-1",
+          "IpRanges": [],
+          "Ipv6Ranges": [],
+          "PrefixListIds": [],
+          "UserIdGroupPairs": [
+            {
+              "GroupId": "sg-0a1b2c3d4e5f60004",
+              "Description": "Allow all intra-SG traffic (default rule)"
+            }
+          ]
+        }
+      ],
+      "IpPermissionsEgress": [
+        {
+          "FromPort": -1,
+          "ToPort": -1,
+          "IpProtocol": "-1",
+          "IpRanges": [
+            { "CidrIp": "0.0.0.0/0" }
+          ],
+          "Ipv6Ranges": [],
+          "PrefixListIds": [],
+          "UserIdGroupPairs": []
+        }
+      ]
+    },
+
+    {
+      "Description": "FINDING: Overly permissive SG — all ports open to internet — AUDIT WILL FLAG THIS",
+      "GroupId": "sg-0a1b2c3d4e5f60005",
+      "GroupName": "sg-overly-permissive",
+      "OwnerId": "123456789012",
+      "VpcId": "vpc-0123456789abcdef0",
+      "Tags": [
+        { "Key": "Name",        "Value": "sg-overly-permissive" },
+        { "Key": "Environment", "Value": "legacy" }
+      ],
+      "IpPermissions": [
+        {
+          "FromPort": 0,
+          "ToPort": 65535,
+          "IpProtocol": "tcp",
+          "IpRanges": [
+            { "CidrIp": "0.0.0.0/0", "Description": "FINDING: wide port range TCP 0-65535 to internet" }
+          ],
+          "Ipv6Ranges": [
+            { "CidrIpv6": "::/0" }
+          ],
+          "PrefixListIds": [],
+          "UserIdGroupPairs": []
+        },
+        {
+          "FromPort": 22,
+          "ToPort": 22,
+          "IpProtocol": "tcp",
+          "IpRanges": [
+            { "CidrIp": "0.0.0.0/0", "Description": "FINDING: SSH open to internet" }
+          ],
+          "Ipv6Ranges": [],
+          "PrefixListIds": [],
+          "UserIdGroupPairs": []
+        },
+        {
+          "FromPort": 3389,
+          "ToPort": 3389,
+          "IpProtocol": "tcp",
+          "IpRanges": [
+            { "CidrIp": "0.0.0.0/0", "Description": "FINDING: RDP open to internet" }
+          ],
+          "Ipv6Ranges": [],
+          "PrefixListIds": [],
+          "UserIdGroupPairs": []
+        }
+      ],
+      "IpPermissionsEgress": [
+        {
+          "FromPort": -1,
+          "ToPort": -1,
+          "IpProtocol": "-1",
+          "IpRanges": [
+            { "CidrIp": "0.0.0.0/0" }
+          ],
+          "Ipv6Ranges": [],
+          "PrefixListIds": [],
+          "UserIdGroupPairs": []
+        }
+      ]
+    }
+  ]
+}
