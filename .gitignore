@@ -42,3 +42,4 @@ DEMO_SETUP.md
 vercel.json
 api/
 Dockerfile.demo
+src/cashel/demo_samples/
