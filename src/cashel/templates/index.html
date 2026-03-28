@@ -1062,7 +1062,7 @@
   </main>
 
   <footer class="footer">
-    <p>Cashel v1.2 &mdash; Firewall Security Auditor</p>
+    <p>Cashel v1.3 &mdash; Firewall Security Auditor</p>
   </footer>
 
   <script nonce="{{ g.csp_nonce }}">
@@ -1703,7 +1703,14 @@
     try {
       // In demo mode, return pre-canned results from the demo SSH endpoint
       const endpoint = DEMO_MODE ? "/demo/ssh-audit" : "/connect";
-      const body     = DEMO_MODE ? null : new FormData(this);
+      let body;
+      if (DEMO_MODE) {
+        const csrfToken = document.querySelector('meta[name="csrf-token"]').content;
+        body = new FormData();
+        body.append("csrf_token", csrfToken);
+      } else {
+        body = new FormData(this);
+      }
       const res  = await fetch(endpoint, { method: "POST", body });
       const data = await res.json();
       if (data.error) {
@@ -2556,23 +2563,19 @@
         if (!resp.ok) throw new Error("Server returned " + resp.status);
         const blob = await resp.blob();
         const ext  = vendor === "aws" ? ".json" : vendor === "paloalto" ? ".xml" : ".txt";
-        const file = new File([blob], label.replace(/[^a-z0-9.]/gi, "_") + ext, { type: "text/plain" });
-        const dt   = new DataTransfer();
-        dt.items.add(file);
-        const configInput = document.getElementById("config");
-        configInput.files = dt.files;
-        configInput.dispatchEvent(new Event("change"));
-
-        const vendorSel = document.getElementById("vendor");
-        if (vendorSel) vendorSel.value = vendor;
-
-        const tagInput = document.getElementById("deviceTag");
-        if (tagInput && !tagInput.value) tagInput.value = label.split(" \u2014")[0];
-
-        document.getElementById("auditForm").scrollIntoView({ behavior: "smooth", block: "start" });
-        setTimeout(() => document.getElementById("submitBtn").click(), 400);
+        const csrfToken = document.querySelector('meta[name="csrf-token"]').content;
+        const formData = new FormData();
+        formData.append("csrf_token", csrfToken);
+        formData.append("config", new File([blob], id + ext, { type: "text/plain" }));
+        formData.append("vendor", vendor);
+        formData.append("tag",    label.split(" \u2014")[0].trim());
+        const res  = await fetch("/audit", { method: "POST", body: formData });
+        const data = await res.json();
+        if (data.error) { showAuditError(data.error); return; }
+        renderResults(data);
+        document.getElementById("resultsSection").scrollIntoView({ behavior: "smooth", block: "start" });
       } catch (err) {
-        alert("Could not load demo config: " + err.message);
+        showAuditError("Could not load demo config: " + err.message);
       }
     });
   });
