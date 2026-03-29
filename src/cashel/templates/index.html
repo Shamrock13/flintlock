@@ -2638,26 +2638,13 @@
       document.getElementById("demoBulkText").textContent    = "Loading samples\u2026";
       document.getElementById("demoBulkSpinner").classList.remove("hidden");
 
-      // Collect all demo config cards (id + vendor from data attributes)
-      const cards = [...document.querySelectorAll("#demoBulkGrid .demo-config-card")]
-                      .filter(c => c.dataset.id);
       try {
         const csrfToken = document.querySelector('meta[name="csrf-token"]').content;
         const formData  = new FormData();
         formData.append("csrf_token", csrfToken);
-        for (const card of cards) {
-          const id     = card.dataset.id;
-          const vendor = card.dataset.vendor;
-          const resp   = await fetch(`/demo/load/${id}`);
-          if (!resp.ok) throw new Error(`Failed to load ${id}`);
-          const blob = await resp.blob();
-          const ext  = vendor === "aws" ? ".json" : vendor === "paloalto" ? ".xml" : ".txt";
-          formData.append("configs[]", new File([blob], id + ext, { type: "text/plain" }));
-        }
-        formData.append("vendor", "auto");
 
         document.getElementById("demoBulkText").textContent = "Running audit\u2026";
-        const res  = await fetch("/bulk_audit", { method: "POST", body: formData });
+        const res  = await fetch("/demo/bulk-audit", { method: "POST", body: formData });
         const data = await res.json();
         if (data.error) {
           document.getElementById("bulkResults").classList.remove("hidden");
