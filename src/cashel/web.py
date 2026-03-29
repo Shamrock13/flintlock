@@ -901,6 +901,45 @@ def demo_ssh_audit():
     )
 
 
+@app.route("/demo/bulk-audit", methods=["POST"])
+def demo_bulk_audit():
+    """Run all demo sample configs through the audit engine and return bulk results."""
+    if not DEMO_MODE:
+        return jsonify({"error": "Not available outside demo mode."}), 404
+
+    results = []
+    for _cfg_id, cfg in _DEMO_CONFIGS.items():
+        src_path = str(_DEMO_SAMPLES_DIR / cfg["filename"])
+        vendor = cfg["vendor"]
+        result_entry: dict = {
+            "filename": cfg["label"],
+            "status": "error",
+            "findings": [],
+            "enriched_findings": [],
+            "summary": {},
+            "vendor": vendor,
+            "archive_id": None,
+            "error": None,
+        }
+        try:
+            findings, _parse, _extra = run_vendor_audit(vendor, src_path)
+            findings = _sort_findings(findings)
+            summary = _build_summary(findings)
+            result_entry.update(
+                {
+                    "status": "ok",
+                    "findings": _findings_to_strings(findings),
+                    "enriched_findings": findings,
+                    "summary": summary,
+                }
+            )
+        except Exception as exc:  # noqa: BLE001
+            result_entry["error"] = str(exc)
+        results.append(result_entry)
+
+    return jsonify(results)
+
+
 # Demo schedules — shown read-only when DEMO_MODE is active
 _DEMO_SCHEDULES = [
     {
