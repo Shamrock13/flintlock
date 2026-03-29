@@ -243,7 +243,7 @@
         <p class="card-subtitle">Run all four sample configs at once &mdash; no upload needed.</p>
         <div class="demo-config-grid" id="demoBulkGrid">
           {% for cfg in demo_configs %}
-          <div class="demo-config-card demo-config-preview">
+          <div class="demo-config-card demo-config-preview" data-id="{{ cfg.id }}" data-vendor="{{ cfg.vendor }}">
             <span class="demo-config-label">{{ cfg.label }}</span>
             <span class="demo-config-desc">{{ cfg.description }}</span>
           </div>
@@ -2638,17 +2638,20 @@
       document.getElementById("demoBulkText").textContent    = "Loading samples\u2026";
       document.getElementById("demoBulkSpinner").classList.remove("hidden");
 
-      // Collect all demo config ids from the preview cards
-      const ids = [...document.querySelectorAll("#demoBulkGrid .demo-config-card")]
-                    .map(c => c.dataset.id).filter(Boolean);
+      // Collect all demo config cards (id + vendor from data attributes)
+      const cards = [...document.querySelectorAll("#demoBulkGrid .demo-config-card")]
+                      .filter(c => c.dataset.id);
       try {
-        const formData = new FormData();
-        for (const id of ids) {
-          const resp = await fetch(`/demo/load/${id}`);
+        const csrfToken = document.querySelector('meta[name="csrf-token"]').content;
+        const formData  = new FormData();
+        formData.append("csrf_token", csrfToken);
+        for (const card of cards) {
+          const id     = card.dataset.id;
+          const vendor = card.dataset.vendor;
+          const resp   = await fetch(`/demo/load/${id}`);
           if (!resp.ok) throw new Error(`Failed to load ${id}`);
-          const blob  = await resp.blob();
-          // determine extension from the content-type / id heuristic
-          const ext   = id === "aws" ? ".json" : id === "palo_alto" ? ".xml" : ".txt";
+          const blob = await resp.blob();
+          const ext  = vendor === "aws" ? ".json" : vendor === "paloalto" ? ".xml" : ".txt";
           formData.append("configs[]", new File([blob], id + ext, { type: "text/plain" }));
         }
         formData.append("vendor", "auto");
