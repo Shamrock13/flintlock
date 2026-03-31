@@ -2121,21 +2121,19 @@ def api_diff():
 app.register_blueprint(api_bp)
 
 
-def main():
-    port = int(os.environ.get("PORT", 5000))
-    app.run(host="0.0.0.0", port=port)
-
-
 # Start scheduler on import — covers both WSGI servers (gunicorn/uwsgi)
-# and direct `cashel-web` invocation. The scheduler has an internal
-# guard that prevents double-start if this module is reloaded.
-start_scheduler()
-atexit.register(stop_scheduler)
+# and direct `cashel-web` invocation. When running under gunicorn with
+# multiple workers, only the first worker starts the scheduler (the others
+# have CASHEL_SKIP_SCHEDULER=1 set by gunicorn.conf.py).
+if os.environ.get("CASHEL_SKIP_SCHEDULER") != "1":
+    start_scheduler()
+    atexit.register(stop_scheduler)
 configure_syslog(get_settings())
 
 
 def main():
-    app.run(host="0.0.0.0", port=5000, debug=False)
+    port = int(os.environ.get("PORT", 5000))
+    app.run(host="0.0.0.0", port=port, debug=False)
 
 
 if __name__ == "__main__":
