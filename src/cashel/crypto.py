@@ -15,9 +15,12 @@ write without a manual migration step.
 """
 
 import base64
+import logging
 import os
 
 from cryptography.fernet import Fernet, InvalidToken
+
+log = logging.getLogger(__name__)
 
 
 def _key_file() -> str:
@@ -73,4 +76,8 @@ def decrypt(ciphertext: str) -> str:
         try:
             return base64.b64decode(ciphertext.encode("ascii")).decode("utf-8")
         except Exception:
+            log.warning(
+                "Failed to decrypt credential (Fernet and legacy base64 both failed). "
+                "The encryption key may have changed or the data is corrupted."
+            )
             return ""

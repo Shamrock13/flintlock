@@ -175,21 +175,16 @@ def test_send_slack_empty_webhook_no_crash():
     send_slack("", SCHEDULE, SUMMARY, FINDINGS)  # must not raise
 
 
-def test_send_slack_url_error_no_crash(monkeypatch=None):
+def test_send_slack_url_error_no_crash(monkeypatch):
     """send_slack must swallow network errors silently."""
     import urllib.request
     import urllib.error
 
-    original = urllib.request.urlopen
-
-    def fake_urlopen(req, timeout=None):
-        raise urllib.error.URLError("simulated failure")
-
-    urllib.request.urlopen = fake_urlopen
-    try:
-        send_slack("https://hooks.slack.com/services/FAKE", SCHEDULE, SUMMARY, FINDINGS)
-    finally:
-        urllib.request.urlopen = original
+    monkeypatch.setattr(
+        urllib.request, "urlopen",
+        lambda req, timeout=None: (_ for _ in ()).throw(urllib.error.URLError("simulated failure")),
+    )
+    send_slack("https://hooks.slack.com/services/FAKE", SCHEDULE, SUMMARY, FINDINGS)
 
 
 def test_send_slack_payload_structure():

@@ -1497,7 +1497,7 @@ select:focus, input[type="text"]:focus {
   font-size: 0.84rem;
   position: sticky;
   top: 0;
-  z-index: 200;
+  z-index: 100;
 }
 .demo-banner strong { color: #7eaeff; }
 .demo-banner-link {

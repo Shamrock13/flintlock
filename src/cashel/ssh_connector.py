@@ -369,8 +369,13 @@ def _pull_iptables(
             "iptables-save 2>/dev/null || sudo iptables-save 2>/dev/null",
             timeout=timeout,
         )
-        out = stdout.read()
-        return out.decode("utf-8", errors="ignore")
+        out = stdout.read().decode("utf-8", errors="ignore")
+        if not out.strip():
+            raise RuntimeError(
+                "iptables-save returned empty output — check permissions or "
+                "verify iptables is installed on the target host"
+            )
+        return out
     finally:
         client.close()
 
@@ -408,8 +413,13 @@ def _pull_nftables(
             "nft list ruleset 2>/dev/null || sudo nft list ruleset 2>/dev/null",
             timeout=timeout,
         )
-        out = stdout.read()
-        return out.decode("utf-8", errors="ignore")
+        out = stdout.read().decode("utf-8", errors="ignore")
+        if not out.strip():
+            raise RuntimeError(
+                "nft list ruleset returned empty output — check permissions or "
+                "verify nftables is installed on the target host"
+            )
+        return out
     finally:
         client.close()
 

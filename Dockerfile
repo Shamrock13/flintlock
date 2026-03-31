@@ -1,16 +1,23 @@
 FROM python:3.11-slim
 
+RUN apt-get update && apt-get install -y --no-install-recommends curl \
+    && rm -rf /var/lib/apt/lists/*
+
 WORKDIR /app
 
 # Install dependencies first (layer caching)
 COPY requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt
+RUN pip install -r requirements.txt
 
 # Copy source
 COPY . .
 
-# Persistent data directories (uploads, reports, license)
+# Persistent data directories (uploads, reports, license, encryption key)
 RUN mkdir -p /data/uploads /data/reports
+
+# Create non-root user and set ownership
+RUN useradd -m -u 1000 cashel && chown -R cashel:cashel /app /data
+USER cashel
 
 # Environment defaults (overridable via docker-compose or -e flags)
 ENV FLASK_APP=src/cashel/web.py
@@ -18,7 +25,11 @@ ENV PYTHONPATH=/app/src
 ENV UPLOAD_FOLDER=/data/uploads
 ENV REPORTS_FOLDER=/data/reports
 ENV LICENSE_PATH=/data/.cashel_license
+ENV CASHEL_KEY_FILE=/data/cashel.key
 
 EXPOSE 5000
+
+HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
+    CMD curl -f http://localhost:5000/ || exit 1
 
 CMD ["python", "-m", "flask", "run", "--host=0.0.0.0", "--port=5000"]

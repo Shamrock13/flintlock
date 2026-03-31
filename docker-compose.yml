@@ -9,8 +9,8 @@ services:
     volumes:
       - cashel_data:/data
     environment:
-      # Change this to a strong secret before deploying to production
-      - CASHEL_SECRET=${CASHEL_SECRET:-change-me-in-production}
+      - CASHEL_SECRET=${CASHEL_SECRET:?Set CASHEL_SECRET to a strong random string}
+      - CASHEL_KEY_FILE=/data/cashel.key
     restart: unless-stopped
 
 volumes:

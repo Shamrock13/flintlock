@@ -83,7 +83,16 @@ for _d in (UPLOAD_FOLDER, REPORTS_FOLDER, ARCHIVE_FOLDER, ACTIVITY_FOLDER):
 # Settings folder is created lazily by settings.py on first save
 
 app = Flask(__name__, template_folder="templates", static_folder="static")
-app.config["SECRET_KEY"] = os.environ.get("CASHEL_SECRET", "change-me-in-production")
+_secret = os.environ.get("CASHEL_SECRET", "")
+if not _secret:
+    import warnings
+    warnings.warn(
+        "CASHEL_SECRET is not set — using a random ephemeral key. "
+        "Sessions will not survive restarts. Set CASHEL_SECRET in production.",
+        stacklevel=1,
+    )
+    _secret = secrets.token_hex(32)
+app.config["SECRET_KEY"] = _secret
 app.config["MAX_CONTENT_LENGTH"] = 50 * 1024 * 1024  # 50 MB total request cap
 app.config["SESSION_COOKIE_HTTPONLY"] = True
 app.config["SESSION_COOKIE_SAMESITE"] = "Lax"
@@ -1469,8 +1478,18 @@ def archive_export(entry_id):
 
 @app.route("/archive/trends", methods=["GET"])
 def archive_trends():
-    """Return time-series data for score/finding trends grouped by filename."""
-    entries = list_archive()
+    """Return time-series data for score/finding trends grouped by filename.
+
+    Accepts an optional ``limit`` query param (default 200) to cap the number
+    of entries returned and avoid scanning unbounded archive directories.
+    """
+    try:
+        limit = int(request.args.get("limit", 200))
+    except (TypeError, ValueError):
+        limit = 200
+    entries = list_archive()  # already sorted newest-first
+    if limit > 0:
+        entries = entries[:limit]
     series = []
     for e in entries:
         s = e.get("summary", {})
@@ -1769,24 +1788,30 @@ def reports_list():
     return jsonify(reports)
 
 
+def _safe_report_path(filename):
+    """Resolve a report filename and verify it stays inside REPORTS_FOLDER."""
+    path = os.path.realpath(os.path.join(REPORTS_FOLDER, filename))
+    if not path.startswith(os.path.realpath(REPORTS_FOLDER) + os.sep):
+        return None
+    if not os.path.exists(path):
+        return None
+    return path
+
+
 @app.route("/reports/<filename>")
 def download_report(filename):
-    if ".." in filename or "/" in filename:
+    path = _safe_report_path(filename)
+    if not path:
         return "Not found", 404
-    path = os.path.join(REPORTS_FOLDER, filename)
-    if not os.path.exists(path):
-        return "Report not found", 404
-    return send_file(path, as_attachment=True, download_name=filename)
+    return send_file(path, as_attachment=True, download_name=os.path.basename(path))
 
 
 @app.route("/reports/<filename>/view")
 def view_report(filename):
     """Serve PDF inline for in-browser viewing."""
-    if ".." in filename or "/" in filename:
+    path = _safe_report_path(filename)
+    if not path:
         return "Not found", 404
-    path = os.path.join(REPORTS_FOLDER, filename)
-    if not os.path.exists(path):
-        return "Report not found", 404
     return send_file(path, as_attachment=False, mimetype="application/pdf")
 
 
@@ -2107,6 +2132,10 @@ def main():
 start_scheduler()
 atexit.register(stop_scheduler)
 configure_syslog(get_settings())
+
+
+def main():
+    app.run(host="0.0.0.0", port=5000, debug=False)
 
 
 if __name__ == "__main__":

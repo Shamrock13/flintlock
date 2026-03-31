@@ -219,8 +219,9 @@ def test_internet_ingress_clean():
 
 def test_forward_chain_flagged():
     findings = check_forward_chain_iptables(_risky_data())
-    assert len(findings) >= 1
-    assert all(f["severity"] == "MEDIUM" for f in findings)
+    assert len(findings) == 1, f"Expected 1 FORWARD finding, got {len(findings)}"
+    assert findings[0]["severity"] == "MEDIUM"
+    assert "FORWARD" in findings[0]["message"]
 
 
 def test_forward_chain_clean():

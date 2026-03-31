@@ -1,5 +1,6 @@
 """Archival review system — persist and compare historical audit results."""
 
+import fcntl
 import os
 import json
 import hashlib
@@ -22,10 +23,14 @@ def _fingerprint(filepath):
 # ── Persistence ───────────────────────────────────────────────────────────────
 
 
+_LOCK_PATH = os.path.join(ARCHIVE_FOLDER, ".archive.lock")
+
+
 def save_audit(filename, vendor, findings, summary, config_path=None, tag=None):
     """
     Save an audit result to the archive.
     Returns (entry_id, entry_dict).
+    Uses a file lock to prevent version collisions under concurrent requests.
     """
     entry_id = uuid.uuid4().hex[:12]
     fingerprint = (
@@ -34,30 +39,36 @@ def save_audit(filename, vendor, findings, summary, config_path=None, tag=None):
         else None
     )
 
-    # Auto-version: find max version for same tag+vendor, increment
-    version = 1
-    if tag:
-        existing = list_archive()
-        prior = [
-            e for e in existing if e.get("tag") == tag and e.get("vendor") == vendor
-        ]
-        if prior:
-            version = max(e.get("version", 1) for e in prior) + 1
+    with open(_LOCK_PATH, "w") as lock_fh:
+        fcntl.flock(lock_fh, fcntl.LOCK_EX)
+        try:
+            # Auto-version: find max version for same tag+vendor, increment
+            version = 1
+            if tag:
+                existing = list_archive()
+                prior = [
+                    e for e in existing if e.get("tag") == tag and e.get("vendor") == vendor
+                ]
+                if prior:
+                    version = max(e.get("version", 1) for e in prior) + 1
 
-    entry = {
-        "id": entry_id,
-        "filename": filename,
-        "vendor": vendor,
-        "timestamp": datetime.utcnow().strftime("%Y-%m-%dT%H:%M:%SZ"),
-        "fingerprint": fingerprint,
-        "summary": summary,
-        "findings": findings,
-        "tag": tag or None,
-        "version": version,
-    }
-    path = os.path.join(ARCHIVE_FOLDER, f"{entry_id}.json")
-    with open(path, "w") as f:
-        json.dump(entry, f, indent=2)
+            entry = {
+                "id": entry_id,
+                "filename": filename,
+                "vendor": vendor,
+                "timestamp": datetime.utcnow().strftime("%Y-%m-%dT%H:%M:%SZ"),
+                "fingerprint": fingerprint,
+                "summary": summary,
+                "findings": findings,
+                "tag": tag or None,
+                "version": version,
+            }
+            path = os.path.join(ARCHIVE_FOLDER, f"{entry_id}.json")
+            with open(path, "w") as f:
+                json.dump(entry, f, indent=2)
+        finally:
+            fcntl.flock(lock_fh, fcntl.LOCK_UN)
+
     return entry_id, entry
 
 
