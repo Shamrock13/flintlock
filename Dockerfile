@@ -20,7 +20,6 @@ RUN useradd -m -u 1000 cashel && chown -R cashel:cashel /app /data
 USER cashel
 
 # Environment defaults (overridable via docker-compose or -e flags)
-ENV FLASK_APP=src/cashel/web.py
 ENV PYTHONPATH=/app/src
 ENV UPLOAD_FOLDER=/data/uploads
 ENV REPORTS_FOLDER=/data/reports
@@ -29,7 +28,7 @@ ENV CASHEL_KEY_FILE=/data/cashel.key
 
 EXPOSE 5000
 
-HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
+HEALTHCHECK --interval=30s --timeout=10s --start-period=10s --retries=3 \
     CMD curl -f http://localhost:5000/ || exit 1
 
-CMD ["python", "-m", "flask", "run", "--host=0.0.0.0", "--port=5000"]
+CMD ["gunicorn", "--config", "gunicorn.conf.py", "cashel.web:app"]
