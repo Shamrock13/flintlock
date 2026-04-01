@@ -576,6 +576,7 @@ select:focus, input[type="text"]:focus {
 /* Actions row — holds PDF, export, and archive divs on one line */
 .actions-row { display: flex; flex-wrap: wrap; align-items: center; gap: 0.75rem; margin-top: 1rem; }
 .actions-row > .pdf-row,
+.actions-row > .remediation-row,
 .actions-row > .export-row,
 .actions-row > .archive-row { display: flex; align-items: center; gap: 0.5rem; margin-top: 0; }
 
@@ -1562,7 +1563,7 @@ select:focus, input[type="text"]:focus {
   font-weight: 600;
 }
 .remediation-row {
-  margin-top: 0.5rem;
+  margin-top: 0.5rem; /* overridden to 0 when inside .actions-row */
 }
 .remediation-modal-box {
   max-width: 780px;
