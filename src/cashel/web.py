@@ -79,7 +79,27 @@ ARCHIVE_FOLDER = os.environ.get("ARCHIVE_FOLDER", "/tmp/cashel_archive")
 ACTIVITY_FOLDER = os.environ.get("ACTIVITY_FOLDER", "/tmp/cashel_activity")
 
 for _d in (UPLOAD_FOLDER, REPORTS_FOLDER, ARCHIVE_FOLDER, ACTIVITY_FOLDER):
-    os.makedirs(_d, exist_ok=True)
+    try:
+        os.makedirs(_d, exist_ok=True)
+    except OSError:
+        pass  # Writability is checked at use-time via _make_temp_path
+
+
+def _make_temp_path(suffix: str) -> str:
+    """Return a writable temp path, preferring UPLOAD_FOLDER with system-temp fallback."""
+    import tempfile
+
+    candidate = os.path.join(UPLOAD_FOLDER, f"{uuid.uuid4()}{suffix}")
+    try:
+        fd = os.open(candidate, os.O_CREAT | os.O_WRONLY, 0o600)
+        os.close(fd)
+        os.unlink(candidate)
+        return candidate
+    except OSError:
+        fd, path = tempfile.mkstemp(suffix=suffix)
+        os.close(fd)
+        return path
+
 
 # Settings folder is created lazily by settings.py on first save
 
@@ -1053,8 +1073,7 @@ def run_audit():
         return jsonify({"error": "File exceeds the 5 MB per-file limit."}), 413
     upload.seek(0)
     suffix = Path(upload.filename).suffix or ".txt"
-    temp_name = f"{uuid.uuid4()}{suffix}"
-    temp_path = os.path.join(UPLOAD_FOLDER, temp_name)
+    temp_path = _make_temp_path(suffix)
     upload.save(temp_path)
 
     try:
@@ -1209,8 +1228,8 @@ def run_diff():
     upload_b = request.files["config_b"]
     suffix_a = Path(upload_a.filename).suffix or ".txt"
     suffix_b = Path(upload_b.filename).suffix or ".txt"
-    path_a = os.path.join(UPLOAD_FOLDER, f"{uuid.uuid4()}{suffix_a}")
-    path_b = os.path.join(UPLOAD_FOLDER, f"{uuid.uuid4()}{suffix_b}")
+    path_a = _make_temp_path(suffix_a)
+    path_b = _make_temp_path(suffix_b)
     upload_a.save(path_a)
     upload_b.save(path_b)
 
@@ -1299,7 +1318,7 @@ def live_connect():
     pem_passphrase = request.form.get("pem_passphrase", "") or None
     pem_upload = request.files.get("pem_key")
     if pem_upload and pem_upload.filename:
-        pem_path = os.path.join(UPLOAD_FOLDER, f"cashel_pem_{uuid.uuid4().hex}.pem")
+        pem_path = _make_temp_path(".pem")
         pem_upload.save(pem_path)
         try:
             os.chmod(pem_path, 0o600)
@@ -1682,8 +1701,7 @@ def bulk_audit():
             continue
 
         suffix = Path(upload.filename).suffix or ".txt"
-        temp_name = f"{uuid.uuid4()}{suffix}"
-        temp_path = os.path.join(UPLOAD_FOLDER, temp_name)
+        temp_path = _make_temp_path(suffix)
         upload.save(temp_path)
 
         result_entry = {
@@ -1980,6 +1998,8 @@ def settings_test_smtp():
     Accepts the same SMTP fields as /settings POST so the user can test
     before saving.  Returns {ok: bool, message: str}.
     """
+    if DEMO_MODE:
+        return jsonify({"ok": False, "message": "SMTP is disabled in demo mode."}), 403
     import smtplib
     import ssl
     from email.mime.text import MIMEText
@@ -2084,7 +2104,7 @@ def api_audit():
     upload.seek(0)
 
     suffix = Path(upload.filename).suffix or ".txt"
-    temp_path = os.path.join(UPLOAD_FOLDER, f"{uuid.uuid4()}{suffix}")
+    temp_path = _make_temp_path(suffix)
     upload.save(temp_path)
 
     try:
@@ -2214,7 +2234,7 @@ def api_diff():
         for field in ("config_a", "config_b"):
             f = request.files[field]
             suffix = Path(f.filename).suffix or ".txt"
-            p = os.path.join(UPLOAD_FOLDER, f"{uuid.uuid4()}{suffix}")
+            p = _make_temp_path(suffix)
             f.save(p)
             paths.append(p)
 
@@ -2255,7 +2275,8 @@ app.register_blueprint(api_bp)
 if os.environ.get("CASHEL_SKIP_SCHEDULER") != "1":
     start_scheduler()
     atexit.register(stop_scheduler)
-configure_syslog(get_settings())
+if not DEMO_MODE:
+    configure_syslog(get_settings())
 
 
 def main():
