@@ -218,7 +218,7 @@
         <div id="findingsPagination" class="findings-pagination hidden"></div>
         <div class="actions-row">
           <div class="pdf-row hidden" id="pdfRow">
-            <a id="pdfLink" class="btn-download" href="#" download>&#8681; Download PDF</a>
+            <a id="pdfLink" class="btn-secondary" href="#" download>&#8681; Download PDF</a>
             <a id="pdfViewLink" class="btn-secondary" href="#" target="_blank" rel="noopener">&#128196; View PDF</a>
           </div>
           <div class="remediation-row hidden" id="remediationRow">
@@ -2794,7 +2794,7 @@
     </div>
   </div>
 
-  <script nonce="{{ csp_nonce }}">
+  <script nonce="{{ g.csp_nonce }}">
   (function() {
     const modal = document.getElementById("remediationModal");
     const body  = document.getElementById("remediationModalBody");
