@@ -47,7 +47,9 @@ def save_audit(filename, vendor, findings, summary, config_path=None, tag=None):
             if tag:
                 existing = list_archive()
                 prior = [
-                    e for e in existing if e.get("tag") == tag and e.get("vendor") == vendor
+                    e
+                    for e in existing
+                    if e.get("tag") == tag and e.get("vendor") == vendor
                 ]
                 if prior:
                     version = max(e.get("version", 1) for e in prior) + 1

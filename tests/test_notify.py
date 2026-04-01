@@ -181,8 +181,11 @@ def test_send_slack_url_error_no_crash(monkeypatch):
     import urllib.error
 
     monkeypatch.setattr(
-        urllib.request, "urlopen",
-        lambda req, timeout=None: (_ for _ in ()).throw(urllib.error.URLError("simulated failure")),
+        urllib.request,
+        "urlopen",
+        lambda req, timeout=None: (_ for _ in ()).throw(
+            urllib.error.URLError("simulated failure")
+        ),
     )
     send_slack("https://hooks.slack.com/services/FAKE", SCHEDULE, SUMMARY, FINDINGS)
 
