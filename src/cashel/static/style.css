@@ -1553,3 +1553,174 @@ select:focus, input[type="text"]:focus {
 .demo-config-desc { font-size: 0.78rem; color: var(--text-muted); line-height: 1.4; }
 .demo-config-action { font-size: 0.78rem; color: var(--btn-primary-bg); font-weight: 600; margin-top: 0.25rem; }
 .demo-loading, .demo-error { color: var(--text-muted); font-size: 0.85rem; }
+
+/* ===== Remediation Plan ===== */
+.btn-remediation {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-weight: 600;
+}
+.remediation-row {
+  margin-top: 0.5rem;
+}
+.remediation-modal-box {
+  max-width: 780px;
+  max-height: 90vh;
+  display: flex;
+  flex-direction: column;
+}
+.remediation-modal-box .modal-body {
+  overflow-y: auto;
+  max-height: calc(90vh - 60px);
+  padding: 1rem 1.4rem;
+}
+.btn-sm {
+  padding: 0.3rem 0.65rem;
+  font-size: 0.75rem;
+  border-radius: 5px;
+}
+.rem-loading {
+  text-align: center;
+  padding: 2rem;
+  color: var(--text-muted);
+  font-size: 0.9rem;
+}
+.rem-empty {
+  text-align: center;
+  padding: 2rem;
+  color: var(--pass);
+  font-weight: 600;
+}
+.rem-plan {
+  font-size: 0.85rem;
+}
+.rem-summary-bar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1.2rem;
+  padding: 0.75rem 1rem;
+  background: var(--card-bg);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  margin-bottom: 0.75rem;
+  font-size: 0.82rem;
+  color: var(--text-muted);
+}
+.rem-summary-bar strong { color: var(--text); }
+.rem-disclaimer {
+  padding: 0.6rem 0.8rem;
+  background: rgba(153,102,0,0.08);
+  border-left: 3px solid #996600;
+  border-radius: 4px;
+  font-size: 0.78rem;
+  color: var(--text-muted);
+  margin-bottom: 1rem;
+}
+.rem-phase {
+  margin-bottom: 1rem;
+}
+.rem-phase-title {
+  font-size: 0.9rem;
+  font-weight: 700;
+  color: var(--text);
+  margin: 0.5rem 0 0.5rem 0;
+  padding-bottom: 0.3rem;
+  border-bottom: 2px solid var(--border);
+}
+.rem-step {
+  border: 1px solid var(--border);
+  border-left: 4px solid var(--border);
+  border-radius: 6px;
+  padding: 0.7rem 0.9rem;
+  margin-bottom: 0.5rem;
+  background: var(--card-bg);
+}
+.rem-step-high { border-left-color: var(--high); }
+.rem-step-medium { border-left-color: var(--medium); }
+.rem-step-header {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: 0.4rem;
+}
+.rem-step-num {
+  font-weight: 700;
+  font-size: 0.82rem;
+  color: var(--text);
+}
+.rem-badge {
+  display: inline-block;
+  padding: 0.15rem 0.45rem;
+  border-radius: 4px;
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: 0.3px;
+}
+.rem-badge-high   { background: rgba(204,34,0,0.1); color: #CC2200; }
+.rem-badge-medium { background: rgba(153,102,0,0.1); color: #996600; }
+.rem-badge-quick  { background: rgba(26,128,85,0.1); color: #1A8055; }
+.rem-badge-moderate { background: rgba(153,102,0,0.1); color: #996600; }
+.rem-badge-change { background: rgba(204,34,0,0.1); color: #CC2200; }
+.rem-step-desc {
+  font-family: 'SF Mono', 'Fira Code', monospace;
+  font-size: 0.78rem;
+  color: var(--text);
+  line-height: 1.45;
+  word-break: break-word;
+}
+.rem-consolidated {
+  font-size: 0.76rem;
+  color: var(--text-muted);
+  margin: 0.35rem 0;
+  padding-left: 0.5rem;
+  border-left: 2px solid var(--border);
+}
+.rem-consolidated ul {
+  margin: 0.25rem 0 0 1rem;
+  padding: 0;
+}
+.rem-consolidated li {
+  font-size: 0.74rem;
+  line-height: 1.35;
+  margin-bottom: 0.15rem;
+}
+.rem-guidance {
+  font-size: 0.78rem;
+  color: var(--text-muted);
+  margin-top: 0.35rem;
+  padding-left: 0.8rem;
+  line-height: 1.4;
+}
+.rem-guidance::before {
+  content: "\2192 ";
+  color: var(--text-muted);
+}
+.rem-commands {
+  margin-top: 0.4rem;
+  border-radius: 5px;
+  overflow: hidden;
+  border: 1px solid var(--border);
+}
+.rem-commands-label {
+  font-size: 0.7rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: var(--text-muted);
+  padding: 0.3rem 0.6rem;
+  background: rgba(126,174,255,0.06);
+  border-bottom: 1px solid var(--border);
+}
+.rem-commands pre {
+  margin: 0;
+  padding: 0.5rem 0.7rem;
+  font-size: 0.74rem;
+  font-family: 'SF Mono', 'Fira Code', monospace;
+  background: var(--card-bg);
+  color: var(--text);
+  overflow-x: auto;
+  line-height: 1.45;
+  white-space: pre-wrap;
+  word-break: break-word;
+}

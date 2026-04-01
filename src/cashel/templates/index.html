@@ -221,6 +221,9 @@
             <a id="pdfLink" class="btn-download" href="#" download>&#8681; Download PDF</a>
             <a id="pdfViewLink" class="btn-secondary" href="#" target="_blank" rel="noopener">&#128196; View PDF</a>
           </div>
+          <div class="remediation-row hidden" id="remediationRow">
+            <button id="remediationPlanBtn" class="btn-primary btn-remediation">&#9881; View Remediation Plan</button>
+          </div>
           <div class="export-row hidden" id="exportRow">
             <button id="exportJsonBtn" class="btn-secondary">&#8681; JSON</button>
             <button id="exportCsvBtn"  class="btn-secondary">&#8681; CSV</button>
@@ -498,6 +501,9 @@
         </div>
         <div class="summary-grid" id="connSummaryGrid"></div>
         <div id="connFindingsList"></div>
+        <div class="remediation-row hidden" id="connRemediationRow">
+          <button id="connRemediationPlanBtn" class="btn-primary btn-remediation">&#9881; View Remediation Plan</button>
+        </div>
         <div class="archive-row hidden" id="connArchiveRow">
           <span class="archive-saved-msg">&#10003; Result saved to Audit History &mdash;
             <button class="link-btn" id="connViewHistoryBtn">View History</button>
@@ -1562,6 +1568,12 @@
 
     lastAuditData = data;
     document.getElementById("exportRow").classList.remove("hidden");
+
+    /* Show remediation plan button when there are findings */
+    const remRow = document.getElementById("remediationRow");
+    const hasFindings = (data.enriched_findings || data.findings || []).length > 0;
+    if (hasFindings) { remRow.classList.remove("hidden"); }
+    else { remRow.classList.add("hidden"); }
   }
 
   document.getElementById("viewHistoryBtn").addEventListener("click", () => switchTab("history"));
@@ -1770,6 +1782,13 @@
     const connArchiveRow = document.getElementById("connArchiveRow");
     if (data.archive_id) connArchiveRow.classList.remove("hidden");
     else connArchiveRow.classList.add("hidden");
+
+    /* Show remediation plan button for connect results */
+    if (window._setLastConnectData) window._setLastConnectData(data);
+    const connRemRow = document.getElementById("connRemediationRow");
+    const connHasFindings = (data.enriched_findings || data.findings || []).length > 0;
+    if (connHasFindings) { connRemRow.classList.remove("hidden"); }
+    else { connRemRow.classList.add("hidden"); }
   }
   document.getElementById("connViewHistoryBtn").addEventListener("click", () => switchTab("history"));
 
@@ -1842,6 +1861,7 @@
           <span class="history-badge sev-high" title="High">${hi}</span>
           <span class="history-badge sev-medium" title="Medium">${med}</span>
           <span class="history-badge sev-total" title="Total">${tot}</span>
+          <button class="btn-secondary btn-sm" data-rem-archive="${escHtml(e.id)}" title="View Remediation Plan">&#9881; Plan</button>
           <a class="btn-secondary btn-sm" href="/archive/${escHtml(e.id)}/export?fmt=json"  download title="Download JSON">JSON</a>
           <a class="btn-secondary btn-sm" href="/archive/${escHtml(e.id)}/export?fmt=csv"   download title="Download CSV">CSV</a>
           <a class="btn-secondary btn-sm" href="/archive/${escHtml(e.id)}/export?fmt=sarif" download title="Download SARIF">SARIF</a>
@@ -1874,6 +1894,31 @@
       btn.addEventListener("click", async function () {
         await fetch("/archive/" + this.dataset.delete, { method: "DELETE" });
         await loadHistory();
+      });
+    });
+
+    /* Remediation plan buttons for archived entries */
+    el.querySelectorAll("[data-rem-archive]").forEach(btn => {
+      btn.addEventListener("click", async function () {
+        const archiveId = this.dataset.remArchive;
+        const modal = document.getElementById("remediationModal");
+        const body  = document.getElementById("remediationModalBody");
+        modal.classList.remove("hidden");
+        document.body.style.overflow = "hidden";
+        body.innerHTML = '<div class="rem-loading">Generating remediation plan&hellip;</div>';
+        try {
+          const res = await fetch(`/archive/${archiveId}/remediation-plan?fmt=json`);
+          if (!res.ok) throw new Error(`HTTP ${res.status}`);
+          const plan = await res.json();
+          /* Reuse the renderPlanHTML function from the remediation modal scope */
+          if (window._renderRemPlan) {
+            body.innerHTML = window._renderRemPlan(plan);
+          } else {
+            body.innerHTML = '<pre>' + JSON.stringify(plan, null, 2) + '</pre>';
+          }
+        } catch (err) {
+          body.innerHTML = `<div class="alert alert-error">Failed: ${escHtml(err.message)}</div>`;
+        }
       });
     });
 
@@ -2155,10 +2200,12 @@
     }
   });
 
+  let _bulkResultsData = [];
   function renderBulkResults(results) {
+    _bulkResultsData = results;
     const el = document.getElementById("bulkResultsList");
     if (!results.length) { el.innerHTML = `<p class="text-muted">No files processed.</p>`; return; }
-    el.innerHTML = results.map(r => {
+    el.innerHTML = results.map((r, i) => {
       const vendor = VENDOR_LABELS[r.vendor] || r.vendor || "Unknown";
       const s = r.summary || {};
       if (r.status === "error") {
@@ -2193,9 +2240,29 @@
             || `<div class="finding finding-pass">[PASS] No issues found</div>`}
           </div>
         </details>
+        ${(r.enriched_findings||r.findings||[]).length > 0
+          ? `<button class="btn-secondary btn-sm bulk-rem-btn" data-rem-idx="${i}">View Remediation Plan</button>`
+          : ''}
       </div>`;
     }).join("");
     document.getElementById("bulkResults").classList.remove("hidden");
+
+    /* Attach remediation plan buttons for bulk results (event delegation) */
+    document.getElementById("bulkResultsList").addEventListener("click", (e) => {
+      const btn = e.target.closest(".bulk-rem-btn");
+      if (!btn) return;
+      const idx = parseInt(btn.dataset.remIdx, 10);
+      const r = _bulkResultsData[idx];
+      if (!r) return;
+      if (window._openBulkRemediation) {
+        window._openBulkRemediation({
+          findings: r.enriched_findings || r.findings || [],
+          vendor: r.vendor || "",
+          filename: r.filename || "",
+          summary: r.summary || {},
+        });
+      }
+    });
   }
 
   // ══════════════════════════════════════════════════════ SCHEDULES ══
@@ -2691,6 +2758,209 @@
   }
   {% endif %}
 
+  </script>
+
+  <!-- ═══════════ Remediation Plan Modal ═══════════ -->
+  <div class="modal-overlay hidden" id="remediationModal" role="dialog" aria-modal="true" aria-label="Remediation Plan">
+    <div class="modal-box remediation-modal-box">
+      <div class="modal-header">
+        <h3 class="modal-title">Remediation Plan</h3>
+        <div style="display:flex;gap:0.5rem;align-items:center;">
+          {% if not demo_mode %}
+          <button class="btn-secondary btn-sm" id="remPlanDownloadPdf" title="Download PDF">PDF</button>
+          <button class="btn-secondary btn-sm" id="remPlanDownloadMd" title="Download Markdown">MD</button>
+          {% endif %}
+          <button class="modal-close" id="remediationModalClose" aria-label="Close">&times;</button>
+        </div>
+      </div>
+      <div class="modal-body" id="remediationModalBody">
+        <div class="rem-loading">Generating plan&hellip;</div>
+      </div>
+    </div>
+  </div>
+
+  <script nonce="{{ csp_nonce }}">
+  (function() {
+    const modal = document.getElementById("remediationModal");
+    const body  = document.getElementById("remediationModalBody");
+    const closeBtn = document.getElementById("remediationModalClose");
+
+    function openRemediationModal() { modal.classList.remove("hidden"); document.body.style.overflow = "hidden"; }
+    function closeRemediationModal() { modal.classList.add("hidden"); document.body.style.overflow = ""; }
+
+    closeBtn.addEventListener("click", closeRemediationModal);
+    modal.addEventListener("click", (e) => { if (e.target === modal) closeRemediationModal(); });
+    document.addEventListener("keydown", (e) => { if (e.key === "Escape" && !modal.classList.contains("hidden")) closeRemediationModal(); });
+
+    const EFFORT_BADGES = {
+      "quick-fix":     '<span class="rem-badge rem-badge-quick">Quick Fix</span>',
+      "moderate":      '<span class="rem-badge rem-badge-moderate">Moderate</span>',
+      "change-window": '<span class="rem-badge rem-badge-change">Change Window</span>',
+    };
+    const SEV_BADGES = {
+      "HIGH":   '<span class="rem-badge rem-badge-high">HIGH</span>',
+      "MEDIUM": '<span class="rem-badge rem-badge-medium">MEDIUM</span>',
+    };
+
+    function escH(s) { const d = document.createElement("div"); d.textContent = s; return d.innerHTML; }
+
+    function renderPlanHTML(plan) {
+      if (!plan.phases || plan.phases.length === 0) {
+        return '<div class="rem-empty">No remediation steps required. All checks passed.</div>';
+      }
+      let html = '<div class="rem-plan">';
+
+      /* Summary bar */
+      const s = plan.summary || {};
+      html += '<div class="rem-summary-bar">'
+        + `<span><strong>${plan.total_steps}</strong> steps</span>`
+        + (s.score != null ? `<span>Score: <strong>${s.score}/100</strong></span>` : '')
+        + `<span>Device: <strong>${escH(plan.filename || 'N/A')}</strong></span>`
+        + `<span>Vendor: <strong>${escH(plan.vendor || '')}</strong></span>`
+        + '</div>';
+
+      /* Disclaimer */
+      if (plan.disclaimer) {
+        html += `<div class="rem-disclaimer">${escH(plan.disclaimer)}</div>`;
+      }
+
+      /* Phases */
+      for (const phase of plan.phases) {
+        html += `<div class="rem-phase">`;
+        html += `<h4 class="rem-phase-title">${escH(phase.phase)}</h4>`;
+        for (const step of phase.steps) {
+          const sevBadge    = SEV_BADGES[step.severity] || `<span class="rem-badge">${escH(step.severity)}</span>`;
+          const effortBadge = EFFORT_BADGES[step.effort] || `<span class="rem-badge">${escH(step.effort)}</span>`;
+          html += `<div class="rem-step rem-step-${step.severity ? step.severity.toLowerCase() : 'medium'}">`;
+          html += `<div class="rem-step-header">`;
+          html += `<span class="rem-step-num">Step ${step.step}</span> ${sevBadge} ${effortBadge}`;
+          html += `</div>`;
+          html += `<div class="rem-step-desc">${escH(step.description)}</div>`;
+
+          if (step.consolidated_count) {
+            html += `<div class="rem-consolidated">Covers ${step.consolidated_count} related findings`;
+            if (step.consolidated_items) {
+              html += '<ul>';
+              const items = step.consolidated_items.slice(0, 5);
+              items.forEach(i => { html += `<li>${escH(i)}</li>`; });
+              if (step.consolidated_count > 5) html += `<li>... and ${step.consolidated_count - 5} more</li>`;
+              html += '</ul>';
+            }
+            html += '</div>';
+          }
+
+          if (step.guidance) {
+            html += `<div class="rem-guidance">${escH(step.guidance)}</div>`;
+          }
+          if (step.suggested_commands) {
+            html += `<div class="rem-commands"><div class="rem-commands-label">Suggested Commands</div><pre>${escH(step.suggested_commands)}</pre></div>`;
+          }
+          html += '</div>'; /* /rem-step */
+        }
+        html += '</div>'; /* /rem-phase */
+      }
+      html += '</div>';
+      return html;
+    }
+
+    /* Store the last plan data for PDF/MD download */
+    let lastPlanPayload = null;
+
+    async function fetchAndShowPlan(auditData) {
+      openRemediationModal();
+      body.innerHTML = '<div class="rem-loading">Generating remediation plan&hellip;</div>';
+      lastPlanPayload = auditData;
+
+      try {
+        const csrfToken = document.querySelector('meta[name="csrf-token"]')?.content
+                       || document.querySelector('input[name="csrf_token"]')?.value || '';
+        const res = await fetch("/remediation-plan?fmt=json", {
+          method: "POST",
+          headers: { "Content-Type": "application/json", "X-CSRFToken": csrfToken },
+          body: JSON.stringify(auditData),
+        });
+        if (!res.ok) {
+          const err = await res.json().catch(() => ({}));
+          throw new Error(err.error || `HTTP ${res.status}`);
+        }
+        const plan = await res.json();
+        body.innerHTML = renderPlanHTML(plan);
+      } catch (err) {
+        body.innerHTML = `<div class="alert alert-error">Failed to generate plan: ${escH(err.message)}</div>`;
+      }
+    }
+
+    /* Download helpers (non-demo only) */
+    {% if not demo_mode %}
+    document.getElementById("remPlanDownloadPdf").addEventListener("click", async () => {
+      if (!lastPlanPayload) return;
+      try {
+        const csrfToken = document.querySelector('meta[name="csrf-token"]')?.content
+                       || document.querySelector('input[name="csrf_token"]')?.value || '';
+        const res = await fetch("/remediation-plan?fmt=pdf", {
+          method: "POST",
+          headers: { "Content-Type": "application/json", "X-CSRFToken": csrfToken },
+          body: JSON.stringify(lastPlanPayload),
+        });
+        if (!res.ok) throw new Error("Download failed");
+        const blob = await res.blob();
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = url; a.download = "remediation_plan.pdf"; a.click();
+        URL.revokeObjectURL(url);
+      } catch (err) { alert("PDF download failed: " + err.message); }
+    });
+
+    document.getElementById("remPlanDownloadMd").addEventListener("click", async () => {
+      if (!lastPlanPayload) return;
+      try {
+        const csrfToken = document.querySelector('meta[name="csrf-token"]')?.content
+                       || document.querySelector('input[name="csrf_token"]')?.value || '';
+        const res = await fetch("/remediation-plan?fmt=markdown", {
+          method: "POST",
+          headers: { "Content-Type": "application/json", "X-CSRFToken": csrfToken },
+          body: JSON.stringify(lastPlanPayload),
+        });
+        if (!res.ok) throw new Error("Download failed");
+        const blob = await res.blob();
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = url; a.download = "remediation_plan.md"; a.click();
+        URL.revokeObjectURL(url);
+      } catch (err) { alert("Markdown download failed: " + err.message); }
+    });
+    {% endif %}
+
+    /* Wire up buttons — single audit */
+    document.getElementById("remediationPlanBtn").addEventListener("click", () => {
+      if (!lastAuditData) return;
+      fetchAndShowPlan({
+        findings: lastAuditData.enriched_findings || lastAuditData.findings || [],
+        vendor: lastAuditData.detected_vendor || lastAuditData.vendor || "",
+        filename: lastAuditData.filename || "",
+        compliance: lastAuditData.compliance || null,
+        summary: lastAuditData.summary || {},
+      });
+    });
+
+    /* Expose for bulk results and history entries */
+    window._openBulkRemediation = function(payload) { fetchAndShowPlan(payload); };
+    window._renderRemPlan = renderPlanHTML;
+
+    /* Wire up buttons — connect (SSH) audit */
+    let lastConnectData = null;
+    window._setLastConnectData = function(d) { lastConnectData = d; };
+
+    document.getElementById("connRemediationPlanBtn").addEventListener("click", () => {
+      if (!lastConnectData) return;
+      fetchAndShowPlan({
+        findings: lastConnectData.enriched_findings || lastConnectData.findings || [],
+        vendor: lastConnectData.detected_vendor || lastConnectData.vendor || "",
+        filename: lastConnectData.filename || lastConnectData.host || "",
+        summary: lastConnectData.summary || {},
+      });
+    });
+  })();
   </script>
 </body>
 </html>

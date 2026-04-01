@@ -71,6 +71,7 @@ from .scheduler_runner import (
     scheduler_available,
 )
 from .syslog_handler import configure_syslog
+from .remediation import generate_plan, plan_to_markdown, plan_to_pdf
 
 UPLOAD_FOLDER = os.environ.get("UPLOAD_FOLDER", "/tmp/cashel_uploads")
 REPORTS_FOLDER = os.environ.get("REPORTS_FOLDER", "/tmp/cashel_reports")
@@ -86,6 +87,7 @@ app = Flask(__name__, template_folder="templates", static_folder="static")
 _secret = os.environ.get("CASHEL_SECRET", "")
 if not _secret:
     import warnings
+
     warnings.warn(
         "CASHEL_SECRET is not set — using a random ephemeral key. "
         "Sessions will not survive restarts. Set CASHEL_SECRET in production.",
@@ -1524,6 +1526,105 @@ def archive_compare():
     return jsonify(result)
 
 
+# ── Remediation Plan ─────────────────────────────────────────────────────────
+
+
+@app.route("/remediation-plan", methods=["POST"])
+@limiter.limit("30/minute")
+def remediation_plan_inline():
+    """Generate a remediation plan from inline audit data (POST JSON).
+
+    Expected body: {findings, vendor, filename?, compliance?, summary?}
+    Query param: fmt = json | markdown | pdf  (default: json)
+    """
+    data = request.get_json(silent=True) or {}
+    findings = data.get("findings") or data.get("enriched_findings") or []
+    vendor = data.get("vendor", "unknown")
+    filename = data.get("filename", "")
+    compliance = data.get("compliance")
+    summary = data.get("summary")
+
+    if not findings:
+        return jsonify({"error": "No findings provided."}), 400
+
+    plan = generate_plan(findings, vendor, filename, compliance, summary)
+    fmt = request.args.get("fmt", "json").lower()
+
+    if fmt == "json":
+        return jsonify(plan)
+    elif fmt == "markdown":
+        md = plan_to_markdown(plan)
+        base = (filename or "audit").rsplit(".", 1)[0]
+        return app.response_class(
+            md,
+            mimetype="text/markdown",
+            headers={
+                "Content-Disposition": f'attachment; filename="{base}_remediation.md"'
+            },
+        )
+    elif fmt == "pdf":
+        report_name = f"remediation_{uuid.uuid4().hex[:8]}.pdf"
+        report_path = os.path.join(REPORTS_FOLDER, report_name)
+        plan_to_pdf(plan, report_path)
+        return send_file(
+            report_path,
+            mimetype="application/pdf",
+            as_attachment=True,
+            download_name=f"{(filename or 'audit').rsplit('.', 1)[0]}_remediation.pdf",
+        )
+    else:
+        return jsonify(
+            {"error": f"Unknown format '{fmt}'. Use json, markdown, or pdf."}
+        ), 400
+
+
+@app.route("/archive/<entry_id>/remediation-plan", methods=["GET"])
+def archive_remediation_plan(entry_id):
+    """Generate a remediation plan from an archived audit.
+
+    Query param: fmt = json | markdown | pdf  (default: json)
+    """
+    entry = get_entry(entry_id)
+    if not entry:
+        return jsonify({"error": "Not found"}), 404
+
+    # Archived findings may be strings or enriched dicts
+    findings = entry.get("findings", [])
+    vendor = entry.get("vendor", "unknown")
+    filename = entry.get("filename", "")
+    summary = entry.get("summary")
+
+    plan = generate_plan(findings, vendor, filename, summary=summary)
+    fmt = request.args.get("fmt", "json").lower()
+
+    if fmt == "json":
+        return jsonify(plan)
+    elif fmt == "markdown":
+        md = plan_to_markdown(plan)
+        base = (filename or "audit").rsplit(".", 1)[0]
+        return app.response_class(
+            md,
+            mimetype="text/markdown",
+            headers={
+                "Content-Disposition": f'attachment; filename="{base}_remediation.md"'
+            },
+        )
+    elif fmt == "pdf":
+        report_name = f"remediation_{uuid.uuid4().hex[:8]}.pdf"
+        report_path = os.path.join(REPORTS_FOLDER, report_name)
+        plan_to_pdf(plan, report_path)
+        return send_file(
+            report_path,
+            mimetype="application/pdf",
+            as_attachment=True,
+            download_name=f"{(filename or 'audit').rsplit('.', 1)[0]}_remediation.pdf",
+        )
+    else:
+        return jsonify(
+            {"error": f"Unknown format '{fmt}'. Use json, markdown, or pdf."}
+        ), 400
+
+
 # ── Activity Log API ──────────────────────────────────────────────────────────
 
 
@@ -2047,6 +2148,32 @@ def api_audit_get(entry_id):
     if not entry:
         return _api_err("Audit not found.", 404)
     return _api_ok(entry)
+
+
+@api_bp.route("/audit/<entry_id>/remediation-plan", methods=["GET"])
+def api_remediation_plan(entry_id):
+    """GET /api/v1/audit/<id>/remediation-plan — generate remediation plan.
+
+    Query param: fmt = json | markdown  (default: json)
+    """
+    entry = get_entry(entry_id)
+    if not entry:
+        return _api_err("Audit not found.", 404)
+
+    findings = entry.get("findings", [])
+    vendor = entry.get("vendor", "unknown")
+    filename = entry.get("filename", "")
+    summary = entry.get("summary")
+
+    plan = generate_plan(findings, vendor, filename, summary=summary)
+    fmt = request.args.get("fmt", "json").lower()
+
+    if fmt == "json":
+        return _api_ok(plan)
+    elif fmt == "markdown":
+        return _api_ok({"markdown": plan_to_markdown(plan)})
+    else:
+        return _api_err(f"Unknown format '{fmt}'. Use json or markdown.", 400)
 
 
 @api_bp.route("/history", methods=["GET"])
