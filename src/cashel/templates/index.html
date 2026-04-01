@@ -207,8 +207,8 @@
           <div style="display:flex;align-items:center;gap:0.75rem;">
             <span class="detected-vendor hidden" id="detectedVendorTag"></span>
             <div class="view-toggle" id="findingsViewToggle" title="Toggle compact view">
-              <button class="view-btn view-btn-active" id="viewDetailed" onclick="setFindingsView('detailed')">Detailed</button>
-              <button class="view-btn" id="viewCompact" onclick="setFindingsView('compact')">Compact</button>
+              <button class="view-btn view-btn-active" id="viewDetailed">Detailed</button>
+              <button class="view-btn" id="viewCompact">Compact</button>
             </div>
           </div>
         </div>
@@ -1321,22 +1321,22 @@
     // Page nav only meaningful when more than one page
     const navHTML = totalPages > 1 ? `
       <div class="pagination-controls">
-        <button class="btn-page"${currentPage === 1 ? " disabled" : ""} onclick="goToPage(${currentPage - 1})">&#8592;</button>
+        <button class="btn-page"${currentPage === 1 ? " disabled" : ""} data-page="${currentPage - 1}">&#8592;</button>
         ${buildPageButtons(totalPages)}
-        <button class="btn-page"${currentPage === totalPages ? " disabled" : ""} onclick="goToPage(${currentPage + 1})">&#8594;</button>
+        <button class="btn-page"${currentPage === totalPages ? " disabled" : ""} data-page="${currentPage + 1}">&#8594;</button>
       </div>
       <span class="pagination-info">Showing ${start}–${end} of ${total}</span>` : `
       <span class="pagination-info">${total} findings</span>`;
 
     el.innerHTML = `${navHTML}
-      <select class="page-size-select" onchange="window.changePageSize(+this.value)">${pageSizeOpts}</select>`;
+      <select class="page-size-select">${pageSizeOpts}</select>`;
   }
 
   function buildPageButtons(totalPages) {
     const btns = [];
     for (let p = 1; p <= totalPages; p++) {
       if (p === 1 || p === totalPages || Math.abs(p - currentPage) <= 1) {
-        btns.push(`<button class="btn-page${p === currentPage ? " btn-page-active" : ""}" onclick="goToPage(${p})">${p}</button>`);
+        btns.push(`<button class="btn-page${p === currentPage ? " btn-page-active" : ""}" data-page="${p}">${p}</button>`);
       } else if (btns[btns.length - 1] !== "…") {
         btns.push("…");
       }
@@ -1352,6 +1352,19 @@
     pageSize = n; currentPage = 1;
     renderFindingsUI();
   };
+  (function () {
+    const paginationEl = document.getElementById("findingsPagination");
+    paginationEl.addEventListener("click", function (e) {
+      const btn = e.target.closest(".btn-page");
+      if (!btn || btn.disabled) return;
+      const page = parseInt(btn.dataset.page, 10);
+      if (!isNaN(page)) window.goToPage(page);
+    });
+    paginationEl.addEventListener("change", function (e) {
+      const sel = e.target.closest(".page-size-select");
+      if (sel) window.changePageSize(+sel.value);
+    });
+  })();
   window.setFindingsView = function(mode) {
     compactView = mode === "compact";
     document.getElementById("viewDetailed").classList.toggle("view-btn-active", !compactView);
@@ -1359,6 +1372,8 @@
     document.getElementById("findingsList").classList.toggle("findings-compact", compactView);
     renderFindingsUI();
   };
+  document.getElementById("viewDetailed").addEventListener("click", () => setFindingsView("detailed"));
+  document.getElementById("viewCompact").addEventListener("click", () => setFindingsView("compact"));
 
   document.getElementById("summaryGrid").addEventListener("click", function (e) {
     const box = e.target.closest(".summary-box[data-filter]");

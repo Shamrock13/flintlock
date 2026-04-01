@@ -1,0 +1,18 @@
+# Cashel Demo — Trigger Render deploy on push to main
+# Render auto-deploys from GitHub, so this is optional —
+# kept here in case you want to add pre-deploy checks later.
+
+name: Demo Deploy
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Trigger Render deploy
+        run: |
+          curl -X POST "${{ secrets.RENDER_DEPLOY_HOOK }}"

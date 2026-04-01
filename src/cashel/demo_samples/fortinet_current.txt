@@ -1,0 +1,78 @@
+config system global
+    set hostname "FGT-EDGE-01"
+    set timezone 04
+    set admin-timeout 60
+end
+
+config system interface
+    edit "wan1"
+        set mode static
+        set ip 203.0.113.2 255.255.255.0
+        set allowaccess ping https ssh
+    next
+    edit "internal"
+        set mode static
+        set ip 10.20.0.1 255.255.0.0
+        set allowaccess ping https ssh
+    next
+end
+
+config system admin
+    edit "admin"
+        set password "Str0ng$Admin2024!"
+    next
+end
+
+config firewall policy
+    edit 1
+        set name "Corp-Outbound-HTTP"
+        set srcintf "internal"
+        set dstintf "wan1"
+        set srcaddr "CorpSubnets"
+        set dstaddr "all"
+        set action accept
+        set schedule "always"
+        set service "HTTP HTTPS"
+        set logtraffic all
+    next
+    edit 2
+        set name "Corp-Outbound-DNS"
+        set srcintf "internal"
+        set dstintf "wan1"
+        set srcaddr "CorpSubnets"
+        set dstaddr "all"
+        set action accept
+        set schedule "always"
+        set service "DNS"
+        set logtraffic all
+    next
+    edit 3
+        set name "Web-Servers-Inbound"
+        set srcintf "wan1"
+        set dstintf "internal"
+        set srcaddr "all"
+        set dstaddr "WebServers"
+        set action accept
+        set schedule "always"
+        set service "HTTPS"
+        set logtraffic all
+    next
+    edit 4
+        set name "Deny-All"
+        set srcintf "wan1"
+        set dstintf "internal"
+        set srcaddr "all"
+        set dstaddr "all"
+        set action deny
+        set schedule "always"
+        set service "ALL"
+        set logtraffic all
+    next
+end
+
+config system snmp community
+    edit 1
+        set name "public"
+        set status enable
+    next
+end

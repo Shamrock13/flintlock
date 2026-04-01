@@ -1,0 +1,78 @@
+config system global
+    set hostname "FGT-EDGE-01"
+    set timezone 04
+    set admin-timeout 480
+end
+
+config system interface
+    edit "wan1"
+        set mode static
+        set ip 203.0.113.2 255.255.255.0
+        set allowaccess ping https ssh telnet
+    next
+    edit "internal"
+        set mode static
+        set ip 10.20.0.1 255.255.0.0
+        set allowaccess ping https ssh http telnet
+    next
+end
+
+config system admin
+    edit "admin"
+        set password ""
+    next
+end
+
+config firewall policy
+    edit 1
+        set name "Any-Any-Outbound"
+        set srcintf "internal"
+        set dstintf "wan1"
+        set srcaddr "all"
+        set dstaddr "all"
+        set action accept
+        set schedule "always"
+        set service "ALL"
+        set logtraffic disable
+    next
+    edit 2
+        set name "Any-Any-Outbound"
+        set srcintf "internal"
+        set dstintf "wan1"
+        set srcaddr "all"
+        set dstaddr "all"
+        set action accept
+        set schedule "always"
+        set service "ALL"
+        set logtraffic disable
+    next
+    edit 3
+        set name "Web-Servers-Inbound"
+        set srcintf "wan1"
+        set dstintf "internal"
+        set srcaddr "all"
+        set dstaddr "WebServers"
+        set action accept
+        set schedule "always"
+        set service "HTTPS"
+        set logtraffic disable
+    next
+    edit 4
+        set name "RDP-Inbound"
+        set srcintf "wan1"
+        set dstintf "internal"
+        set srcaddr "all"
+        set dstaddr "all"
+        set action accept
+        set schedule "always"
+        set service "RDP"
+        set logtraffic disable
+    next
+end
+
+config system snmp community
+    edit 1
+        set name "public"
+        set status enable
+    next
+end

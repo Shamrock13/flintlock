@@ -1,0 +1,58 @@
+! Cisco ASA 5525-X — Baseline Config (Week 1)
+! hostname: ASA01-EDGE
+hostname ASA01-EDGE
+domain-name corp.example.com
+
+! --- Interface configuration ---
+interface GigabitEthernet0/0
+ nameif outside
+ security-level 0
+ ip address 203.0.113.1 255.255.255.0
+interface GigabitEthernet0/1
+ nameif inside
+ security-level 100
+ ip address 10.10.0.1 255.255.0.0
+interface GigabitEthernet0/2
+ nameif dmz
+ security-level 50
+ ip address 172.16.0.1 255.255.255.0
+
+! --- Remote access (Telnet still enabled — not yet migrated) ---
+telnet 10.10.0.0 255.255.0.0 inside
+telnet timeout 30
+ssh 10.10.0.0 255.255.0.0 inside
+ssh timeout 30
+
+! --- SNMP (v2c with weak community) ---
+snmp-server community public RO
+snmp-server community cisco123 RW
+snmp-server enable traps
+
+! --- NTP not yet configured ---
+
+! --- HTTP server (management) ---
+http server enable
+http 10.10.0.0 255.255.0.0 inside
+http 0.0.0.0 0.0.0.0 outside
+
+! --- Access lists (OUTSIDE_IN) ---
+access-list OUTSIDE_IN extended permit ip any any
+access-list OUTSIDE_IN extended permit tcp any host 172.16.0.10 eq 80
+access-list OUTSIDE_IN extended permit tcp any host 172.16.0.10 eq 443
+access-list OUTSIDE_IN extended permit tcp any host 172.16.0.10 eq 80
+access-list OUTSIDE_IN extended permit tcp any host 10.10.1.5 eq 3389
+access-list OUTSIDE_IN extended permit tcp any host 10.10.1.6 eq 22
+access-list OUTSIDE_IN extended deny ip any any
+
+! --- Access lists (INSIDE_OUT) ---
+access-list INSIDE_OUT extended permit ip any any
+access-list INSIDE_OUT extended permit tcp 10.10.0.0 255.255.0.0 any eq 80
+access-list INSIDE_OUT extended permit tcp 10.10.0.0 255.255.0.0 any eq 443
+
+! --- NAT ---
+nat (inside,outside) dynamic interface
+nat (dmz,outside) dynamic interface
+
+! --- Logging ---
+logging enable
+logging buffered informational

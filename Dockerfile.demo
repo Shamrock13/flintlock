@@ -1,0 +1,41 @@
+# Cashel — Demo image
+# Extends the production image with demo-mode defaults.
+# Never use this image in production.
+#
+# Build:
+#   docker build -f Dockerfile.demo -t cashel-demo .
+# Run locally:
+#   docker run -p 5000:5000 -e CASHEL_SECRET=dev-secret cashel-demo
+
+FROM python:3.11-slim
+
+WORKDIR /app
+
+# Install dependencies
+COPY requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt
+RUN pip install --no-cache-dir gunicorn
+
+# Copy source (includes src/cashel/demo_samples/)
+COPY . .
+
+# Demo mode uses only ephemeral /tmp paths — no persistent volume needed
+ENV FLASK_APP=src/cashel/web.py
+ENV PYTHONPATH=/app/src
+ENV UPLOAD_FOLDER=/tmp/cashel_uploads
+ENV REPORTS_FOLDER=/tmp/cashel_reports
+ENV ARCHIVE_FOLDER=/tmp/cashel_archive
+ENV ACTIVITY_FOLDER=/tmp/cashel_activity
+
+# Demo-specific flags
+ENV CASHEL_DEMO_MODE=true
+ENV CASHEL_SECURE_COOKIES=true
+
+EXPOSE 5000
+
+CMD ["gunicorn", \
+     "--bind", "0.0.0.0:5000", \
+     "--workers", "2", \
+     "--timeout", "60", \
+     "--access-logfile", "-", \
+     "cashel.web:app"]
