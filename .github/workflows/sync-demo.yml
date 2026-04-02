@@ -1,0 +1,25 @@
+name: Sync Demo
+
+on:
+  workflow_run:
+    workflows: [CI]
+    types: [completed]
+    branches: [main]
+
+jobs:
+  sync-demo:
+    runs-on: ubuntu-latest
+    if: github.event.workflow_run.conclusion == 'success'
+    steps:
+      - name: Sync cashel-demo with upstream/main
+        env:
+          DEMO_REPO_TOKEN: ${{ secrets.DEMO_REPO_TOKEN }}
+        run: |
+          git config --global user.email "github-actions[bot]@users.noreply.github.com"
+          git config --global user.name "github-actions[bot]"
+          git clone https://x-access-token:${DEMO_REPO_TOKEN}@github.com/Shamrock13/cashel-demo.git demo
+          cd demo
+          git remote add upstream https://github.com/Shamrock13/cashel.git
+          git fetch upstream
+          git merge upstream/main --no-edit -X theirs
+          git push origin main
