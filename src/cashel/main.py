@@ -13,8 +13,17 @@ _console = Console()
 app = typer.Typer()
 
 _VALID_VENDORS = [
-    "asa", "ftd", "paloalto", "fortinet", "pfsense",
-    "aws", "azure", "gcp", "juniper", "iptables", "nftables",
+    "asa",
+    "ftd",
+    "paloalto",
+    "fortinet",
+    "pfsense",
+    "aws",
+    "azure",
+    "gcp",
+    "juniper",
+    "iptables",
+    "nftables",
 ]
 _VALID_FRAMEWORKS = ["cis", "pci", "nist", "hipaa", "soc2", "stig"]
 
