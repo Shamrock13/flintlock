@@ -13,7 +13,7 @@
 
 ## Supported Vendors
 
-Cashel supports **10 vendor platforms** spanning on-premises firewalls and cloud security groups.
+Cashel supports **11 vendor platforms** spanning on-premises firewalls and cloud security groups.
 
 > **Cisco note:** Cashel supports Cisco ASA and FTD under a single **Cisco** vendor option. The platform auto-detects which appliance type from the config content and applies the appropriate checks.
 
