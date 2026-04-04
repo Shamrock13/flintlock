@@ -1,5 +1,7 @@
 # Cashel
 
+![CI](https://github.com/Shamrock13/cashel/actions/workflows/ci.yml/badge.svg)
+
 **Cashel** is a firewall configuration auditing tool with a web UI and CLI. It detects security misconfigurations, generates scored severity reports, compares configs across time, connects directly to live devices via SSH, and runs automated scheduled audits with alerting. Deployable in minutes via Docker Compose.
 
 **Try the live demo:** [demo.cashel.app](https://demo.cashel.app)
@@ -11,7 +13,7 @@
 
 ## Supported Vendors
 
-Cashel supports **10 vendor platforms** spanning on-premises firewalls and cloud security groups.
+Cashel supports **11 vendor platforms** spanning on-premises firewalls and cloud security groups.
 
 > **Cisco note:** Cashel supports Cisco ASA and FTD under a single **Cisco** vendor option. The platform auto-detects which appliance type from the config content and applies the appropriate checks.
 
@@ -22,9 +24,8 @@ Cashel supports **10 vendor platforms** spanning on-premises firewalls and cloud
 | Cisco (ASA / FTD) | Text | ✓ | Running config (`show running-config`); FTD auto-detected |
 | Fortinet FortiGate | Text | ✓ | Running config (`show full-configuration`) |
 | GCP VPC Firewall | JSON | — | `gcloud compute firewall-rules list --format json` |
-| iptables (Linux) | Text | ✓ | `iptables-save` format |
+| iptables / nftables (Linux) | Text | ✓ | `iptables-save` (iptables) or `nft list ruleset` (nftables) |
 | Juniper SRX | Text | ✓ | Set-format or hierarchical config |
-| nftables (Linux) | Text | ✓ | `nft list ruleset` output |
 | Palo Alto Networks | XML | ✓ | Candidate or running config |
 | pfSense | XML | ✓ | Full config export (`config.xml`) |
 
@@ -54,6 +55,7 @@ Cashel supports **10 vendor platforms** spanning on-premises firewalls and cloud
 - **JSON export** — structured findings with severity, category, remediation, and metadata
 - **CSV export** — tabular findings for import into spreadsheets or ticketing systems
 - **SARIF export** — Static Analysis Results Interchange Format for CI/CD pipeline and security tooling integration
+- **REST API for CI/CD pipeline integration** — POST `/api/v1/audit`, returns JSON findings
 
 **History & comparison**
 - **Audit History** — save, browse, filter (vendor/date/tag), and search past audits
