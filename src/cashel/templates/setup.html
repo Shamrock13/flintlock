@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <meta name="csrf-token" content="{{ csrf_token() }}" />
-  <title>Cashel — Login</title>
+  <title>Cashel — Setup</title>
   <link rel="icon" type="image/svg+xml" href="{{ url_for('static', filename='favicon.svg') }}" />
   <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}" />
   <style>
@@ -85,33 +85,53 @@
       font-size: 0.88rem;
       margin-bottom: 1.25rem;
     }
+    .setup-note {
+      font-size: 0.82rem;
+      color: var(--text-muted);
+      margin-bottom: 1.5rem;
+      line-height: 1.5;
+    }
   </style>
 </head>
 <body>
   <div class="login-wrap">
     <div class="login-card">
       <div class="login-logo">&#128274; Cashel</div>
-      <div class="login-sub">Firewall Configuration Auditor</div>
+      <div class="login-sub">First-Run Setup</div>
 
-      {% if error %}
-      <div class="login-error">{{ error }}</div>
+      {% if errors %}
+      <div class="login-error">
+        {% for e in errors %}<div>{{ e }}</div>{% endfor %}
+      </div>
       {% endif %}
 
-      <form method="POST" action="{{ url_for('auth.login_post', next=request.args.get('next', '')) }}">
+      <p class="setup-note">
+        Create your admin account. Store your credentials safely — there is no
+        password recovery without database access.
+      </p>
+
+      <form method="POST" action="{{ url_for('auth.setup_post') }}">
         <input type="hidden" name="csrf_token" value="{{ csrf_token() }}" />
         <div class="login-field">
           <label for="username">Username</label>
           <input type="text" id="username" name="username"
+                 value="{{ username or '' }}"
                  autocomplete="username" autofocus required
-                 placeholder="Username" />
+                 placeholder="admin" />
         </div>
         <div class="login-field">
           <label for="password">Password</label>
           <input type="password" id="password" name="password"
-                 autocomplete="current-password" required
-                 placeholder="Password" />
+                 autocomplete="new-password" required
+                 placeholder="12+ characters" />
         </div>
-        <button type="submit" class="login-btn">Sign In</button>
+        <div class="login-field">
+          <label for="confirm_password">Confirm Password</label>
+          <input type="password" id="confirm_password" name="confirm_password"
+                 autocomplete="new-password" required
+                 placeholder="Repeat password" />
+        </div>
+        <button type="submit" class="login-btn">Create Admin Account</button>
       </form>
     </div>
   </div>

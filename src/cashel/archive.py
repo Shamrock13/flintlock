@@ -1,14 +1,12 @@
 """Archival review system — persist and compare historical audit results."""
 
-import fcntl
-import os
-import json
 import hashlib
+import json
+import os
 import uuid
 from datetime import datetime
 
-ARCHIVE_FOLDER = os.environ.get("ARCHIVE_FOLDER", "/tmp/cashel_archive")
-os.makedirs(ARCHIVE_FOLDER, exist_ok=True)
+from .db import get_conn
 
 
 def _fingerprint(filepath):
@@ -23,14 +21,11 @@ def _fingerprint(filepath):
 # ── Persistence ───────────────────────────────────────────────────────────────
 
 
-_LOCK_PATH = os.path.join(ARCHIVE_FOLDER, ".archive.lock")
-
-
 def save_audit(filename, vendor, findings, summary, config_path=None, tag=None):
     """
     Save an audit result to the archive.
     Returns (entry_id, entry_dict).
-    Uses a file lock to prevent version collisions under concurrent requests.
+    Uses a SQLite transaction to prevent version collisions under concurrent requests.
     """
     entry_id = uuid.uuid4().hex[:12]
     fingerprint = (
@@ -38,76 +33,79 @@ def save_audit(filename, vendor, findings, summary, config_path=None, tag=None):
         if config_path and os.path.exists(config_path)
         else None
     )
+    timestamp = datetime.utcnow().strftime("%Y-%m-%dT%H:%M:%SZ")
 
-    with open(_LOCK_PATH, "w") as lock_fh:
-        fcntl.flock(lock_fh, fcntl.LOCK_EX)
-        try:
-            # Auto-version: find max version for same tag+vendor, increment
-            version = 1
-            if tag:
-                existing = list_archive()
-                prior = [
-                    e
-                    for e in existing
-                    if e.get("tag") == tag and e.get("vendor") == vendor
-                ]
-                if prior:
-                    version = max(e.get("version", 1) for e in prior) + 1
+    conn = get_conn()
+    # Auto-version inside a transaction
+    with conn:
+        version = 1
+        if tag:
+            row = conn.execute(
+                "SELECT MAX(version) FROM audits WHERE tag=? AND vendor=?",
+                (tag, vendor),
+            ).fetchone()
+            if row and row[0] is not None:
+                version = row[0] + 1
 
-            entry = {
-                "id": entry_id,
-                "filename": filename,
-                "vendor": vendor,
-                "timestamp": datetime.utcnow().strftime("%Y-%m-%dT%H:%M:%SZ"),
-                "fingerprint": fingerprint,
-                "summary": summary,
-                "findings": findings,
-                "tag": tag or None,
-                "version": version,
-            }
-            path = os.path.join(ARCHIVE_FOLDER, f"{entry_id}.json")
-            with open(path, "w") as f:
-                json.dump(entry, f, indent=2)
-        finally:
-            fcntl.flock(lock_fh, fcntl.LOCK_UN)
+        conn.execute(
+            """
+            INSERT INTO audits (id, filename, vendor, timestamp, fingerprint,
+                                summary, findings, tag, version)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """,
+            (
+                entry_id,
+                filename,
+                vendor,
+                timestamp,
+                fingerprint,
+                json.dumps(summary),
+                json.dumps(findings),
+                tag or None,
+                version,
+            ),
+        )
 
+    entry = {
+        "id": entry_id,
+        "filename": filename,
+        "vendor": vendor,
+        "timestamp": timestamp,
+        "fingerprint": fingerprint,
+        "summary": summary,
+        "findings": findings,
+        "tag": tag or None,
+        "version": version,
+    }
     return entry_id, entry
 
 
 def list_archive():
     """Return all archived entries sorted newest-first."""
-    entries = []
-    for fname in os.listdir(ARCHIVE_FOLDER):
-        if not fname.endswith(".json"):
-            continue
-        try:
-            with open(os.path.join(ARCHIVE_FOLDER, fname)) as f:
-                entries.append(json.load(f))
-        except Exception:
-            pass
-    entries.sort(key=lambda e: e.get("timestamp", ""), reverse=True)
-    return entries
+    conn = get_conn()
+    rows = conn.execute(
+        "SELECT * FROM audits ORDER BY timestamp DESC"
+    ).fetchall()
+    return [_row_to_dict(row) for row in rows]
 
 
 def get_entry(entry_id):
     """Return a single archive entry by ID, or None."""
-    # Sanitize
     safe_id = "".join(c for c in entry_id if c.isalnum())
-    path = os.path.join(ARCHIVE_FOLDER, f"{safe_id}.json")
-    if not os.path.exists(path):
+    conn = get_conn()
+    row = conn.execute("SELECT * FROM audits WHERE id=?", (safe_id,)).fetchone()
+    if row is None:
         return None
-    with open(path) as f:
-        return json.load(f)
+    return _row_to_dict(row)
 
 
 def delete_entry(entry_id):
     """Delete an archive entry. Returns True if deleted."""
     safe_id = "".join(c for c in entry_id if c.isalnum())
-    path = os.path.join(ARCHIVE_FOLDER, f"{safe_id}.json")
-    if os.path.exists(path):
-        os.remove(path)
-        return True
-    return False
+    conn = get_conn()
+    cur = conn.execute("DELETE FROM audits WHERE id=?", (safe_id,))
+    conn.commit()
+    return cur.rowcount > 0
 
 
 # ── Comparison ────────────────────────────────────────────────────────────────
@@ -153,3 +151,13 @@ def compare_entries(id_a, id_b):
         "resolved_findings": sorted(set_a - set_b),
         "improved": s_b.get("total", 0) < s_a.get("total", 0),
     }, None
+
+
+# ── Internal helpers ───────────────────────────────────────────────────────────
+
+
+def _row_to_dict(row) -> dict:
+    d = dict(row)
+    d["summary"] = json.loads(d["summary"]) if d.get("summary") else {}
+    d["findings"] = json.loads(d["findings"]) if d.get("findings") else []
+    return d

@@ -1,4 +1,4 @@
-"""Schedule store — persists scheduled SSH audit jobs as individual JSON files.
+"""Schedule store — persists scheduled SSH audit jobs in SQLite.
 
 Passwords are encrypted with Fernet symmetric encryption via crypto.py.
 The key lives at CASHEL_KEY_FILE (default /data/cashel.key) and is
@@ -6,14 +6,11 @@ generated automatically on first use. Legacy base64-encoded passwords
 are transparently migrated to Fernet on next write.
 """
 
-import json
-import os
 import uuid
 from datetime import datetime
 
 from .crypto import encrypt, decrypt
-
-SCHEDULES_FOLDER = os.environ.get("SCHEDULES_FOLDER", "/tmp/cashel_schedules")
+from .db import get_conn
 
 VALID_VENDORS = (
     "asa",
@@ -94,10 +91,6 @@ def _validate_schedule_fields(data: dict) -> dict:
 # ── Internal helpers ───────────────────────────────────────────────────────────
 
 
-def _path(entry_id: str) -> str:
-    return os.path.join(SCHEDULES_FOLDER, f"{entry_id}.json")
-
-
 def _encode_password(password: str) -> str:
     return encrypt(password)
 
@@ -113,38 +106,45 @@ def _strip_password(schedule: dict) -> dict:
     return s
 
 
+def _row_to_dict(row) -> dict:
+    """Convert a sqlite3.Row to a plain dict, restoring Python types."""
+    d = dict(row)
+    d["enabled"] = bool(d["enabled"])
+    d["notify_on_finding"] = bool(d["notify_on_finding"])
+    d["notify_on_error"] = bool(d["notify_on_error"])
+    return d
+
+
 # ── Public CRUD ────────────────────────────────────────────────────────────────
 
 
 def list_schedules(include_password: bool = False) -> list:
-    os.makedirs(SCHEDULES_FOLDER, exist_ok=True)
+    conn = get_conn()
+    rows = conn.execute("SELECT * FROM schedules ORDER BY created_at").fetchall()
     result = []
-    for fname in sorted(os.listdir(SCHEDULES_FOLDER)):
-        if not fname.endswith(".json"):
-            continue
-        try:
-            with open(os.path.join(SCHEDULES_FOLDER, fname)) as f:
-                data = json.load(f)
-            result.append(data if include_password else _strip_password(data))
-        except Exception:
-            pass
+    for row in rows:
+        data = _row_to_dict(row)
+        result.append(data if include_password else _strip_password(data))
     return result
 
 
 def get_schedule(entry_id: str, include_password: bool = False) -> dict | None:
-    try:
-        with open(_path(entry_id)) as f:
-            data = json.load(f)
-        return data if include_password else _strip_password(data)
-    except FileNotFoundError:
+    conn = get_conn()
+    row = conn.execute(
+        "SELECT * FROM schedules WHERE id=?", (entry_id,)
+    ).fetchone()
+    if row is None:
         return None
+    data = _row_to_dict(row)
+    return data if include_password else _strip_password(data)
 
 
 def create_schedule(data: dict) -> dict:
     """Create and persist a new schedule.  Raises ScheduleValidationError on bad input."""
     validated = _validate_schedule_fields(data)
-    os.makedirs(SCHEDULES_FOLDER, exist_ok=True)
     entry_id = uuid.uuid4().hex
+    created_at = datetime.utcnow().isoformat()
+
     schedule = {
         "id": entry_id,
         "name": str(data.get("name", "Unnamed Schedule"))[:80],
@@ -160,7 +160,6 @@ def create_schedule(data: dict) -> dict:
         "minute": validated["minute"],
         "day_of_week": validated["day_of_week"],
         "enabled": bool(data.get("enabled", True)),
-        # Notification settings
         "notify_on_finding": bool(data.get("notify_on_finding", False)),
         "notify_on_error": bool(data.get("notify_on_error", False)),
         "notify_slack_webhook": str(data.get("notify_slack_webhook", ""))[:512],
@@ -169,10 +168,33 @@ def create_schedule(data: dict) -> dict:
         "last_run": None,
         "last_status": None,
         "last_error": None,
-        "created_at": datetime.utcnow().isoformat(),
+        "created_at": created_at,
     }
-    with open(_path(entry_id), "w") as f:
-        json.dump(schedule, f, indent=2)
+
+    conn = get_conn()
+    conn.execute(
+        """
+        INSERT INTO schedules (
+            id, name, vendor, host, port, username, password_enc, tag, compliance,
+            frequency, hour, minute, day_of_week, enabled, notify_on_finding,
+            notify_on_error, notify_slack_webhook, notify_teams_webhook, notify_email,
+            last_run, last_status, last_error, created_at
+        ) VALUES (
+            :id, :name, :vendor, :host, :port, :username, :password_enc, :tag,
+            :compliance, :frequency, :hour, :minute, :day_of_week,
+            :enabled, :notify_on_finding, :notify_on_error,
+            :notify_slack_webhook, :notify_teams_webhook, :notify_email,
+            :last_run, :last_status, :last_error, :created_at
+        )
+        """,
+        {
+            **schedule,
+            "enabled": 1 if schedule["enabled"] else 0,
+            "notify_on_finding": 1 if schedule["notify_on_finding"] else 0,
+            "notify_on_error": 1 if schedule["notify_on_error"] else 0,
+        },
+    )
+    conn.commit()
     return _strip_password(schedule)
 
 
@@ -212,33 +234,55 @@ def update_schedule(entry_id: str, data: dict) -> dict | None:
     if data.get("password"):
         schedule["password_enc"] = _encode_password(str(data["password"]))
 
-    with open(_path(entry_id), "w") as f:
-        json.dump(schedule, f, indent=2)
+    conn = get_conn()
+    conn.execute(
+        """
+        UPDATE schedules SET
+            name=:name, vendor=:vendor, host=:host, port=:port,
+            username=:username, password_enc=:password_enc, tag=:tag,
+            compliance=:compliance, frequency=:frequency, hour=:hour,
+            minute=:minute, day_of_week=:day_of_week, enabled=:enabled,
+            notify_on_finding=:notify_on_finding, notify_on_error=:notify_on_error,
+            notify_slack_webhook=:notify_slack_webhook,
+            notify_teams_webhook=:notify_teams_webhook, notify_email=:notify_email
+        WHERE id=:id
+        """,
+        {
+            **schedule,
+            "enabled": 1 if schedule["enabled"] else 0,
+            "notify_on_finding": 1 if schedule["notify_on_finding"] else 0,
+            "notify_on_error": 1 if schedule["notify_on_error"] else 0,
+        },
+    )
+    conn.commit()
     return _strip_password(schedule)
 
 
 def delete_schedule(entry_id: str) -> bool:
-    try:
-        os.remove(_path(entry_id))
-        return True
-    except FileNotFoundError:
-        return False
+    conn = get_conn()
+    cur = conn.execute("DELETE FROM schedules WHERE id=?", (entry_id,))
+    conn.commit()
+    return cur.rowcount > 0
 
 
 def record_run(entry_id: str, status: str, error: str | None = None):
     """Update last_run, last_status, last_error after a job executes."""
-    schedule = get_schedule(entry_id, include_password=True)
-    if not schedule:
-        return
-    schedule["last_run"] = datetime.utcnow().isoformat()
-    schedule["last_status"] = status
-    schedule["last_error"] = error
-    with open(_path(entry_id), "w") as f:
-        json.dump(schedule, f, indent=2)
+    conn = get_conn()
+    conn.execute(
+        """
+        UPDATE schedules SET last_run=?, last_status=?, last_error=?
+        WHERE id=?
+        """,
+        (datetime.utcnow().isoformat(), status, error, entry_id),
+    )
+    conn.commit()
 
 
 def get_password(entry_id: str) -> str:
-    schedule = get_schedule(entry_id, include_password=True)
-    if not schedule:
+    conn = get_conn()
+    row = conn.execute(
+        "SELECT password_enc FROM schedules WHERE id=?", (entry_id,)
+    ).fetchone()
+    if row is None:
         return ""
-    return _decode_password(schedule.get("password_enc", ""))
+    return _decode_password(row["password_enc"])

@@ -1,12 +1,10 @@
 """Activity log — record every user action (audits, SSH attempts, diffs) including failures."""
 
-import os
 import json
 import uuid
 from datetime import datetime
 
-ACTIVITY_FOLDER = os.environ.get("ACTIVITY_FOLDER", "/tmp/cashel_activity")
-os.makedirs(ACTIVITY_FOLDER, exist_ok=True)
+from .db import get_conn
 
 # Action type constants
 ACTION_FILE_AUDIT = "file_audit"
@@ -29,55 +27,59 @@ def log_activity(
     Returns the new event ID.
     """
     event_id = uuid.uuid4().hex[:12]
-    event = {
-        "id": event_id,
-        "action": action_type,
-        "label": label,
-        "vendor": vendor or "",
-        "success": success,
-        "error": error or "",
-        "details": details or {},
-        "timestamp": datetime.utcnow().strftime("%Y-%m-%dT%H:%M:%SZ"),
-    }
-    path = os.path.join(ACTIVITY_FOLDER, f"{event_id}.json")
-    with open(path, "w") as f:
-        json.dump(event, f, indent=2)
+    timestamp = datetime.utcnow().strftime("%Y-%m-%dT%H:%M:%SZ")
+    conn = get_conn()
+    conn.execute(
+        """
+        INSERT INTO activity (id, action, label, vendor, success, error, details, timestamp)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+        """,
+        (
+            event_id,
+            action_type,
+            label,
+            vendor or "",
+            1 if success else 0,
+            error or "",
+            json.dumps(details or {}),
+            timestamp,
+        ),
+    )
+    conn.commit()
     return event_id
 
 
 def list_activity(limit: int = 200) -> list:
     """Return activity events sorted newest-first, up to *limit* entries."""
-    events = []
-    for fname in os.listdir(ACTIVITY_FOLDER):
-        if not fname.endswith(".json"):
-            continue
-        try:
-            with open(os.path.join(ACTIVITY_FOLDER, fname)) as f:
-                events.append(json.load(f))
-        except Exception:
-            pass
-    events.sort(key=lambda e: e.get("timestamp", ""), reverse=True)
-    return events[:limit]
+    conn = get_conn()
+    rows = conn.execute(
+        "SELECT * FROM activity ORDER BY timestamp DESC LIMIT ?", (limit,)
+    ).fetchall()
+    return [_row_to_dict(row) for row in rows]
 
 
 def delete_activity_entry(event_id: str) -> bool:
     """Delete a single activity log entry. Returns True if deleted."""
     safe_id = "".join(c for c in event_id if c.isalnum())
-    path = os.path.join(ACTIVITY_FOLDER, f"{safe_id}.json")
-    if os.path.exists(path):
-        os.remove(path)
-        return True
-    return False
+    conn = get_conn()
+    cur = conn.execute("DELETE FROM activity WHERE id=?", (safe_id,))
+    conn.commit()
+    return cur.rowcount > 0
 
 
 def clear_activity() -> int:
     """Delete all activity log entries. Returns count deleted."""
-    count = 0
-    for fname in os.listdir(ACTIVITY_FOLDER):
-        if fname.endswith(".json"):
-            try:
-                os.remove(os.path.join(ACTIVITY_FOLDER, fname))
-                count += 1
-            except Exception:
-                pass
-    return count
+    conn = get_conn()
+    cur = conn.execute("DELETE FROM activity")
+    conn.commit()
+    return cur.rowcount
+
+
+# ── Internal helpers ───────────────────────────────────────────────────────────
+
+
+def _row_to_dict(row) -> dict:
+    d = dict(row)
+    d["success"] = bool(d["success"])
+    d["details"] = json.loads(d["details"]) if d.get("details") else {}
+    return d
