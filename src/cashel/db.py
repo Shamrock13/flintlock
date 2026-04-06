@@ -92,6 +92,12 @@ def init_db() -> None:
         );
 
         CREATE UNIQUE INDEX IF NOT EXISTS idx_users_username ON users(username);
+
+        CREATE TABLE IF NOT EXISTS login_attempts (
+            username      TEXT PRIMARY KEY,
+            attempts      INTEGER NOT NULL DEFAULT 0,
+            lockout_until REAL NOT NULL DEFAULT 0
+        );
     """)
     conn.commit()
     _migrate_json_to_sqlite()

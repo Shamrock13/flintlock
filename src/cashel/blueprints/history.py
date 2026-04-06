@@ -5,6 +5,7 @@ import uuid
 
 from flask import Blueprint, Response, jsonify, request, send_file
 
+from cashel._helpers import _require_role
 from cashel.web import limiter  # noqa: F401
 from cashel.archive import (
     save_audit,
@@ -55,6 +56,7 @@ def archive_get(entry_id):
 
 
 @history_bp.route("/archive/<entry_id>", methods=["DELETE"])
+@_require_role("admin", "auditor")
 def archive_delete(entry_id):
     deleted = delete_entry(entry_id)
     return jsonify({"deleted": deleted})
@@ -191,12 +193,14 @@ def activity_list():
 
 
 @history_bp.route("/activity/<event_id>", methods=["DELETE"])
+@_require_role("admin")
 def activity_delete(event_id):
     deleted = delete_activity_entry(event_id)
     return jsonify({"deleted": deleted})
 
 
 @history_bp.route("/activity/clear", methods=["POST"])
+@_require_role("admin")
 def activity_clear():
     count = clear_activity()
     return jsonify({"cleared": count})

@@ -20,6 +20,7 @@ settings_bp = Blueprint("settings_bp", __name__)
 
 
 @settings_bp.route("/license/activate", methods=["POST"])
+@_require_role("admin")
 def license_activate():
     key = request.form.get("key", "").strip()
     success, message = activate_license(key)
@@ -27,6 +28,7 @@ def license_activate():
 
 
 @settings_bp.route("/license/deactivate", methods=["POST"])
+@_require_role("admin")
 def license_deactivate():
     success, message = deactivate_license()
     return jsonify({"success": success, "message": message})
@@ -39,6 +41,7 @@ def license_status():
 
 
 @settings_bp.route("/settings", methods=["GET"])
+@_require_role("admin")
 def settings_get():
     s = get_settings()
     return jsonify(s)

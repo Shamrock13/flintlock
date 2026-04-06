@@ -28,9 +28,6 @@ def _tmp_db(fn):
             db_mod.DB_PATH = tmp
             db_mod._local.conn = None
             db_mod.init_db()
-            # Also reset the lockout dict between tests
-            import cashel.blueprints.auth as auth_bp_mod
-            auth_bp_mod._lockout.clear()
             return fn(*args, **kwargs)
         finally:
             conn = getattr(db_mod._local, "conn", None)
@@ -216,9 +213,6 @@ class TestWebAuth(unittest.TestCase):
         db_mod.DB_PATH = tmp
         db_mod._local.conn = None
         db_mod.init_db()
-
-        import cashel.blueprints.auth as auth_bp_mod
-        auth_bp_mod._lockout.clear()
 
         client = _make_client()
         return client, tmp, orig_path, orig_conn
