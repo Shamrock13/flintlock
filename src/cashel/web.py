@@ -141,6 +141,7 @@ def index():
         demo_mode=DEMO_MODE,
         demo_configs=demo_configs,
         demo_comparisons=demo_comparisons,
+        current_user=getattr(g, "current_user", None),
     )
 
 

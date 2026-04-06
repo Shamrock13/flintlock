@@ -2,6 +2,7 @@
 
 from flask import Blueprint, jsonify, request
 
+from cashel._helpers import _require_role
 from cashel.license import DEMO_MODE
 from cashel.schedule_store import (
     list_schedules,
@@ -101,6 +102,7 @@ def schedules_list():
 
 
 @schedules_bp.route("/schedules", methods=["POST"])
+@_require_role("admin", "auditor")
 def schedules_create():
     if DEMO_MODE:
         return jsonify({"error": "Schedules are read-only in demo mode."}), 403
@@ -124,6 +126,7 @@ def schedules_get(schedule_id):
 
 
 @schedules_bp.route("/schedules/<schedule_id>", methods=["PUT"])
+@_require_role("admin", "auditor")
 def schedules_update(schedule_id):
     if DEMO_MODE:
         return jsonify({"error": "Schedules are read-only in demo mode."}), 403
@@ -139,6 +142,7 @@ def schedules_update(schedule_id):
 
 
 @schedules_bp.route("/schedules/<schedule_id>", methods=["DELETE"])
+@_require_role("admin", "auditor")
 def schedules_delete(schedule_id):
     if DEMO_MODE:
         return jsonify({"error": "Schedules are read-only in demo mode."}), 403
@@ -149,6 +153,7 @@ def schedules_delete(schedule_id):
 
 
 @schedules_bp.route("/schedules/<schedule_id>/run", methods=["POST"])
+@_require_role("admin", "auditor")
 def schedules_run_now(schedule_id):
     """Trigger an immediate on-demand run of a scheduled audit."""
     if DEMO_MODE:

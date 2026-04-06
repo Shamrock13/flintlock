@@ -14,7 +14,7 @@ from cashel._vendor_helpers import (
     validate_vendor_format,
     extract_hostname,
 )
-from cashel._helpers import _err, _make_temp_path, _MAX_FILE_BYTES, UPLOAD_FOLDER
+from cashel._helpers import _err, _make_temp_path, _MAX_FILE_BYTES, _require_role, UPLOAD_FOLDER
 from cashel.ftd import is_ftd_config
 from cashel.audit_engine import (
     _findings_to_strings,
@@ -296,6 +296,7 @@ def demo_bulk_audit():
 
 @audit_bp.route("/audit", methods=["POST"])
 @limiter.limit("30/minute")
+@_require_role("admin", "auditor")
 def run_audit():
     if "config" not in request.files or request.files["config"].filename == "":
         return jsonify({"error": "No config file uploaded"}), 400
@@ -536,6 +537,7 @@ def run_diff():
 
 @audit_bp.route("/connect", methods=["POST"])
 @limiter.limit("10/minute")
+@_require_role("admin", "auditor")
 def live_connect():
     host = request.form.get("host", "").strip()
     port = request.form.get("port", "22").strip() or "22"
@@ -672,6 +674,7 @@ def live_connect():
 
 @audit_bp.route("/bulk_audit", methods=["POST"])
 @limiter.limit("10/minute")
+@_require_role("admin", "auditor")
 def bulk_audit():
     """Audit multiple config files in one request.
 

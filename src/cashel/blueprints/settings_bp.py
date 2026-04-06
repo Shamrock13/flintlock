@@ -1,19 +1,19 @@
 """Settings blueprint — /settings/*, /license/*."""
 
-import secrets
 import smtplib
 import ssl
 from email.mime.text import MIMEText
 
 from flask import Blueprint, jsonify, request
 
+from cashel._helpers import _require_role
 from cashel.license import (
     check_license,
     activate_license,
     deactivate_license,
     DEMO_MODE,
 )
-from cashel.settings import get_settings, save_settings, save_api_key
+from cashel.settings import get_settings, save_settings
 from cashel.syslog_handler import configure_syslog
 
 settings_bp = Blueprint("settings_bp", __name__)
@@ -41,16 +41,11 @@ def license_status():
 @settings_bp.route("/settings", methods=["GET"])
 def settings_get():
     s = get_settings()
-    # Never expose the plaintext API key over the wire — return masked hint only
-    raw_key = s.pop("api_key", "")
-    s["api_key_set"] = bool(raw_key)
-    s["api_key_hint"] = (
-        ("csh_…" + raw_key[-4:]) if len(raw_key) >= 4 else ("set" if raw_key else "")
-    )
     return jsonify(s)
 
 
 @settings_bp.route("/settings", methods=["POST"])
+@_require_role("admin")
 def settings_save():
     if DEMO_MODE:
         return jsonify({"error": "Settings cannot be saved in demo mode."}), 403
@@ -58,22 +53,11 @@ def settings_save():
     saved = save_settings(data)
     # Reconfigure syslog immediately when settings are changed.
     configure_syslog(saved)
-    saved.pop("api_key", None)
     return jsonify(saved)
 
 
-@settings_bp.route("/settings/generate-api-key", methods=["POST"])
-def settings_generate_api_key():
-    """Generate a new random API key, store it encrypted, and return it once in plaintext.
-    The caller must copy and store the key immediately — it cannot be retrieved again.
-    """
-    new_key = "csh_" + secrets.token_urlsafe(32)
-    save_api_key(new_key)
-    hint = ("csh_…" + new_key[-4:]) if len(new_key) >= 4 else ""
-    return jsonify({"ok": True, "api_key": new_key, "api_key_hint": hint})
-
-
 @settings_bp.route("/settings/test-smtp", methods=["POST"])
+@_require_role("admin")
 def settings_test_smtp():
     """Attempt a live SMTP connection and send a test email.
 

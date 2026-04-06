@@ -81,6 +81,17 @@ def init_db() -> None:
             last_error              TEXT,
             created_at              TEXT NOT NULL
         );
+
+        CREATE TABLE IF NOT EXISTS users (
+            id            TEXT PRIMARY KEY,
+            username      TEXT NOT NULL UNIQUE,
+            password_hash TEXT NOT NULL,
+            role          TEXT NOT NULL DEFAULT 'viewer',
+            api_key_enc   TEXT NOT NULL DEFAULT '',
+            created_at    TEXT NOT NULL
+        );
+
+        CREATE UNIQUE INDEX IF NOT EXISTS idx_users_username ON users(username);
     """)
     conn.commit()
     _migrate_json_to_sqlite()
