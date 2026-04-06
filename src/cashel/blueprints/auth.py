@@ -8,6 +8,7 @@ import time
 from flask import Blueprint, g, jsonify, redirect, render_template, request, session, url_for
 
 from cashel._helpers import _require_role
+from cashel.db import get_conn
 from cashel.settings import get_settings, save_settings
 from cashel.user_store import (
     UserValidationError,
@@ -23,8 +24,37 @@ from cashel.user_store import (
 
 auth_bp = Blueprint("auth", __name__)
 
-# In-memory lockout: {username_lower: (attempts, lockout_until)}
-_lockout: dict = {}
+_LOCKOUT_THRESHOLD = 5
+_LOCKOUT_SECONDS = 300  # 5 minutes
+
+
+def _get_lockout(username: str) -> tuple[int, float]:
+    row = get_conn().execute(
+        "SELECT attempts, lockout_until FROM login_attempts WHERE username = ?",
+        (username.lower(),),
+    ).fetchone()
+    if row:
+        return row["attempts"], row["lockout_until"]
+    return 0, 0.0
+
+
+def _record_failed_login(username: str) -> None:
+    conn = get_conn()
+    attempts, _ = _get_lockout(username)
+    attempts += 1
+    lockout_until = time.time() + _LOCKOUT_SECONDS if attempts >= _LOCKOUT_THRESHOLD else 0.0
+    conn.execute(
+        "INSERT INTO login_attempts (username, attempts, lockout_until) VALUES (?, ?, ?) "
+        "ON CONFLICT(username) DO UPDATE SET attempts=excluded.attempts, lockout_until=excluded.lockout_until",
+        (username.lower(), attempts, lockout_until),
+    )
+    conn.commit()
+
+
+def _clear_lockout(username: str) -> None:
+    conn = get_conn()
+    conn.execute("DELETE FROM login_attempts WHERE username = ?", (username.lower(),))
+    conn.commit()
 
 
 # ── Login / Logout ─────────────────────────────────────────────────────────────
@@ -45,8 +75,7 @@ def login_post():
     if not username or not password:
         return render_template("login.html", error="Username and password are required."), 401
 
-    key = username.lower()
-    attempts, lockout_until = _lockout.get(key, (0, 0))
+    attempts, lockout_until = _get_lockout(username)
     if lockout_until and time.time() < lockout_until:
         remaining = int(lockout_until - time.time())
         return render_template(
@@ -55,20 +84,17 @@ def login_post():
 
     user = check_password(username, password)
     if user:
-        _lockout.pop(key, None)
+        _clear_lockout(username)
         session.clear()
         session["authenticated"] = True
         session["user_id"] = user["id"]
         session["last_seen"] = time.time()
         next_url = request.args.get("next", "")
-        # Guard against open-redirect: only accept relative paths
         if next_url and next_url.startswith("/") and not next_url.startswith("//"):
             return redirect(next_url)
         return redirect(url_for("index"))
     else:
-        attempts += 1
-        lockout_until_new = time.time() + 300 if attempts >= 5 else 0
-        _lockout[key] = (attempts, lockout_until_new)
+        _record_failed_login(username)
         return render_template("login.html", error="Invalid username or password."), 401
 
 
@@ -115,11 +141,9 @@ def setup_post():
     except UserValidationError as exc:
         return render_template("setup.html", errors=[str(exc)], username=username), 400
 
-    # Enable auth
     settings = get_settings()
     save_settings({**settings, "auth_enabled": True})
 
-    # Auto-login the new admin
     session.clear()
     session["authenticated"] = True
     session["user_id"] = user["id"]
@@ -153,7 +177,6 @@ def create_user_route():
 @auth_bp.route("/auth/users/<user_id>", methods=["DELETE"])
 @_require_role("admin")
 def delete_user_route(user_id):
-    # Prevent self-deletion
     current = getattr(g, "current_user", None)
     if current and current.get("id") == user_id:
         return jsonify({"error": "Cannot delete your own account."}), 400
