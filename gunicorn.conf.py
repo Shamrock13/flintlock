@@ -7,6 +7,13 @@ created after forking and survive correctly.
 """
 
 import os
+import secrets as _secrets
+
+# Ensure all workers share the same Flask SECRET_KEY.
+# Without this, each worker generates its own random key (web.py fallback),
+# causing session cookies signed by one worker to be rejected by another.
+if not os.environ.get("CASHEL_SECRET"):
+    os.environ["CASHEL_SECRET"] = _secrets.token_hex(32)
 
 # ── Server ────────────────────────────────────────────────────────────────────
 bind = f"0.0.0.0:{os.environ.get('PORT', '5000')}"
