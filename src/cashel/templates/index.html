@@ -2582,6 +2582,7 @@
   async function loadSettings() {
     try {
       const res = await fetch("/settings");
+      if (!res.ok) return;  // viewer (and other non-admin roles) get 403 — skip silently
       appSettings = await res.json();
       applySettingsToUI();
       applySettingsToForm();
@@ -2640,12 +2641,16 @@
   });
 
   function applySettingsToForm() {
-    document.getElementById("report").checked  = !!appSettings.auto_pdf;
-    document.getElementById("archive").checked = !!appSettings.auto_archive;
+    const reportEl  = document.getElementById("report");
+    const archiveEl = document.getElementById("archive");
+    if (reportEl)  reportEl.checked  = !!appSettings.auto_pdf;
+    if (archiveEl) archiveEl.checked = !!appSettings.auto_archive;
     const comp = appSettings.default_compliance || "";
     if (comp) {
-      document.getElementById("compliance").value     = comp;
-      document.getElementById("connCompliance").value = comp;
+      const compEl     = document.getElementById("compliance");
+      const connCompEl = document.getElementById("connCompliance");
+      if (compEl)     compEl.value     = comp;
+      if (connCompEl) connCompEl.value = comp;
     }
   }
 
