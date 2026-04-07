@@ -33,6 +33,7 @@ def archive_list():
 
 
 @history_bp.route("/archive/save", methods=["POST"])
+@_require_role("admin", "auditor")
 def archive_save():
     """Manually save the most recent audit result to the archive."""
     data = request.get_json(silent=True) or {}
@@ -56,7 +57,7 @@ def archive_get(entry_id):
 
 
 @history_bp.route("/archive/<entry_id>", methods=["DELETE"])
-@_require_role("admin", "auditor")
+@_require_role("admin")
 def archive_delete(entry_id):
     deleted = delete_entry(entry_id)
     return jsonify({"deleted": deleted})
@@ -187,6 +188,7 @@ def archive_remediation_plan(entry_id):
 
 
 @history_bp.route("/activity", methods=["GET"])
+@_require_role("admin")
 def activity_list():
     limit = int(request.args.get("limit", 200))
     return jsonify(list_activity(limit=limit))

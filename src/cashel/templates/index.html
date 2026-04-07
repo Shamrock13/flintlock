@@ -49,10 +49,10 @@
           {% endif %}
         </button>
         {% if current_user and not demo_mode %}
-        <span class="header-user" title="Signed in as {{ current_user.username }} ({{ current_user.role }})">&#128100; {{ current_user.username }}</span>
-        <form method="post" action="/logout" style="display:inline">
+        <span class="header-username">{{ current_user.username }}</span>
+        <form method="post" action="/logout" style="display:inline;margin:0">
           <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-          <button type="submit" class="btn-logout" title="Sign out">Sign out</button>
+          <button type="submit" class="btn-logout">Logout</button>
         </form>
         {% endif %}
       </div>
@@ -99,10 +99,12 @@
         <svg class="tab-icon" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="2" y="3" width="7" height="14" rx="1"/><rect x="11" y="3" width="7" height="14" rx="1"/><path d="M5.5 7h2M5.5 10h2M5.5 13h2M12.5 7h2M12.5 10h2M12.5 13h2"/></svg>
         Compare
       </button>
+      {% if not current_user or current_user.role in ('admin', 'auditor') %}
       <button class="tab-btn" data-tab="connect" role="tab">
         <svg class="tab-icon" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="2" y="3" width="16" height="14" rx="2"/><path d="M2 7h16"/><path d="M6 11l3 2.5L6 16"/><path d="M12 15h3"/></svg>
         Live Connect
       </button>
+      {% endif %}
       <button class="tab-btn" data-tab="schedules" role="tab">
         <svg class="tab-icon" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="2" y="3.5" width="16" height="14" rx="2"/><path d="M2 8h16M7 2v3M13 2v3"/><circle cx="13.5" cy="13.5" r="3"/><path d="M13.5 12v1.5l1 1"/></svg>
         Schedules
@@ -111,15 +113,23 @@
         <svg class="tab-icon" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 10a6 6 0 1 0 1.5-4"/><path d="M2 8.5l1.5 2 2-1.5"/><path d="M10 7v4l2 1.5"/></svg>
         History
       </button>
+      {% if not current_user or current_user.role == 'admin' %}
       <button class="tab-btn" data-tab="settings" role="tab">
         <svg class="tab-icon" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" aria-hidden="true"><line x1="3" y1="5" x2="17" y2="5"/><line x1="3" y1="10" x2="17" y2="10"/><line x1="3" y1="15" x2="17" y2="15"/><circle cx="7" cy="5" r="2"/><circle cx="13" cy="10" r="2"/><circle cx="8" cy="15" r="2"/></svg>
         Settings
       </button>
+      {% elif current_user and not demo_mode %}
+      <button class="tab-btn" data-tab="settings" role="tab">
+        <svg class="tab-icon" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="10" cy="7.5" r="3.5"/><path d="M3 18c0-3.3 3.1-6 7-6s7 2.7 7 6"/></svg>
+        My Account
+      </button>
+      {% endif %}
     </nav>
 
     <!-- ══════════════════════════════════════════════ AUDIT ══ -->
     <section class="tab-panel" id="tab-audit">
 
+      {% if not current_user or current_user.role in ('admin', 'auditor') %}
       <!-- Audit mode toggle: Single File / Bulk -->
       <div class="audit-mode-bar">
         <button class="mode-btn mode-active" data-mode="single">Single File</button>
@@ -326,6 +336,11 @@
         <div id="bulkResultsList"></div>
       </div>
       </div><!-- /audit-mode-bulk -->
+      {% else %}
+      <div class="card">
+        <p class="role-notice">Audit execution requires Auditor or Admin role. You can view results in the History tab.</p>
+      </div>
+      {% endif %}
 
     </section>
 
@@ -525,7 +540,9 @@
       <!-- History sub-tabs: Audit History / Activity Log -->
       <div class="sub-tab-nav">
         <button class="sub-tab-btn sub-tab-active" data-subtab="audits">&#128337; Audit History</button>
+        {% if not current_user or current_user.role == 'admin' %}
         <button class="sub-tab-btn" data-subtab="activity">&#128203; Activity Log</button>
+        {% endif %}
       </div>
 
       <!-- ── Audit History sub-tab ── -->
@@ -608,6 +625,7 @@
       </div><!-- /sub-audits -->
 
       <!-- ── Activity Log sub-tab ── -->
+      {% if not current_user or current_user.role == 'admin' %}
       <div id="sub-activity" class="hidden">
       <div class="card">
         <div class="results-header">
@@ -623,6 +641,9 @@
         </div>
       </div>
       </div><!-- /sub-activity -->
+      {% else %}
+      <div id="sub-activity" class="hidden"></div>
+      {% endif %}
 
     </section>
 
@@ -644,8 +665,8 @@
         </div>
       </div>
 
-      <!-- New / Edit Schedule Form — hidden in demo mode -->
-      <div class="card{% if demo_mode %} hidden{% endif %}" id="scheduleFormCard">
+      <!-- New / Edit Schedule Form — hidden in demo mode and for viewer role -->
+      <div class="card{% if demo_mode or (current_user and current_user.role == 'viewer') %} hidden{% endif %}" id="scheduleFormCard">
         <h2 class="card-title" id="scheduleFormTitle">New Schedule</h2>
         <form id="scheduleForm">
           <input type="hidden" id="scheduleId" value="" />
@@ -773,7 +794,8 @@
     <section class="tab-panel hidden" id="tab-settings">
       <div class="settings-shell">
 
-        <!-- ── Left sidebar ─────────────────────────────────────────────── -->
+        <!-- ── Left sidebar — admin only ─────────────────────────────────── -->
+        {% if not current_user or current_user.role == 'admin' %}
         <nav class="settings-sidebar" role="navigation" aria-label="Settings sections">
           <div class="settings-nav-group-label">Configuration</div>
 
@@ -804,10 +826,12 @@
             Syslog
           </button>
         </nav>
+        {% endif %}
 
         <!-- ── Right content ─────────────────────────────────────────────── -->
         <div class="settings-content">
 
+          {% if not current_user or current_user.role == 'admin' %}
           <!-- General pane -->
           <div class="settings-pane active" id="spane-general">
             <div class="settings-pane-header">
@@ -902,15 +926,17 @@
               <span id="smtpTestResult" style="font-size:0.85rem"></span>
             </div>
           </div>
+          {% endif %}{# /admin-only general+email panes #}
 
           <!-- Authentication pane — hidden in demo mode -->
           {% if not demo_mode %}
-          <div class="settings-pane" id="spane-auth">
+          <div class="settings-pane{% if current_user and current_user.role != 'admin' %} active{% endif %}" id="spane-auth">
             <div class="settings-pane-header">
-              <h2 class="settings-pane-title">Authentication</h2>
+              <h2 class="settings-pane-title">{% if current_user and current_user.role != 'admin' %}My Account{% else %}Authentication{% endif %}</h2>
               <p class="settings-pane-desc">Protect the Cashel web UI and API with an API key. When enabled, all routes require the key — via browser login or <code>X-API-Key</code> header for CI/CD clients.</p>
             </div>
 
+            {% if not current_user or current_user.role == 'admin' %}
             <div class="settings-group">
               <h3 class="settings-group-title">Access Control</h3>
               <label class="settings-row">
@@ -931,6 +957,7 @@
                 </div>
               </div>
             </div>
+            {% endif %}
 
             <!-- Users table — admin only -->
             {% if current_user and current_user.role == 'admin' %}
@@ -1028,6 +1055,7 @@
           </div>
           {% endif %}
 
+          {% if not current_user or current_user.role == 'admin' %}
           <!-- Security pane -->
           <div class="settings-pane" id="spane-security">
             <div class="settings-pane-header">
@@ -1132,12 +1160,15 @@
               </div>
             </div>
           </div>
+          {% endif %}{# /admin-only security+syslog panes #}
 
-          <!-- Shared footer -->
+          <!-- Shared footer — admin only -->
+          {% if not current_user or current_user.role == 'admin' %}
           <div class="settings-footer">
             <button class="btn-primary" id="saveSettingsBtn">Save Settings</button>
             <span class="settings-saved-msg hidden" id="settingsSavedMsg">&#10003; Saved</span>
           </div>
+          {% endif %}
 
         </div><!-- /.settings-content -->
       </div><!-- /.settings-shell -->
@@ -1236,6 +1267,8 @@
   }
 
   const DEMO_MODE = {{ 'true' if demo_mode else 'false' }};
+  const userRole = {{ (current_user.role if current_user else 'admin') | tojson }};
+  const canManageSchedules = (userRole === 'admin' || userRole === 'auditor');
 
   // ═══════════════════════════════════════════════════════════════ TABS ══
   const tabBtns   = document.querySelectorAll(".tab-btn");
@@ -1957,7 +1990,10 @@
           <a class="btn-secondary btn-sm" href="/archive/${escHtml(e.id)}/export?fmt=json"  download title="Download JSON">JSON</a>
           <a class="btn-secondary btn-sm" href="/archive/${escHtml(e.id)}/export?fmt=csv"   download title="Download CSV">CSV</a>
           <a class="btn-secondary btn-sm" href="/archive/${escHtml(e.id)}/export?fmt=sarif" download title="Download SARIF">SARIF</a>
-          <button class="btn-danger btn-sm" data-delete="${escHtml(e.id)}" title="Delete">&#128465;</button>
+          ${userRole === 'admin'
+            ? `<button class="btn-danger btn-sm" data-delete="${escHtml(e.id)}" title="Delete">&#128465;</button>`
+            : `<button class="btn-danger btn-sm" disabled title="Deletion requires Admin role" style="opacity:0.4;cursor:not-allowed">&#128465;</button>`
+          }
         </div>
       </div>`;
     }).join("") + `
@@ -2125,13 +2161,15 @@
   };
 
   async function loadActivity() {
-    document.getElementById("activityList").innerHTML = `<p class="text-muted">Loading&hellip;</p>`;
+    const activityList = document.getElementById("activityList");
+    if (!activityList) return;
+    activityList.innerHTML = `<p class="text-muted">Loading&hellip;</p>`;
     try {
       const res    = await fetch("/activity");
       const events = await res.json();
       renderActivity(events);
     } catch (err) {
-      document.getElementById("activityList").innerHTML =
+      activityList.innerHTML =
         `<div class="alert alert-error">Failed to load activity: ${escHtml(err.message)}</div>`;
     }
   }
@@ -2172,8 +2210,10 @@
     });
   }
 
-  document.getElementById("refreshActivityBtn").addEventListener("click", loadActivity);
-  document.getElementById("clearActivityBtn").addEventListener("click", async function () {
+  const _refreshActivityBtn = document.getElementById("refreshActivityBtn");
+  if (_refreshActivityBtn) _refreshActivityBtn.addEventListener("click", loadActivity);
+  const _clearActivityBtn = document.getElementById("clearActivityBtn");
+  if (_clearActivityBtn) _clearActivityBtn.addEventListener("click", async function () {
     if (!confirm("Clear all activity log entries?")) return;
     await fetch("/activity/clear", { method: "POST" });
     await loadActivity();
@@ -2404,11 +2444,11 @@
         </div>
         <div class="schedule-entry-right">
           <span class="schedule-status-pill ${s.enabled ? "pill-enabled" : "pill-disabled"}">${s.enabled ? "Enabled" : "Disabled"}</span>
-          ${DEMO_MODE ? "" : `
+          ${(!DEMO_MODE && canManageSchedules) ? `
           <button class="btn-secondary btn-sm" data-sched-run="${escHtml(s.id)}" title="Run now">&#9654; Run Now</button>
           <button class="btn-secondary btn-sm" data-sched-edit="${escHtml(s.id)}" title="Edit">&#9998; Edit</button>
           <button class="btn-danger btn-sm"    data-sched-del="${escHtml(s.id)}"  title="Delete">&#128465;</button>
-          `}
+          ` : ""}
         </div>
       </div>`;
     }).join("");
@@ -2549,32 +2589,42 @@
   }
 
   function applySettingsToUI() {
-    document.getElementById("setting-auto-pdf").checked              = !!appSettings.auto_pdf;
-    document.getElementById("setting-auto-archive").checked          = !!appSettings.auto_archive;
-    document.getElementById("setting-default-compliance").value      = appSettings.default_compliance  || "";
-    document.getElementById("setting-smtp-host").value               = appSettings.smtp_host            || "";
-    document.getElementById("setting-smtp-port").value               = appSettings.smtp_port            || 587;
-    document.getElementById("setting-smtp-user").value               = appSettings.smtp_user            || "";
-    document.getElementById("setting-smtp-password").value           = "";  // never pre-fill password
-    document.getElementById("setting-smtp-from").value               = appSettings.smtp_from            || "";
-    document.getElementById("setting-smtp-tls").checked              = appSettings.smtp_tls !== false;
-    // Security settings
-    document.getElementById("setting-ssh-host-key-policy").value     = appSettings.ssh_host_key_policy || "warn";
-    document.getElementById("setting-error-detail").value            = appSettings.error_detail         || "sanitized";
-    document.getElementById("setting-webhook-allowlist").value       = appSettings.webhook_allowlist    || "";
-    // Syslog settings
-    document.getElementById("setting-syslog-enabled").checked        = !!appSettings.syslog_enabled;
-    document.getElementById("setting-syslog-host").value             = appSettings.syslog_host          || "localhost";
-    document.getElementById("setting-syslog-port").value             = appSettings.syslog_port          || 514;
-    document.getElementById("setting-syslog-protocol").value         = appSettings.syslog_protocol      || "udp";
-    document.getElementById("setting-syslog-facility").value         = appSettings.syslog_facility      || "local0";
-    // Auth settings
+    // Settings pane elements only exist for admin — guard each access
+    const _set = (id, prop, fallback) => {
+      const el = document.getElementById(id);
+      if (!el) return;
+      if (typeof el.checked !== "undefined" && prop !== "value") {
+        el.checked = !!appSettings[prop];
+      } else {
+        el.value = appSettings[prop] !== undefined ? appSettings[prop] : fallback;
+      }
+    };
+    _set("setting-auto-pdf",             "auto_pdf",              false);
+    _set("setting-auto-archive",         "auto_archive",          false);
+    _set("setting-default-compliance",   "default_compliance",    "");
+    _set("setting-smtp-host",            "smtp_host",             "");
+    _set("setting-smtp-port",            "smtp_port",             587);
+    _set("setting-smtp-user",            "smtp_user",             "");
+    _set("setting-smtp-from",            "smtp_from",             "");
+    const smtpTls = document.getElementById("setting-smtp-tls");
+    if (smtpTls) smtpTls.checked = appSettings.smtp_tls !== false;
+    _set("setting-ssh-host-key-policy",  "ssh_host_key_policy",   "warn");
+    _set("setting-error-detail",         "error_detail",          "sanitized");
+    _set("setting-webhook-allowlist",    "webhook_allowlist",      "");
+    const syslogEnabled = document.getElementById("setting-syslog-enabled");
+    if (syslogEnabled) syslogEnabled.checked = !!appSettings.syslog_enabled;
+    _set("setting-syslog-host",          "syslog_host",           "localhost");
+    _set("setting-syslog-port",          "syslog_port",           514);
+    _set("setting-syslog-protocol",      "syslog_protocol",       "udp");
+    _set("setting-syslog-facility",      "syslog_facility",       "local0");
     if (document.getElementById("setting-auth-enabled")) {
       document.getElementById("setting-auth-enabled").checked        = !!appSettings.auth_enabled;
     }
     if (document.getElementById("setting-session-lifetime")) {
       document.getElementById("setting-session-lifetime").value      = appSettings.session_lifetime_minutes || 480;
     }
+    const smtpPass = document.getElementById("setting-smtp-password");
+    if (smtpPass) smtpPass.value = "";  // never pre-fill password
   }
 
   // ── Settings sidebar navigation ──────────────────────────────────────────
