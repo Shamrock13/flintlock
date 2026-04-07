@@ -1361,9 +1361,9 @@
     if (unsupported) sel.value = "";
   }
 
-  document.getElementById("vendor").addEventListener("change", syncComplianceSelector);
+  document.getElementById("vendor")?.addEventListener("change", syncComplianceSelector);
 
-  document.getElementById("config").addEventListener("change", function () {
+  document.getElementById("config")?.addEventListener("change", function () {
     document.getElementById("fileLabel").textContent =
       this.files.length ? this.files[0].name : "Choose a file\u2026";
     if (!this.files.length) return;
@@ -1482,10 +1482,10 @@
     document.getElementById("findingsList").classList.toggle("findings-compact", compactView);
     renderFindingsUI();
   };
-  document.getElementById("viewDetailed").addEventListener("click", () => setFindingsView("detailed"));
-  document.getElementById("viewCompact").addEventListener("click", () => setFindingsView("compact"));
+  document.getElementById("viewDetailed")?.addEventListener("click", () => setFindingsView("detailed"));
+  document.getElementById("viewCompact")?.addEventListener("click", () => setFindingsView("compact"));
 
-  document.getElementById("summaryGrid").addEventListener("click", function (e) {
+  document.getElementById("summaryGrid")?.addEventListener("click", function (e) {
     const box = e.target.closest(".summary-box[data-filter]");
     if (!box) return;
     const filter = box.dataset.filter;
@@ -1630,7 +1630,7 @@
   });
   document.getElementById("trendsDeviceFilter").addEventListener("change", () => renderTrends(trendsData));
 
-  document.getElementById("auditForm").addEventListener("submit", async function (e) {
+  document.getElementById("auditForm")?.addEventListener("submit", async function (e) {
     e.preventDefault();
     if (DEMO_MODE) { showAuditError("File uploads are not available in demo mode. Use the sample configs above."); return; }
     setLoading("submitBtn", "submitText", "submitSpinner", "Running\u2026", true);
@@ -1701,7 +1701,7 @@
     else { remRow.classList.add("hidden"); }
   }
 
-  document.getElementById("viewHistoryBtn").addEventListener("click", () => switchTab("history"));
+  document.getElementById("viewHistoryBtn")?.addEventListener("click", () => switchTab("history"));
 
   // ══════════════════════════════════════════════════════ EXPORT ══
   let lastAuditData = null;
@@ -1783,9 +1783,9 @@
     _downloadBlob(JSON.stringify(sarif, null, 2), _exportBasename() + "_cashel.sarif", "application/json");
   }
 
-  document.getElementById("exportJsonBtn").addEventListener("click",  exportJSON);
-  document.getElementById("exportCsvBtn").addEventListener("click",   exportCSV);
-  document.getElementById("exportSarifBtn").addEventListener("click", exportSARIF);
+  document.getElementById("exportJsonBtn")?.addEventListener("click",  exportJSON);
+  document.getElementById("exportCsvBtn")?.addEventListener("click",   exportCSV);
+  document.getElementById("exportSarifBtn")?.addEventListener("click", exportSARIF);
 
   // ══════════════════════════════════════════════════ COMPARE CONFIGS ══
   document.getElementById("config_a").addEventListener("change", function () {
@@ -1915,7 +1915,7 @@
     if (connHasFindings) { connRemRow.classList.remove("hidden"); }
     else { connRemRow.classList.add("hidden"); }
   }
-  document.getElementById("connViewHistoryBtn").addEventListener("click", () => switchTab("history"));
+  document.getElementById("connViewHistoryBtn")?.addEventListener("click", () => switchTab("history"));
 
   // ════════════════════════════════════════════════ AUDIT HISTORY ══════
   let historyData = [];
@@ -2297,14 +2297,14 @@
   }
 
   // ══════════════════════════════════════════════════════ BULK AUDIT ══
-  document.getElementById("bulkConfigs").addEventListener("change", function () {
+  document.getElementById("bulkConfigs")?.addEventListener("change", function () {
     const n = this.files.length;
     document.getElementById("bulkFileLabel").textContent =
       n === 0 ? "Choose one or more files\u2026" :
       n === 1 ? this.files[0].name : n + " files selected";
   });
 
-  document.getElementById("bulkForm").addEventListener("submit", async function (e) {
+  document.getElementById("bulkForm")?.addEventListener("submit", async function (e) {
     e.preventDefault();
     if (DEMO_MODE) {
       document.getElementById("bulkResults").classList.remove("hidden");
@@ -3226,7 +3226,7 @@
     {% endif %}
 
     /* Wire up buttons — single audit */
-    document.getElementById("remediationPlanBtn").addEventListener("click", () => {
+    document.getElementById("remediationPlanBtn")?.addEventListener("click", () => {
       if (!lastAuditData) return;
       fetchAndShowPlan({
         findings: lastAuditData.enriched_findings || lastAuditData.findings || [],
