@@ -5,7 +5,16 @@ Seed location for future LDAP/OIDC/TACACS+ routes.
 
 import time
 
-from flask import Blueprint, g, jsonify, redirect, render_template, request, session, url_for
+from flask import (
+    Blueprint,
+    g,
+    jsonify,
+    redirect,
+    render_template,
+    request,
+    session,
+    url_for,
+)
 
 from cashel._helpers import _require_role
 from cashel.db import get_conn
@@ -29,10 +38,14 @@ _LOCKOUT_SECONDS = 300  # 5 minutes
 
 
 def _get_lockout(username: str) -> tuple[int, float]:
-    row = get_conn().execute(
-        "SELECT attempts, lockout_until FROM login_attempts WHERE username = ?",
-        (username.lower(),),
-    ).fetchone()
+    row = (
+        get_conn()
+        .execute(
+            "SELECT attempts, lockout_until FROM login_attempts WHERE username = ?",
+            (username.lower(),),
+        )
+        .fetchone()
+    )
     if row:
         return row["attempts"], row["lockout_until"]
     return 0, 0.0
@@ -42,7 +55,9 @@ def _record_failed_login(username: str) -> None:
     conn = get_conn()
     attempts, _ = _get_lockout(username)
     attempts += 1
-    lockout_until = time.time() + _LOCKOUT_SECONDS if attempts >= _LOCKOUT_THRESHOLD else 0.0
+    lockout_until = (
+        time.time() + _LOCKOUT_SECONDS if attempts >= _LOCKOUT_THRESHOLD else 0.0
+    )
     conn.execute(
         "INSERT INTO login_attempts (username, attempts, lockout_until) VALUES (?, ?, ?) "
         "ON CONFLICT(username) DO UPDATE SET attempts=excluded.attempts, lockout_until=excluded.lockout_until",
@@ -73,7 +88,9 @@ def login_post():
     password = request.form.get("password", "")
 
     if not username or not password:
-        return render_template("login.html", error="Username and password are required."), 401
+        return render_template(
+            "login.html", error="Username and password are required."
+        ), 401
 
     attempts, lockout_until = _get_lockout(username)
     if lockout_until and time.time() < lockout_until:

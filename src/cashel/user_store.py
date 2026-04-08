@@ -64,7 +64,9 @@ def create_user(username: str, password: str, role: str = "viewer") -> dict:
     if len(password) < 12:
         raise UserValidationError("Password must be at least 12 characters.")
     if role not in _VALID_ROLES:
-        raise UserValidationError(f"Role must be one of: {', '.join(sorted(_VALID_ROLES))}.")
+        raise UserValidationError(
+            f"Role must be one of: {', '.join(sorted(_VALID_ROLES))}."
+        )
 
     user_id = uuid4().hex[:12]
     pw_hash = generate_password_hash(password)
@@ -112,9 +114,7 @@ def get_user_by_api_key(plaintext_key: str) -> dict | None:
     if not plaintext_key:
         return None
     conn = get_conn()
-    rows = conn.execute(
-        "SELECT * FROM users WHERE api_key_enc != ''"
-    ).fetchall()
+    rows = conn.execute("SELECT * FROM users WHERE api_key_enc != ''").fetchall()
     for row in rows:
         enc = dict(row).get("api_key_enc", "")
         if not enc:
@@ -145,9 +145,7 @@ def check_password(username: str, plaintext: str) -> dict | None:
 def list_users() -> list:
     """Return list of safe user dicts (id, username, role, has_api_key, created_at)."""
     conn = get_conn()
-    rows = conn.execute(
-        "SELECT * FROM users ORDER BY created_at ASC"
-    ).fetchall()
+    rows = conn.execute("SELECT * FROM users ORDER BY created_at ASC").fetchall()
     return [_safe_dict(r) for r in rows]
 
 
@@ -186,9 +184,7 @@ def change_password(user_id: str, new_password: str) -> None:
     if row is None:
         raise UserValidationError("User not found.")
     pw_hash = generate_password_hash(new_password)
-    conn.execute(
-        "UPDATE users SET password_hash = ? WHERE id = ?", (pw_hash, user_id)
-    )
+    conn.execute("UPDATE users SET password_hash = ? WHERE id = ?", (pw_hash, user_id))
     conn.commit()
 
 

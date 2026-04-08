@@ -206,8 +206,6 @@ def _migrate_json_to_sqlite() -> None:
     if os.path.isdir(schedules_folder):
         count = conn.execute("SELECT COUNT(*) FROM schedules").fetchone()[0]
         if count == 0:
-            _import_json_folder(
-                conn, schedules_folder, "schedules", _map_schedule_row
-            )
+            _import_json_folder(conn, schedules_folder, "schedules", _map_schedule_row)
 
     conn.commit()

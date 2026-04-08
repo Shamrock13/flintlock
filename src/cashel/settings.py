@@ -128,5 +128,3 @@ def save_settings(data: dict) -> dict:
     # Return with decrypted values so callers get the expected keys
     merged["smtp_password"] = smtp_pw
     return merged
-
-

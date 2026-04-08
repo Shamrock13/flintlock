@@ -48,7 +48,6 @@ def _tmp_db(fn):
 
 
 class TestUserStore(unittest.TestCase):
-
     @_tmp_db
     def test_has_users_false_when_empty(self):
         self.assertFalse(us.has_users())
@@ -195,6 +194,7 @@ def _make_client():
     """Create a Flask test client with CSRF disabled and auth enabled."""
     # Must be imported after sys.path adjustment
     import cashel.web as web_mod
+
     app = web_mod.app
     app.config["TESTING"] = True
     app.config["WTF_CSRF_ENABLED"] = False
@@ -203,7 +203,6 @@ def _make_client():
 
 
 class TestWebAuth(unittest.TestCase):
-
     def _setup(self):
         """Return (client, tmp_path) with an isolated DB."""
         with tempfile.NamedTemporaryFile(suffix=".db", delete=False) as f:
@@ -240,11 +239,15 @@ class TestWebAuth(unittest.TestCase):
     def test_setup_post_creates_admin_and_enables_auth(self):
         client, tmp, orig, orig_conn = self._setup()
         try:
-            resp = client.post("/setup", data={
-                "username": "adminuser",
-                "password": "strongpassword1",
-                "confirm_password": "strongpassword1",
-            }, follow_redirects=False)
+            resp = client.post(
+                "/setup",
+                data={
+                    "username": "adminuser",
+                    "password": "strongpassword1",
+                    "confirm_password": "strongpassword1",
+                },
+                follow_redirects=False,
+            )
             # Should redirect to index after setup
             self.assertIn(resp.status_code, (302, 200))
             users = us.list_users()
@@ -269,12 +272,17 @@ class TestWebAuth(unittest.TestCase):
             us.create_user("testuser", "supersecretpass1", "admin")
             # Enable auth via settings
             from cashel.settings import save_settings, get_settings
+
             save_settings({**get_settings(), "auth_enabled": True})
 
-            resp = client.post("/login", data={
-                "username": "testuser",
-                "password": "supersecretpass1",
-            }, follow_redirects=False)
+            resp = client.post(
+                "/login",
+                data={
+                    "username": "testuser",
+                    "password": "supersecretpass1",
+                },
+                follow_redirects=False,
+            )
             self.assertEqual(resp.status_code, 302)
             with client.session_transaction() as sess:
                 self.assertTrue(sess.get("authenticated"))
@@ -287,12 +295,16 @@ class TestWebAuth(unittest.TestCase):
         try:
             us.create_user("testuser2", "supersecretpass1", "viewer")
             from cashel.settings import save_settings, get_settings
+
             save_settings({**get_settings(), "auth_enabled": True})
 
-            resp = client.post("/login", data={
-                "username": "testuser2",
-                "password": "wrongpassword!!",
-            })
+            resp = client.post(
+                "/login",
+                data={
+                    "username": "testuser2",
+                    "password": "wrongpassword!!",
+                },
+            )
             self.assertEqual(resp.status_code, 401)
         finally:
             self._teardown(tmp, orig, orig_conn)
@@ -303,12 +315,16 @@ class TestWebAuth(unittest.TestCase):
         try:
             us.create_user("testuser3", "supersecretpass1", "viewer")
             from cashel.settings import save_settings, get_settings
+
             save_settings({**get_settings(), "auth_enabled": True})
 
-            resp = client.post("/login", data={
-                "username": "testuser3",
-                "password": "badpassword1234",
-            })
+            resp = client.post(
+                "/login",
+                data={
+                    "username": "testuser3",
+                    "password": "badpassword1234",
+                },
+            )
             body = resp.data.decode()
             self.assertIn("Invalid username or password", body)
             self.assertNotIn("wrong password", body.lower())
@@ -321,6 +337,7 @@ class TestWebAuth(unittest.TestCase):
         try:
             us.create_user("lockme", "supersecretpass1", "viewer")
             from cashel.settings import save_settings, get_settings
+
             save_settings({**get_settings(), "auth_enabled": True})
 
             for _ in range(5):
@@ -338,6 +355,7 @@ class TestWebAuth(unittest.TestCase):
             users = us.list_users()
             api_key = us.generate_api_key(users[0]["id"])
             from cashel.settings import save_settings, get_settings
+
             save_settings({**get_settings(), "auth_enabled": True})
 
             resp = client.get("/schedules", headers={"X-API-Key": api_key})
@@ -354,10 +372,12 @@ class TestWebAuth(unittest.TestCase):
             users = us.list_users()
             api_key = us.generate_api_key(users[0]["id"])
             from cashel.settings import save_settings, get_settings
+
             save_settings({**get_settings(), "auth_enabled": True})
 
-            resp = client.post("/audit", headers={"X-API-Key": api_key},
-                               data={"vendor": "asa"})
+            resp = client.post(
+                "/audit", headers={"X-API-Key": api_key}, data={"vendor": "asa"}
+            )
             self.assertEqual(resp.status_code, 403)
         finally:
             self._teardown(tmp, orig, orig_conn)
@@ -370,10 +390,12 @@ class TestWebAuth(unittest.TestCase):
             users = us.list_users()
             api_key = us.generate_api_key(users[0]["id"])
             from cashel.settings import save_settings, get_settings
+
             save_settings({**get_settings(), "auth_enabled": True})
 
-            resp = client.post("/audit", headers={"X-API-Key": api_key},
-                               data={"vendor": "asa"})
+            resp = client.post(
+                "/audit", headers={"X-API-Key": api_key}, data={"vendor": "asa"}
+            )
             # 400 means it passed role check but failed file validation — correct
             self.assertNotEqual(resp.status_code, 403)
         finally:
@@ -386,6 +408,7 @@ class TestWebAuth(unittest.TestCase):
             users = us.list_users()
             api_key = us.generate_api_key(users[0]["id"])
             from cashel.settings import save_settings, get_settings
+
             save_settings({**get_settings(), "auth_enabled": True})
 
             resp = client.get("/auth/users", headers={"X-API-Key": api_key})
@@ -400,6 +423,7 @@ class TestWebAuth(unittest.TestCase):
             users = us.list_users()
             api_key = us.generate_api_key(users[0]["id"])
             from cashel.settings import save_settings, get_settings
+
             save_settings({**get_settings(), "auth_enabled": True})
 
             resp = client.get("/auth/users", headers={"X-API-Key": api_key})
@@ -414,9 +438,11 @@ class TestWebAuth(unittest.TestCase):
             users = us.list_users()
             api_key = us.generate_api_key(users[0]["id"])
             from cashel.settings import save_settings, get_settings
+
             save_settings({**get_settings(), "auth_enabled": True})
 
             import json
+
             resp = client.post(
                 "/auth/change-password",
                 headers={"X-API-Key": api_key, "Content-Type": "application/json"},
@@ -435,6 +461,7 @@ class TestWebAuth(unittest.TestCase):
             users = us.list_users()
             api_key = us.generate_api_key(users[0]["id"])
             from cashel.settings import save_settings, get_settings
+
             save_settings({**get_settings(), "auth_enabled": True})
 
             resp = client.post(

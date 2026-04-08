@@ -14,7 +14,13 @@ from cashel._vendor_helpers import (
     validate_vendor_format,
     extract_hostname,
 )
-from cashel._helpers import _err, _make_temp_path, _MAX_FILE_BYTES, _require_role, UPLOAD_FOLDER
+from cashel._helpers import (
+    _err,
+    _make_temp_path,
+    _MAX_FILE_BYTES,
+    _require_role,
+    UPLOAD_FOLDER,
+)
 from cashel.ftd import is_ftd_config
 from cashel.audit_engine import (
     _findings_to_strings,
@@ -151,13 +157,22 @@ _DEMO_SSH_SUMMARY = {
 def get_demo_index_data() -> tuple[list, list]:
     """Return (demo_configs, demo_comparisons) card lists for the index template."""
     configs = [
-        {"id": k, "label": v["label"], "vendor": v["vendor"], "description": v["description"]}
+        {
+            "id": k,
+            "label": v["label"],
+            "vendor": v["vendor"],
+            "description": v["description"],
+        }
         for k, v in _DEMO_CONFIGS.items()
     ]
     comparisons = [
         {
-            "id": k, "label": v["label"], "vendor": v["vendor"],
-            "description": v["description"], "label_a": v["label_a"], "label_b": v["label_b"],
+            "id": k,
+            "label": v["label"],
+            "vendor": v["vendor"],
+            "description": v["description"],
+            "label_a": v["label_a"],
+            "label_b": v["label_b"],
         }
         for k, v in _DEMO_COMPARISON_PAIRS.items()
     ]

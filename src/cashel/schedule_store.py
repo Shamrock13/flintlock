@@ -130,9 +130,7 @@ def list_schedules(include_password: bool = False) -> list:
 
 def get_schedule(entry_id: str, include_password: bool = False) -> dict | None:
     conn = get_conn()
-    row = conn.execute(
-        "SELECT * FROM schedules WHERE id=?", (entry_id,)
-    ).fetchone()
+    row = conn.execute("SELECT * FROM schedules WHERE id=?", (entry_id,)).fetchone()
     if row is None:
         return None
     data = _row_to_dict(row)

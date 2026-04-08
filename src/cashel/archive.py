@@ -83,9 +83,7 @@ def save_audit(filename, vendor, findings, summary, config_path=None, tag=None):
 def list_archive():
     """Return all archived entries sorted newest-first."""
     conn = get_conn()
-    rows = conn.execute(
-        "SELECT * FROM audits ORDER BY timestamp DESC"
-    ).fetchall()
+    rows = conn.execute("SELECT * FROM audits ORDER BY timestamp DESC").fetchall()
     return [_row_to_dict(row) for row in rows]
 
 

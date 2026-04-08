@@ -317,7 +317,9 @@ class TestJsonMigration(unittest.TestCase):
         import tempfile
 
         # Pre-populate the table
-        archive.save_audit("existing.cfg", "asa", [], {"high": 0, "medium": 0, "total": 0})
+        archive.save_audit(
+            "existing.cfg", "asa", [], {"high": 0, "medium": 0, "total": 0}
+        )
 
         # Create a JSON folder with a different entry
         migrated_entry = {

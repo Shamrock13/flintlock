@@ -32,6 +32,7 @@ app = Flask(__name__, template_folder="templates", static_folder="static")
 _secret = os.environ.get("CASHEL_SECRET", "")
 if not _secret:
     import warnings
+
     warnings.warn(
         "CASHEL_SECRET is not set — using a random ephemeral key. "
         "Sessions will not survive restarts. Set CASHEL_SECRET in production.",
@@ -71,7 +72,9 @@ def _add_security_headers(response):
     response.headers.setdefault("X-Content-Type-Options", "nosniff")
     response.headers.setdefault("X-XSS-Protection", "1; mode=block")
     response.headers.setdefault("Referrer-Policy", "strict-origin-when-cross-origin")
-    response.headers.setdefault("Permissions-Policy", "geolocation=(), microphone=(), camera=()")
+    response.headers.setdefault(
+        "Permissions-Policy", "geolocation=(), microphone=(), camera=()"
+    )
     response.headers.setdefault(
         "Content-Security-Policy",
         f"default-src 'self'; "
@@ -88,13 +91,18 @@ def _add_security_headers(response):
 
 @app.errorhandler(413)
 def request_too_large(_e):
-    return jsonify({"error": "Upload too large. Maximum file size is 5 MB per file."}), 413
+    return jsonify(
+        {"error": "Upload too large. Maximum file size is 5 MB per file."}
+    ), 413
 
 
 @app.errorhandler(429)
 def rate_limit_exceeded(e):
     return jsonify(
-        {"error": "Rate limit exceeded. Please slow down.", "retry_after": str(getattr(e, "retry_after", ""))}
+        {
+            "error": "Rate limit exceeded. Please slow down.",
+            "retry_after": str(getattr(e, "retry_after", "")),
+        }
     ), 429
 
 
