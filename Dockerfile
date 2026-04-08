@@ -28,7 +28,7 @@ ENV CASHEL_KEY_FILE=/data/cashel.key
 
 EXPOSE 5000
 
-HEALTHCHECK --interval=30s --timeout=10s --start-period=10s --retries=3 \
-    CMD curl -f http://localhost:5000/ || exit 1
+HEALTHCHECK --interval=30s --timeout=10s --start-period=15s --retries=3 \
+    CMD curl -f "http://localhost:${PORT:-5000}/" || exit 1
 
 CMD ["gunicorn", "--config", "gunicorn.conf.py", "cashel.web:app"]
