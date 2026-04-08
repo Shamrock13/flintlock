@@ -2952,8 +2952,9 @@
   {% endif %}
   {% endif %}
 
-  // Load settings on startup and apply defaults to the audit form
-  loadSettings();
+  // Load settings on startup — admin only; non-admin roles get 403 and have
+  // sensible JS-side defaults (auto_pdf:false, auto_archive:false, default_compliance:"")
+  if (userRole === 'admin') loadSettings();
 
   {% if demo_mode %}
   // ── Demo mode: audit single-file picker (cards already in DOM) ──────────────
