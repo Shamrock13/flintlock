@@ -1418,6 +1418,7 @@
 
   function renderPaginationBar(total, totalPages) {
     const el = document.getElementById("findingsPagination");
+    if (!el) return;
     // Show the bar whenever total > 10 (so page size selector is always accessible)
     if (allFindings.length <= 10) { el.classList.add("hidden"); return; }
     el.classList.remove("hidden");
@@ -1464,16 +1465,18 @@
   };
   (function () {
     const paginationEl = document.getElementById("findingsPagination");
-    paginationEl.addEventListener("click", function (e) {
-      const btn = e.target.closest(".btn-page");
-      if (!btn || btn.disabled) return;
-      const page = parseInt(btn.dataset.page, 10);
-      if (!isNaN(page)) window.goToPage(page);
-    });
-    paginationEl.addEventListener("change", function (e) {
-      const sel = e.target.closest(".page-size-select");
-      if (sel) window.changePageSize(+sel.value);
-    });
+    if (paginationEl) {
+      paginationEl.addEventListener("click", function (e) {
+        const btn = e.target.closest(".btn-page");
+        if (!btn || btn.disabled) return;
+        const page = parseInt(btn.dataset.page, 10);
+        if (!isNaN(page)) window.goToPage(page);
+      });
+      paginationEl.addEventListener("change", function (e) {
+        const sel = e.target.closest(".page-size-select");
+        if (sel) window.changePageSize(+sel.value);
+      });
+    }
   })();
   window.setFindingsView = function(mode) {
     compactView = mode === "compact";
