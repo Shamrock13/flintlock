@@ -19,6 +19,7 @@ from cashel.activity_log import (
     delete_activity_entry,
     clear_activity,
 )
+from cashel.auth_audit import list_auth_events, clear_auth_events
 from cashel.remediation import generate_plan, plan_to_markdown, plan_to_pdf
 
 REPORTS_FOLDER = os.environ.get("REPORTS_FOLDER", "/tmp/cashel_reports")
@@ -204,4 +205,25 @@ def activity_delete(event_id):
 @_require_role("admin")
 def activity_clear():
     count = clear_activity()
+    return jsonify({"cleared": count})
+
+
+# ── Security (auth event) log ──────────────────────────────────────────────────
+
+
+@history_bp.route("/auth-events", methods=["GET"])
+@_require_role("admin", "auditor")
+def auth_events_list():
+    """Return auth/security events, admin and auditor roles only."""
+    try:
+        limit = int(request.args.get("limit", 200))
+    except (ValueError, TypeError):
+        limit = 200
+    return jsonify(list_auth_events(limit=limit))
+
+
+@history_bp.route("/auth-events/clear", methods=["POST"])
+@_require_role("admin")
+def auth_events_clear():
+    count = clear_auth_events()
     return jsonify({"cleared": count})

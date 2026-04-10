@@ -41,7 +41,87 @@ def _api_err(message, status=400):
 @api_bp.route("/audit", methods=["POST"])
 @limiter.limit("30/minute")
 def api_audit():
-    """POST /api/v1/audit — audit a config file, returns findings + summary."""
+    """Audit a firewall config file and return findings with a security score.
+    ---
+    tags:
+      - Audit
+    consumes:
+      - multipart/form-data
+    parameters:
+      - name: config
+        in: formData
+        type: file
+        required: true
+        description: Firewall configuration file to audit.
+      - name: vendor
+        in: formData
+        type: string
+        required: false
+        default: auto
+        description: "Vendor hint. One of: auto, asa, ftd, fortinet, paloalto, pfsense, juniper, iptables, nftables, aws, azure, gcp."
+      - name: compliance
+        in: formData
+        type: string
+        required: false
+        description: "Optional compliance framework: cis, nist, pci, hipaa, stig, soc2."
+      - name: archive
+        in: formData
+        type: string
+        required: false
+        default: "1"
+        description: "Set to '0' to skip saving the result to audit history."
+      - name: tag
+        in: formData
+        type: string
+        required: false
+        description: Optional label for grouping audits (e.g. device hostname).
+    security:
+      - ApiKeyHeader: []
+    responses:
+      200:
+        description: Audit completed successfully.
+        schema:
+          type: object
+          properties:
+            ok:
+              type: boolean
+            data:
+              type: object
+              properties:
+                archive_id:
+                  type: string
+                  description: ID of the saved audit entry, or null if not archived.
+                vendor:
+                  type: string
+                summary:
+                  type: object
+                  properties:
+                    high:
+                      type: integer
+                    medium:
+                      type: integer
+                    total:
+                      type: integer
+                    score:
+                      type: integer
+                      description: Security score 0–100.
+                findings:
+                  type: array
+                  items:
+                    type: string
+                detected_hostname:
+                  type: string
+            error:
+              type: string
+      400:
+        description: Missing or invalid parameters.
+      401:
+        description: Authentication required.
+      413:
+        description: File exceeds the 5 MB limit.
+      429:
+        description: Rate limit exceeded (30 requests/minute).
+    """
     if "config" not in request.files or not request.files["config"].filename:
         return _api_err("config file is required")
 
@@ -124,7 +204,33 @@ def api_audit():
 
 @api_bp.route("/audit/<entry_id>", methods=["GET"])
 def api_audit_get(entry_id):
-    """GET /api/v1/audit/<id> — retrieve a specific archived audit result."""
+    """Retrieve a specific archived audit result by ID.
+    ---
+    tags:
+      - Audit
+    parameters:
+      - name: entry_id
+        in: path
+        type: string
+        required: true
+        description: Audit entry ID returned by POST /api/v1/audit.
+    security:
+      - ApiKeyHeader: []
+    responses:
+      200:
+        description: Audit entry found.
+        schema:
+          type: object
+          properties:
+            ok:
+              type: boolean
+            data:
+              type: object
+            error:
+              type: string
+      404:
+        description: Audit entry not found.
+    """
     entry = get_entry(entry_id)
     if not entry:
         return _api_err("Audit not found.", 404)
@@ -133,9 +239,39 @@ def api_audit_get(entry_id):
 
 @api_bp.route("/audit/<entry_id>/remediation-plan", methods=["GET"])
 def api_remediation_plan(entry_id):
-    """GET /api/v1/audit/<id>/remediation-plan — generate remediation plan.
-
-    Query param: fmt = json | markdown  (default: json)
+    """Generate a remediation plan from an archived audit.
+    ---
+    tags:
+      - Audit
+    parameters:
+      - name: entry_id
+        in: path
+        type: string
+        required: true
+        description: Audit entry ID.
+      - name: fmt
+        in: query
+        type: string
+        required: false
+        default: json
+        description: "Output format: json or markdown."
+    security:
+      - ApiKeyHeader: []
+    responses:
+      200:
+        description: Remediation plan generated.
+        schema:
+          type: object
+          properties:
+            ok:
+              type: boolean
+            data:
+              type: object
+              description: Plan object (json) or {markdown string} depending on fmt.
+            error:
+              type: string
+      404:
+        description: Audit entry not found.
     """
     entry = get_entry(entry_id)
     if not entry:
@@ -159,7 +295,44 @@ def api_remediation_plan(entry_id):
 
 @api_bp.route("/history", methods=["GET"])
 def api_history():
-    """GET /api/v1/history — list audit history (metadata only, no findings)."""
+    """List audit history (metadata only, no findings payload).
+    ---
+    tags:
+      - History
+    parameters:
+      - name: limit
+        in: query
+        type: integer
+        required: false
+        default: 50
+        description: Maximum number of entries to return (max 500).
+      - name: vendor
+        in: query
+        type: string
+        required: false
+        description: Filter by vendor slug (e.g. asa, fortinet, paloalto).
+      - name: tag
+        in: query
+        type: string
+        required: false
+        description: Filter by tag label.
+    security:
+      - ApiKeyHeader: []
+    responses:
+      200:
+        description: List of audit history entries (slim, no findings).
+        schema:
+          type: object
+          properties:
+            ok:
+              type: boolean
+            data:
+              type: array
+              items:
+                type: object
+            error:
+              type: string
+    """
     try:
         limit = min(int(request.args.get("limit", 50)), 500)
     except (ValueError, TypeError):
@@ -182,7 +355,49 @@ def api_history():
 @api_bp.route("/diff", methods=["POST"])
 @limiter.limit("30/minute")
 def api_diff():
-    """POST /api/v1/diff — compare two config files."""
+    """Compare two firewall config files and return a structured diff.
+    ---
+    tags:
+      - Diff
+    consumes:
+      - multipart/form-data
+    parameters:
+      - name: config_a
+        in: formData
+        type: file
+        required: true
+        description: First (baseline) config file.
+      - name: config_b
+        in: formData
+        type: file
+        required: true
+        description: Second (current) config file.
+      - name: vendor
+        in: formData
+        type: string
+        required: false
+        default: auto
+        description: "Vendor hint. One of: auto, asa, ftd, fortinet, paloalto, etc."
+    security:
+      - ApiKeyHeader: []
+    responses:
+      200:
+        description: Diff result.
+        schema:
+          type: object
+          properties:
+            ok:
+              type: boolean
+            data:
+              type: object
+              description: Structured diff with added/removed/changed sections.
+            error:
+              type: string
+      400:
+        description: Missing files or invalid vendor.
+      429:
+        description: Rate limit exceeded (30 requests/minute).
+    """
     if "config_a" not in request.files or "config_b" not in request.files:
         return _api_err("config_a and config_b files are required.")
 

@@ -4,7 +4,8 @@ import os
 import secrets
 import time
 
-from flask import Flask, g, jsonify, render_template
+from flask import Flask, g, jsonify, render_template, request
+from flasgger import Swagger
 
 from .extensions import csrf, limiter
 from .license import check_license, mask_key, DEMO_MODE
@@ -48,6 +49,47 @@ app.config["SESSION_COOKIE_SECURE"] = (
 csrf.init_app(app)
 limiter.init_app(app)
 
+_swagger = Swagger(
+    app,
+    config={
+        "headers": [],
+        "specs": [
+            {
+                "endpoint": "apispec",
+                "route": "/apispec.json",
+                "rule_filter": lambda rule: rule.rule.startswith("/api/v1"),
+                "model_filter": lambda tag: True,
+            }
+        ],
+        "static_url_path": "/flasgger_static",
+        "swagger_ui": True,
+        "specs_route": "/api/docs",
+    },
+    template={
+        "info": {
+            "title": "Cashel API",
+            "description": (
+                "Cashel firewall auditing REST API. "
+                "Authenticate with an `X-API-Key` header or `?api_key=` query parameter."
+            ),
+            "version": "1",
+        },
+        "securityDefinitions": {
+            "ApiKeyHeader": {
+                "type": "apiKey",
+                "in": "header",
+                "name": "X-API-Key",
+            }
+        },
+        "security": [{"ApiKeyHeader": []}],
+        "tags": [
+            {"name": "Audit", "description": "Run and retrieve audits"},
+            {"name": "History", "description": "Browse audit history"},
+            {"name": "Diff", "description": "Compare two configs"},
+        ],
+    },
+)
+
 _start_time = time.time()
 
 
@@ -67,10 +109,17 @@ def _add_security_headers(response):
     response.headers.setdefault(
         "Permissions-Policy", "geolocation=(), microphone=(), camera=()"
     )
+    # Swagger UI (flasgger) serves its own bundled JS from the same origin and
+    # uses inline scripts for initialisation — relax script-src for those paths only.
+    _is_docs = request.path.startswith(("/api/docs", "/flasgger_static/", "/apispec"))
+    if _is_docs:
+        script_src = "'self' 'unsafe-inline' https://cdn.jsdelivr.net"
+    else:
+        script_src = f"'nonce-{nonce}' https://cdn.jsdelivr.net"
     response.headers.setdefault(
         "Content-Security-Policy",
         f"default-src 'self'; "
-        f"script-src 'nonce-{nonce}' https://cdn.jsdelivr.net; "
+        f"script-src {script_src}; "
         f"style-src 'self' 'unsafe-inline'; "
         f"img-src 'self' data:; "
         f"connect-src 'self'; "

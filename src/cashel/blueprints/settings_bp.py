@@ -4,9 +4,14 @@ import smtplib
 import ssl
 from email.mime.text import MIMEText
 
-from flask import Blueprint, jsonify, request
+from flask import Blueprint, g, jsonify, request
 
 from cashel._helpers import _require_role
+from cashel.auth_audit import (
+    AUTH_LICENSE_CHANGED,
+    AUTH_SETTINGS_CHANGED,
+    log_auth_event,
+)
 from cashel.license import (
     check_license,
     activate_license,
@@ -24,6 +29,13 @@ settings_bp = Blueprint("settings_bp", __name__)
 def license_activate():
     key = request.form.get("key", "").strip()
     success, message = activate_license(key)
+    actor = (getattr(g, "current_user", None) or {}).get("username", "")
+    log_auth_event(
+        AUTH_LICENSE_CHANGED,
+        actor=actor,
+        success=success,
+        details={"action": "activated", "message": message},
+    )
     return jsonify({"success": success, "message": message})
 
 
@@ -31,6 +43,13 @@ def license_activate():
 @_require_role("admin")
 def license_deactivate():
     success, message = deactivate_license()
+    actor = (getattr(g, "current_user", None) or {}).get("username", "")
+    log_auth_event(
+        AUTH_LICENSE_CHANGED,
+        actor=actor,
+        success=success,
+        details={"action": "deactivated", "message": message},
+    )
     return jsonify({"success": success, "message": message})
 
 
@@ -56,6 +75,10 @@ def settings_save():
     saved = save_settings(data)
     # Reconfigure syslog immediately when settings are changed.
     configure_syslog(saved)
+    actor = (getattr(g, "current_user", None) or {}).get("username", "")
+    log_auth_event(
+        AUTH_SETTINGS_CHANGED, actor=actor, details={"keys_updated": list(data.keys())}
+    )
     return jsonify(saved)
 
 
