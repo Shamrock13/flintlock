@@ -98,6 +98,19 @@ def init_db() -> None:
             attempts      INTEGER NOT NULL DEFAULT 0,
             lockout_until REAL NOT NULL DEFAULT 0
         );
+
+        CREATE TABLE IF NOT EXISTS auth_events (
+            id          TEXT PRIMARY KEY,
+            event       TEXT NOT NULL,             -- event type constant
+            actor       TEXT NOT NULL DEFAULT '',  -- username performing the action
+            target      TEXT NOT NULL DEFAULT '',  -- affected username (user mgmt events)
+            ip_address  TEXT NOT NULL DEFAULT '',
+            user_agent  TEXT NOT NULL DEFAULT '',
+            success     INTEGER NOT NULL DEFAULT 1,
+            details     TEXT NOT NULL DEFAULT '{}',  -- JSON blob
+            timestamp   TEXT NOT NULL
+        );
+        CREATE INDEX IF NOT EXISTS idx_auth_events_ts ON auth_events(timestamp DESC);
     """)
     conn.commit()
     _migrate_json_to_sqlite()

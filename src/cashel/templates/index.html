@@ -543,6 +543,9 @@
         {% if not current_user or current_user.role == 'admin' %}
         <button class="sub-tab-btn" data-subtab="activity">&#128203; Activity Log</button>
         {% endif %}
+        {% if not current_user or current_user.role in ('admin', 'auditor') %}
+        <button class="sub-tab-btn" data-subtab="seclog">&#128274; Security Log</button>
+        {% endif %}
       </div>
 
       <!-- ── Audit History sub-tab ── -->
@@ -643,6 +646,29 @@
       </div><!-- /sub-activity -->
       {% else %}
       <div id="sub-activity" class="hidden"></div>
+      {% endif %}
+
+      <!-- ── Security Log sub-tab ── -->
+      {% if not current_user or current_user.role in ('admin', 'auditor') %}
+      <div id="sub-seclog" class="hidden">
+      <div class="card">
+        <div class="results-header">
+          <h2 class="card-title" style="margin-bottom:0">Security Log</h2>
+          <div style="display:flex;gap:0.5rem;align-items:center;">
+            <button class="btn-secondary" id="refreshSecLogBtn" style="font-size:0.8rem;padding:0.3rem 0.75rem">&#8635; Refresh</button>
+            {% if not current_user or current_user.role == 'admin' %}
+            <button class="btn-danger" id="clearSecLogBtn" style="font-size:0.8rem;padding:0.3rem 0.75rem">&#128465; Clear All</button>
+            {% endif %}
+          </div>
+        </div>
+        <p class="card-desc">Authentication events — logins, failures, invalid API keys, and user/settings changes.</p>
+        <div id="secLogList" class="history-list">
+          <p class="text-muted">Loading&hellip;</p>
+        </div>
+      </div>
+      </div><!-- /sub-seclog -->
+      {% else %}
+      <div id="sub-seclog" class="hidden"></div>
       {% endif %}
 
     </section>
@@ -1295,9 +1321,14 @@
   // ═══════════════════════════════════════ HISTORY SUB-TABS (audits/activity) ══
   function switchHistorySubTab(subtab) {
     document.querySelectorAll(".sub-tab-btn").forEach(b => b.classList.toggle("sub-tab-active", b.dataset.subtab === subtab));
-    document.getElementById("sub-audits").classList.toggle("hidden", subtab !== "audits");
-    document.getElementById("sub-activity").classList.toggle("hidden", subtab !== "activity");
+    const subAudits = document.getElementById("sub-audits");
+    const subActivity = document.getElementById("sub-activity");
+    const subSecLog = document.getElementById("sub-seclog");
+    if (subAudits) subAudits.classList.toggle("hidden", subtab !== "audits");
+    if (subActivity) subActivity.classList.toggle("hidden", subtab !== "activity");
+    if (subSecLog) subSecLog.classList.toggle("hidden", subtab !== "seclog");
     if (subtab === "activity") loadActivity();
+    if (subtab === "seclog") loadSecLog();
   }
   document.querySelectorAll(".sub-tab-btn").forEach(btn =>
     btn.addEventListener("click", () => switchHistorySubTab(btn.dataset.subtab))
@@ -2220,6 +2251,74 @@
     if (!confirm("Clear all activity log entries?")) return;
     await fetch("/activity/clear", { method: "POST" });
     await loadActivity();
+  });
+
+  // ══════════════════════════════════════════════════ SECURITY LOG ══
+  const SEC_EVENT_LABELS = {
+    login_success:     "Login",
+    login_failure:     "Login Failed",
+    account_lockout:   "Account Locked",
+    logout:            "Logout",
+    invalid_api_key:   "Invalid API Key",
+    user_created:      "User Created",
+    user_deleted:      "User Deleted",
+    password_changed:  "Password Changed",
+    api_key_generated: "API Key Generated",
+    api_key_revoked:   "API Key Revoked",
+    settings_changed:  "Settings Changed",
+    license_changed:   "License Changed",
+  };
+
+  async function loadSecLog() {
+    const el = document.getElementById("secLogList");
+    if (!el) return;
+    el.innerHTML = `<p class="text-muted">Loading&hellip;</p>`;
+    try {
+      const res    = await fetch("/auth-events");
+      const events = await res.json();
+      renderSecLog(events);
+    } catch (err) {
+      el.innerHTML = `<div class="alert alert-error">Failed to load security log: ${escHtml(err.message)}</div>`;
+    }
+  }
+
+  function renderSecLog(events) {
+    const el = document.getElementById("secLogList");
+    if (!el) return;
+    if (!events.length) {
+      el.innerHTML = `<p class="text-muted">No security events yet.</p>`;
+      return;
+    }
+    el.innerHTML = events.map(e => {
+      const ts     = e.timestamp ? new Date(e.timestamp).toLocaleString() : "—";
+      const label  = SEC_EVENT_LABELS[e.event] || e.event;
+      const ok     = e.success;
+      const actor  = e.actor ? `<strong>${escHtml(e.actor)}</strong>` : "<em>unknown</em>";
+      const target = e.target ? ` → ${escHtml(e.target)}` : "";
+      const ip     = e.ip_address ? `<span class="history-meta">${escHtml(e.ip_address)}</span>` : "";
+      return `<div class="activity-entry ${ok ? "" : "activity-entry-fail"}">
+        <div class="activity-entry-left">
+          <span class="activity-action-badge">${escHtml(label)}</span>
+          <div class="history-entry-info">
+            <span class="history-filename">${actor}${target}</span>
+            <span class="history-meta">${escHtml(ts)}</span>
+            ${ip}
+          </div>
+        </div>
+        <div class="activity-entry-right">
+          <span class="${ok ? "activity-ok" : "activity-fail"}">${ok ? "&#10003;" : "&#10007;"}</span>
+        </div>
+      </div>`;
+    }).join("");
+  }
+
+  const _refreshSecLogBtn = document.getElementById("refreshSecLogBtn");
+  if (_refreshSecLogBtn) _refreshSecLogBtn.addEventListener("click", loadSecLog);
+  const _clearSecLogBtn = document.getElementById("clearSecLogBtn");
+  if (_clearSecLogBtn) _clearSecLogBtn.addEventListener("click", async function () {
+    if (!confirm("Clear all security log entries?")) return;
+    await fetch("/auth-events/clear", { method: "POST" });
+    await loadSecLog();
   });
 
   // ══════════════════════════════════════════════════════════ HELPERS ══

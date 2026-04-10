@@ -46,6 +46,10 @@ _AUTH_EXEMPT_ENDPOINTS = {
     "static",
 }
 
+# Path prefixes that bypass auth (Swagger UI and spec JSON — public API docs)
+# Path prefixes exempt from auth — Swagger UI + spec JSON are always public
+_AUTH_EXEMPT_PATH_PREFIXES = ("/api/docs", "/flasgger_static/", "/apispec")
+
 
 def _require_auth_impl(demo_mode: bool):
     """Core auth gate — called by web.py's app.before_request hook."""
@@ -70,6 +74,9 @@ def _require_auth_impl(demo_mode: bool):
     if request.endpoint in _AUTH_EXEMPT_ENDPOINTS:
         return
 
+    if request.path.startswith(_AUTH_EXEMPT_PATH_PREFIXES):
+        return
+
     # API key auth (X-API-Key header or ?api_key= param) — CI/CLI
     api_key_header = request.headers.get("X-API-Key") or request.args.get("api_key")
     if api_key_header:
@@ -80,6 +87,9 @@ def _require_auth_impl(demo_mode: bool):
             g.auth_method = "api_key"
             g.current_user = user
             return
+        from .auth_audit import log_auth_event, AUTH_INVALID_API_KEY
+        log_auth_event(AUTH_INVALID_API_KEY, success=False,
+                       details={"endpoint": request.path})
         if request.path.startswith("/api/"):
             return jsonify(
                 {"ok": False, "data": None, "error": "Invalid API key."}
