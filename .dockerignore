@@ -34,4 +34,24 @@ env/
 
 # Local env files
 .env
+.env.local
+.env.*.local
 *.env
+
+# Secrets and credentials (should always be mounted as volumes, never baked in)
+*.key
+*.pem
+*.p12
+*.pkcs12
+*.crt
+*.pfx
+secrets.*
+
+# Database files (runtime data — always use volumes)
+*.db
+*.sqlite
+*.sqlite3
+
+# Planning and ops docs
+PLAN.md
+CLAUDE.md

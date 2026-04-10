@@ -5,8 +5,29 @@ __pycache__/
 *.pyd
 .Python
 
-# License file
+# License files
 .fwaudit_license
+.cashel_license
+*.license
+
+# Secrets and credentials
+.env
+.env.local
+.env.*.local
+*.key
+*.pem
+*.p12
+*.pkcs12
+*.crt
+*.pfx
+secrets.*
+config.local.*
+settings.local.*
+
+# Database files (runtime data — never commit)
+*.db
+*.sqlite
+*.sqlite3
 
 # Virtual environments
 .venv/
