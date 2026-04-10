@@ -18,9 +18,15 @@ from flask import (
 
 from cashel._helpers import _require_role
 from cashel.auth_audit import (
-    AUTH_LOGIN_SUCCESS, AUTH_LOGIN_FAILURE, AUTH_ACCOUNT_LOCKOUT, AUTH_LOGOUT,
-    AUTH_USER_CREATED, AUTH_USER_DELETED, AUTH_PASSWORD_CHANGED,
-    AUTH_API_KEY_GENERATED, AUTH_API_KEY_REVOKED,
+    AUTH_LOGIN_SUCCESS,
+    AUTH_LOGIN_FAILURE,
+    AUTH_ACCOUNT_LOCKOUT,
+    AUTH_LOGOUT,
+    AUTH_USER_CREATED,
+    AUTH_USER_DELETED,
+    AUTH_PASSWORD_CHANGED,
+    AUTH_API_KEY_GENERATED,
+    AUTH_API_KEY_REVOKED,
     log_auth_event,
 )
 from cashel.db import get_conn
@@ -101,8 +107,12 @@ def login_post():
     attempts, lockout_until = _get_lockout(username)
     if lockout_until and time.time() < lockout_until:
         remaining = int(lockout_until - time.time())
-        log_auth_event(AUTH_ACCOUNT_LOCKOUT, actor=username, success=False,
-                       details={"lockout_remaining_seconds": remaining})
+        log_auth_event(
+            AUTH_ACCOUNT_LOCKOUT,
+            actor=username,
+            success=False,
+            details={"lockout_remaining_seconds": remaining},
+        )
         return render_template(
             "login.html", error=f"Account locked. Try again in {remaining}s."
         ), 429
@@ -110,8 +120,9 @@ def login_post():
     user = check_password(username, password)
     if user:
         _clear_lockout(username)
-        log_auth_event(AUTH_LOGIN_SUCCESS, actor=username,
-                       details={"role": user.get("role", "")})
+        log_auth_event(
+            AUTH_LOGIN_SUCCESS, actor=username, details={"role": user.get("role", "")}
+        )
         session.clear()
         session["authenticated"] = True
         session["user_id"] = user["id"]
@@ -122,8 +133,12 @@ def login_post():
         return redirect(url_for("index"))
     else:
         _record_failed_login(username)
-        log_auth_event(AUTH_LOGIN_FAILURE, actor=username, success=False,
-                       details={"reason": "invalid_credentials"})
+        log_auth_event(
+            AUTH_LOGIN_FAILURE,
+            actor=username,
+            success=False,
+            details={"reason": "invalid_credentials"},
+        )
         return render_template("login.html", error="Invalid username or password."), 401
 
 
@@ -134,6 +149,7 @@ def logout():
     user_id = session.get("user_id")
     if user_id:
         from cashel.user_store import get_user_by_id
+
         user = get_user_by_id(user_id)
         actor = (user or {}).get("username", "")
     log_auth_event(AUTH_LOGOUT, actor=actor)
@@ -178,8 +194,12 @@ def setup_post():
     except UserValidationError as exc:
         return render_template("setup.html", errors=[str(exc)], username=username), 400
 
-    log_auth_event(AUTH_USER_CREATED, actor=username, target=username,
-                   details={"role": "admin", "context": "first_run_setup"})
+    log_auth_event(
+        AUTH_USER_CREATED,
+        actor=username,
+        target=username,
+        details={"role": "admin", "context": "first_run_setup"},
+    )
 
     settings = get_settings()
     save_settings({**settings, "auth_enabled": True})
@@ -212,8 +232,9 @@ def create_user_route():
         user = create_user(username, password, role)
     except UserValidationError as exc:
         return jsonify({"error": str(exc)}), 400
-    log_auth_event(AUTH_USER_CREATED, actor=actor, target=username,
-                   details={"role": role})
+    log_auth_event(
+        AUTH_USER_CREATED, actor=actor, target=username, details={"role": role}
+    )
     return jsonify(user), 201
 
 
@@ -225,6 +246,7 @@ def delete_user_route(user_id):
         return jsonify({"error": "Cannot delete your own account."}), 400
     # Fetch target username before deletion for the audit log
     from cashel.user_store import get_user_by_id
+
     target_user = get_user_by_id(user_id)
     target_username = (target_user or {}).get("username", user_id)
     try:
@@ -253,8 +275,11 @@ def change_password_route():
         change_password(current["id"], new_password)
     except UserValidationError as exc:
         return jsonify({"error": str(exc)}), 400
-    log_auth_event(AUTH_PASSWORD_CHANGED, actor=current.get("username", ""),
-                   target=current.get("username", ""))
+    log_auth_event(
+        AUTH_PASSWORD_CHANGED,
+        actor=current.get("username", ""),
+        target=current.get("username", ""),
+    )
     return jsonify({"ok": True})
 
 

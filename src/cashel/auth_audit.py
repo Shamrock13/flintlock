@@ -43,9 +43,7 @@ def log_auth_event(
     if has_request_context():
         # Prefer X-Real-IP set by nginx/Caddy so logs show the real client IP,
         # not the proxy's loopback address.
-        ip = (_flask_request.headers.get("X-Real-IP")
-              or _flask_request.remote_addr
-              or "")
+        ip = _flask_request.headers.get("X-Real-IP") or _flask_request.remote_addr or ""
         ua = _flask_request.headers.get("User-Agent", "")[:256]
 
     conn = get_conn()

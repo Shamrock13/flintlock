@@ -8,7 +8,9 @@ from flask import Blueprint, g, jsonify, request
 
 from cashel._helpers import _require_role
 from cashel.auth_audit import (
-    AUTH_LICENSE_CHANGED, AUTH_SETTINGS_CHANGED, log_auth_event,
+    AUTH_LICENSE_CHANGED,
+    AUTH_SETTINGS_CHANGED,
+    log_auth_event,
 )
 from cashel.license import (
     check_license,
@@ -28,8 +30,12 @@ def license_activate():
     key = request.form.get("key", "").strip()
     success, message = activate_license(key)
     actor = (getattr(g, "current_user", None) or {}).get("username", "")
-    log_auth_event(AUTH_LICENSE_CHANGED, actor=actor, success=success,
-                   details={"action": "activated", "message": message})
+    log_auth_event(
+        AUTH_LICENSE_CHANGED,
+        actor=actor,
+        success=success,
+        details={"action": "activated", "message": message},
+    )
     return jsonify({"success": success, "message": message})
 
 
@@ -38,8 +44,12 @@ def license_activate():
 def license_deactivate():
     success, message = deactivate_license()
     actor = (getattr(g, "current_user", None) or {}).get("username", "")
-    log_auth_event(AUTH_LICENSE_CHANGED, actor=actor, success=success,
-                   details={"action": "deactivated", "message": message})
+    log_auth_event(
+        AUTH_LICENSE_CHANGED,
+        actor=actor,
+        success=success,
+        details={"action": "deactivated", "message": message},
+    )
     return jsonify({"success": success, "message": message})
 
 
@@ -66,8 +76,9 @@ def settings_save():
     # Reconfigure syslog immediately when settings are changed.
     configure_syslog(saved)
     actor = (getattr(g, "current_user", None) or {}).get("username", "")
-    log_auth_event(AUTH_SETTINGS_CHANGED, actor=actor,
-                   details={"keys_updated": list(data.keys())})
+    log_auth_event(
+        AUTH_SETTINGS_CHANGED, actor=actor, details={"keys_updated": list(data.keys())}
+    )
     return jsonify(saved)
 
 

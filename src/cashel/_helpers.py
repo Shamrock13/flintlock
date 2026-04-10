@@ -88,8 +88,10 @@ def _require_auth_impl(demo_mode: bool):
             g.current_user = user
             return
         from .auth_audit import log_auth_event, AUTH_INVALID_API_KEY
-        log_auth_event(AUTH_INVALID_API_KEY, success=False,
-                       details={"endpoint": request.path})
+
+        log_auth_event(
+            AUTH_INVALID_API_KEY, success=False, details={"endpoint": request.path}
+        )
         if request.path.startswith("/api/"):
             return jsonify(
                 {"ok": False, "data": None, "error": "Invalid API key."}

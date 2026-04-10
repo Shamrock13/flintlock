@@ -49,42 +49,46 @@ app.config["SESSION_COOKIE_SECURE"] = (
 csrf.init_app(app)
 limiter.init_app(app)
 
-_swagger = Swagger(app, config={
-    "headers": [],
-    "specs": [
-        {
-            "endpoint": "apispec",
-            "route": "/apispec.json",
-            "rule_filter": lambda rule: rule.rule.startswith("/api/v1"),
-            "model_filter": lambda tag: True,
-        }
-    ],
-    "static_url_path": "/flasgger_static",
-    "swagger_ui": True,
-    "specs_route": "/api/docs",
-}, template={
-    "info": {
-        "title": "Cashel API",
-        "description": (
-            "Cashel firewall auditing REST API. "
-            "Authenticate with an `X-API-Key` header or `?api_key=` query parameter."
-        ),
-        "version": "1",
+_swagger = Swagger(
+    app,
+    config={
+        "headers": [],
+        "specs": [
+            {
+                "endpoint": "apispec",
+                "route": "/apispec.json",
+                "rule_filter": lambda rule: rule.rule.startswith("/api/v1"),
+                "model_filter": lambda tag: True,
+            }
+        ],
+        "static_url_path": "/flasgger_static",
+        "swagger_ui": True,
+        "specs_route": "/api/docs",
     },
-    "securityDefinitions": {
-        "ApiKeyHeader": {
-            "type": "apiKey",
-            "in": "header",
-            "name": "X-API-Key",
-        }
+    template={
+        "info": {
+            "title": "Cashel API",
+            "description": (
+                "Cashel firewall auditing REST API. "
+                "Authenticate with an `X-API-Key` header or `?api_key=` query parameter."
+            ),
+            "version": "1",
+        },
+        "securityDefinitions": {
+            "ApiKeyHeader": {
+                "type": "apiKey",
+                "in": "header",
+                "name": "X-API-Key",
+            }
+        },
+        "security": [{"ApiKeyHeader": []}],
+        "tags": [
+            {"name": "Audit", "description": "Run and retrieve audits"},
+            {"name": "History", "description": "Browse audit history"},
+            {"name": "Diff", "description": "Compare two configs"},
+        ],
     },
-    "security": [{"ApiKeyHeader": []}],
-    "tags": [
-        {"name": "Audit", "description": "Run and retrieve audits"},
-        {"name": "History", "description": "Browse audit history"},
-        {"name": "Diff", "description": "Compare two configs"},
-    ],
-})
+)
 
 _start_time = time.time()
 
