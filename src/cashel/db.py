@@ -125,6 +125,7 @@ def init_db() -> None:
             ON alert_thresholds(schedule_id);
 
         CREATE TABLE IF NOT EXISTS alert_state (
+            -- No FK to schedules: schedule_id may also be '__manual__' (sentinel for non-scheduled audits)
             schedule_id         TEXT PRIMARY KEY,
             in_breach           INTEGER NOT NULL DEFAULT 0,
             breach_started_at   TEXT,
