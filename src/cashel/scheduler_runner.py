@@ -33,6 +33,7 @@ def _run_scheduled_audit(schedule_id: str):
     )
     from .notify import send_slack, send_teams, send_email
     from .settings import get_settings
+    from .alert_engine import check_thresholds
 
     schedule = get_schedule(schedule_id, include_password=True)
     if not schedule or not schedule.get("enabled"):
@@ -141,6 +142,16 @@ def _run_scheduled_audit(schedule_id: str):
             },
         )
         record_run(schedule_id, "ok")
+
+        try:
+            check_thresholds(
+                summary,
+                schedule_id=schedule_id,
+                audit_id=None,
+                hostname=host,
+            )
+        except Exception as _ae:  # noqa: BLE001
+            logger.warning("check_thresholds failed for schedule %s: %s", schedule_id, _ae)
 
         if schedule.get("notify_on_finding") and summary.get("high", 0) > 0:
             send_slack(
