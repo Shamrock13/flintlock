@@ -13,6 +13,7 @@ import cashel.db as db_mod
 
 def _tmp_db(fn):
     """Decorator: run test against an isolated temp database."""
+
     @functools.wraps(fn)
     def wrapper(*args, **kwargs):
         with tempfile.NamedTemporaryFile(suffix=".db", delete=False) as f:
@@ -34,6 +35,7 @@ def _tmp_db(fn):
                 os.unlink(tmp)
             except OSError:
                 pass
+
     return wrapper
 
 
@@ -61,10 +63,15 @@ from cashel import alert_engine  # noqa: E402
 class TestThresholdCRUD(unittest.TestCase):
     @_tmp_db
     def test_save_and_get_global_threshold(self):
-        alert_engine.save_threshold({
-            "metric": "score", "operator": "lt", "threshold_value": 70.0,
-            "enabled": True, "schedule_id": None,
-        })
+        alert_engine.save_threshold(
+            {
+                "metric": "score",
+                "operator": "lt",
+                "threshold_value": 70.0,
+                "enabled": True,
+                "schedule_id": None,
+            }
+        )
         thresholds = alert_engine.get_effective_thresholds(schedule_id=None)
         self.assertEqual(len(thresholds), 1)
         t = thresholds[0]
@@ -76,15 +83,25 @@ class TestThresholdCRUD(unittest.TestCase):
     @_tmp_db
     def test_per_schedule_override_takes_precedence(self):
         # Global: alert if score < 70
-        alert_engine.save_threshold({
-            "metric": "score", "operator": "lt", "threshold_value": 70.0,
-            "enabled": True, "schedule_id": None,
-        })
+        alert_engine.save_threshold(
+            {
+                "metric": "score",
+                "operator": "lt",
+                "threshold_value": 70.0,
+                "enabled": True,
+                "schedule_id": None,
+            }
+        )
         # Override: alert if score < 80
-        alert_engine.save_threshold({
-            "metric": "score", "operator": "lt", "threshold_value": 80.0,
-            "enabled": True, "schedule_id": "sched-abc",
-        })
+        alert_engine.save_threshold(
+            {
+                "metric": "score",
+                "operator": "lt",
+                "threshold_value": 80.0,
+                "enabled": True,
+                "schedule_id": "sched-abc",
+            }
+        )
         effective = alert_engine.get_effective_thresholds(schedule_id="sched-abc")
         score_thresholds = [t for t in effective if t["metric"] == "score"]
         self.assertEqual(len(score_thresholds), 1)
@@ -92,20 +109,30 @@ class TestThresholdCRUD(unittest.TestCase):
 
     @_tmp_db
     def test_global_used_when_no_override(self):
-        alert_engine.save_threshold({
-            "metric": "high", "operator": "gte", "threshold_value": 1.0,
-            "enabled": True, "schedule_id": None,
-        })
+        alert_engine.save_threshold(
+            {
+                "metric": "high",
+                "operator": "gte",
+                "threshold_value": 1.0,
+                "enabled": True,
+                "schedule_id": None,
+            }
+        )
         effective = alert_engine.get_effective_thresholds(schedule_id="sched-xyz")
         self.assertEqual(len(effective), 1)
         self.assertEqual(effective[0]["metric"], "high")
 
     @_tmp_db
     def test_delete_threshold(self):
-        alert_engine.save_threshold({
-            "metric": "score", "operator": "lt", "threshold_value": 70.0,
-            "enabled": True, "schedule_id": None,
-        })
+        alert_engine.save_threshold(
+            {
+                "metric": "score",
+                "operator": "lt",
+                "threshold_value": 70.0,
+                "enabled": True,
+                "schedule_id": None,
+            }
+        )
         thresholds = alert_engine.get_effective_thresholds()
         tid = thresholds[0]["id"]
         alert_engine.delete_threshold(tid)
@@ -113,10 +140,15 @@ class TestThresholdCRUD(unittest.TestCase):
 
     @_tmp_db
     def test_disabled_threshold_not_evaluated(self):
-        alert_engine.save_threshold({
-            "metric": "score", "operator": "lt", "threshold_value": 70.0,
-            "enabled": False, "schedule_id": None,
-        })
+        alert_engine.save_threshold(
+            {
+                "metric": "score",
+                "operator": "lt",
+                "threshold_value": 70.0,
+                "enabled": False,
+                "schedule_id": None,
+            }
+        )
         summary = {"score": 50, "high": 0, "medium": 0, "low": 0, "total": 0}
         result = alert_engine.check_thresholds(summary, schedule_id=None)
         self.assertFalse(result.breached)
@@ -125,10 +157,15 @@ class TestThresholdCRUD(unittest.TestCase):
 class TestThresholdEvaluation(unittest.TestCase):
     @_tmp_db
     def test_lt_operator_breaches_when_below(self):
-        alert_engine.save_threshold({
-            "metric": "score", "operator": "lt", "threshold_value": 70.0,
-            "enabled": True, "schedule_id": None,
-        })
+        alert_engine.save_threshold(
+            {
+                "metric": "score",
+                "operator": "lt",
+                "threshold_value": 70.0,
+                "enabled": True,
+                "schedule_id": None,
+            }
+        )
         summary = {"score": 65, "high": 0, "medium": 0, "low": 0, "total": 0}
         result = alert_engine.check_thresholds(summary, schedule_id="s1")
         self.assertTrue(result.breached)
@@ -137,32 +174,51 @@ class TestThresholdEvaluation(unittest.TestCase):
 
     @_tmp_db
     def test_lt_operator_no_breach_when_above(self):
-        alert_engine.save_threshold({
-            "metric": "score", "operator": "lt", "threshold_value": 70.0,
-            "enabled": True, "schedule_id": None,
-        })
+        alert_engine.save_threshold(
+            {
+                "metric": "score",
+                "operator": "lt",
+                "threshold_value": 70.0,
+                "enabled": True,
+                "schedule_id": None,
+            }
+        )
         summary = {"score": 85, "high": 0, "medium": 0, "low": 0, "total": 0}
         result = alert_engine.check_thresholds(summary, schedule_id="s1")
         self.assertFalse(result.breached)
 
     @_tmp_db
     def test_gte_operator_breaches_when_at_or_above(self):
-        alert_engine.save_threshold({
-            "metric": "high", "operator": "gte", "threshold_value": 1.0,
-            "enabled": True, "schedule_id": None,
-        })
+        alert_engine.save_threshold(
+            {
+                "metric": "high",
+                "operator": "gte",
+                "threshold_value": 1.0,
+                "enabled": True,
+                "schedule_id": None,
+            }
+        )
         summary = {"score": 90, "high": 1, "medium": 0, "low": 0, "total": 1}
         result = alert_engine.check_thresholds(summary, schedule_id="s1")
         self.assertTrue(result.breached)
 
     @_tmp_db
     def test_compliance_metric_breach(self):
-        alert_engine.save_threshold({
-            "metric": "pci", "operator": "lt", "threshold_value": 100.0,
-            "enabled": True, "schedule_id": None,
-        })
+        alert_engine.save_threshold(
+            {
+                "metric": "pci",
+                "operator": "lt",
+                "threshold_value": 100.0,
+                "enabled": True,
+                "schedule_id": None,
+            }
+        )
         summary = {
-            "score": 90, "high": 0, "medium": 0, "low": 0, "total": 0,
+            "score": 90,
+            "high": 0,
+            "medium": 0,
+            "low": 0,
+            "total": 0,
             "compliance": {"pci": {"score": 87}},
         }
         result = alert_engine.check_thresholds(summary, schedule_id="s1")
@@ -172,10 +228,15 @@ class TestThresholdEvaluation(unittest.TestCase):
     @_tmp_db
     def test_missing_metric_key_no_breach(self):
         """Metric not in summary should not trigger a breach."""
-        alert_engine.save_threshold({
-            "metric": "pci", "operator": "lt", "threshold_value": 100.0,
-            "enabled": True, "schedule_id": None,
-        })
+        alert_engine.save_threshold(
+            {
+                "metric": "pci",
+                "operator": "lt",
+                "threshold_value": 100.0,
+                "enabled": True,
+                "schedule_id": None,
+            }
+        )
         # summary has no 'compliance' key
         summary = {"score": 90, "high": 0, "medium": 0, "low": 0, "total": 0}
         result = alert_engine.check_thresholds(summary, schedule_id="s1")
@@ -183,14 +244,24 @@ class TestThresholdEvaluation(unittest.TestCase):
 
     @_tmp_db
     def test_multiple_thresholds_consolidated(self):
-        alert_engine.save_threshold({
-            "metric": "score", "operator": "lt", "threshold_value": 70.0,
-            "enabled": True, "schedule_id": None,
-        })
-        alert_engine.save_threshold({
-            "metric": "high", "operator": "gte", "threshold_value": 1.0,
-            "enabled": True, "schedule_id": None,
-        })
+        alert_engine.save_threshold(
+            {
+                "metric": "score",
+                "operator": "lt",
+                "threshold_value": 70.0,
+                "enabled": True,
+                "schedule_id": None,
+            }
+        )
+        alert_engine.save_threshold(
+            {
+                "metric": "high",
+                "operator": "gte",
+                "threshold_value": 1.0,
+                "enabled": True,
+                "schedule_id": None,
+            }
+        )
         summary = {"score": 55, "high": 3, "medium": 0, "low": 0, "total": 3}
         result = alert_engine.check_thresholds(summary, schedule_id="s1")
         self.assertTrue(result.breached)
@@ -200,10 +271,15 @@ class TestThresholdEvaluation(unittest.TestCase):
 class TestAlertDedup(unittest.TestCase):
     @_tmp_db
     def test_second_breach_suppressed(self):
-        alert_engine.save_threshold({
-            "metric": "score", "operator": "lt", "threshold_value": 70.0,
-            "enabled": True, "schedule_id": None,
-        })
+        alert_engine.save_threshold(
+            {
+                "metric": "score",
+                "operator": "lt",
+                "threshold_value": 70.0,
+                "enabled": True,
+                "schedule_id": None,
+            }
+        )
         summary = {"score": 55, "high": 0, "medium": 0, "low": 0, "total": 0}
         # First call — breaches
         r1 = alert_engine.check_thresholds(summary, schedule_id="s1")
@@ -216,11 +292,16 @@ class TestAlertDedup(unittest.TestCase):
 
     @_tmp_db
     def test_clears_and_rearms_when_condition_resolves(self):
-        alert_engine.save_threshold({
-            "metric": "score", "operator": "lt", "threshold_value": 70.0,
-            "enabled": True, "schedule_id": None,
-        })
-        bad_summary  = {"score": 55, "high": 0, "medium": 0, "low": 0, "total": 0}
+        alert_engine.save_threshold(
+            {
+                "metric": "score",
+                "operator": "lt",
+                "threshold_value": 70.0,
+                "enabled": True,
+                "schedule_id": None,
+            }
+        )
+        bad_summary = {"score": 55, "high": 0, "medium": 0, "low": 0, "total": 0}
         good_summary = {"score": 85, "high": 0, "medium": 0, "low": 0, "total": 0}
         # Breach
         r1 = alert_engine.check_thresholds(bad_summary, schedule_id="s1")
@@ -236,14 +317,24 @@ class TestAlertDedup(unittest.TestCase):
 
     @_tmp_db
     def test_new_metric_fires_during_existing_breach(self):
-        alert_engine.save_threshold({
-            "metric": "score", "operator": "lt", "threshold_value": 70.0,
-            "enabled": True, "schedule_id": None,
-        })
-        alert_engine.save_threshold({
-            "metric": "high", "operator": "gte", "threshold_value": 1.0,
-            "enabled": True, "schedule_id": None,
-        })
+        alert_engine.save_threshold(
+            {
+                "metric": "score",
+                "operator": "lt",
+                "threshold_value": 70.0,
+                "enabled": True,
+                "schedule_id": None,
+            }
+        )
+        alert_engine.save_threshold(
+            {
+                "metric": "high",
+                "operator": "gte",
+                "threshold_value": 1.0,
+                "enabled": True,
+                "schedule_id": None,
+            }
+        )
         # First breach: score only
         r1 = alert_engine.check_thresholds(
             {"score": 55, "high": 0, "medium": 0, "low": 0, "total": 0},
@@ -262,10 +353,15 @@ class TestAlertDedup(unittest.TestCase):
 
     @_tmp_db
     def test_manual_audit_uses_sentinel(self):
-        alert_engine.save_threshold({
-            "metric": "score", "operator": "lt", "threshold_value": 70.0,
-            "enabled": True, "schedule_id": None,
-        })
+        alert_engine.save_threshold(
+            {
+                "metric": "score",
+                "operator": "lt",
+                "threshold_value": 70.0,
+                "enabled": True,
+                "schedule_id": None,
+            }
+        )
         summary = {"score": 55, "high": 0, "medium": 0, "low": 0, "total": 0}
         r1 = alert_engine.check_thresholds(summary, schedule_id=None)
         r2 = alert_engine.check_thresholds(summary, schedule_id=None)

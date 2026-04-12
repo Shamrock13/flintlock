@@ -30,9 +30,9 @@ _MANUAL_SENTINEL = "__manual__"
 @dataclass
 class AlertResult:
     breached: bool = False
-    suppressed: bool = False       # True when already in_breach with no new metrics
+    suppressed: bool = False  # True when already in_breach with no new metrics
     breached_metrics: list[dict] = field(default_factory=list)
-    cleared: bool = False          # True when was in_breach and condition is now clean
+    cleared: bool = False  # True when was in_breach and condition is now clean
 
 
 # ── Threshold CRUD ─────────────────────────────────────────────────────────────
@@ -43,9 +43,13 @@ def save_threshold(threshold: dict) -> dict:
     metric = threshold.get("metric")
     operator = threshold.get("operator")
     if metric not in VALID_METRICS:
-        raise ValueError(f"Invalid metric: {metric!r}. Must be one of {sorted(VALID_METRICS)}")
+        raise ValueError(
+            f"Invalid metric: {metric!r}. Must be one of {sorted(VALID_METRICS)}"
+        )
     if operator not in VALID_OPERATORS:
-        raise ValueError(f"Invalid operator: {operator!r}. Must be one of {sorted(VALID_OPERATORS)}")
+        raise ValueError(
+            f"Invalid operator: {operator!r}. Must be one of {sorted(VALID_OPERATORS)}"
+        )
     tid = threshold.get("id") or uuid.uuid4().hex[:12]
     now = datetime.utcnow().strftime("%Y-%m-%dT%H:%M:%SZ")
     conn = get_conn()
@@ -228,12 +232,14 @@ def _check_thresholds_impl(
             logger.debug("Metric %s not found in summary — skipping", t["metric"])
             continue
         if _operator_matches(value, t["operator"], t["threshold_value"]):
-            newly_breached.append({
-                "metric": t["metric"],
-                "operator": t["operator"],
-                "threshold_value": t["threshold_value"],
-                "actual_value": value,
-            })
+            newly_breached.append(
+                {
+                    "metric": t["metric"],
+                    "operator": t["operator"],
+                    "threshold_value": t["threshold_value"],
+                    "actual_value": value,
+                }
+            )
 
     # Load current state
     state = _get_state(state_key)
@@ -403,6 +409,7 @@ def _build_body(
     hostname: str | None,
 ) -> str:
     import os
+
     host = hostname or "unknown"
     score = summary.get("score", "?")
     ts = datetime.utcnow().strftime("%Y-%m-%d %H:%M UTC")
@@ -456,8 +463,10 @@ def _send_alert_slack(
         )
     payload = _json.dumps({"text": "\n".join(lines)}).encode("utf-8")
     req = urllib.request.Request(
-        webhook_url, data=payload,
-        headers={"Content-Type": "application/json"}, method="POST",
+        webhook_url,
+        data=payload,
+        headers={"Content-Type": "application/json"},
+        method="POST",
     )
     try:
         with urllib.request.urlopen(req, timeout=10):
@@ -487,25 +496,31 @@ def _send_alert_teams(
     facts = []
     for m in breached_metrics:
         op_str = "<" if m["operator"] == "lt" else ">="
-        facts.append({
-            "name": m["metric"].upper(),
-            "value": f"{m['actual_value']} (threshold: {op_str} {m['threshold_value']})",
-        })
+        facts.append(
+            {
+                "name": m["metric"].upper(),
+                "value": f"{m['actual_value']} (threshold: {op_str} {m['threshold_value']})",
+            }
+        )
     card = {
         "@type": "MessageCard",
         "@context": "http://schema.org/extensions",
         "themeColor": "CC2200",
         "summary": f"Cashel threshold breach — {host}",
-        "sections": [{
-            "activityTitle": "**Cashel Firewall Auditor — Threshold Breach**",
-            "activitySubtitle": f"{host} | Score: {score}/100",
-            "facts": facts,
-        }],
+        "sections": [
+            {
+                "activityTitle": "**Cashel Firewall Auditor — Threshold Breach**",
+                "activitySubtitle": f"{host} | Score: {score}/100",
+                "facts": facts,
+            }
+        ],
     }
     payload = _json.dumps(card).encode("utf-8")
     req = urllib.request.Request(
-        webhook_url, data=payload,
-        headers={"Content-Type": "application/json"}, method="POST",
+        webhook_url,
+        data=payload,
+        headers={"Content-Type": "application/json"},
+        method="POST",
     )
     try:
         with urllib.request.urlopen(req, timeout=10):

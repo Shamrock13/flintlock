@@ -151,7 +151,9 @@ def _run_scheduled_audit(schedule_id: str):
                 hostname=host,
             )
         except Exception as _ae:  # noqa: BLE001
-            logger.warning("check_thresholds failed for schedule %s: %s", schedule_id, _ae)
+            logger.warning(
+                "check_thresholds failed for schedule %s: %s", schedule_id, _ae
+            )
 
         if schedule.get("notify_on_finding") and summary.get("high", 0) > 0:
             send_slack(
