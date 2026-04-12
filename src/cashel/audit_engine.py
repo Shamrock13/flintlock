@@ -45,19 +45,21 @@ def _sort_findings(findings: list) -> list:
         is_comp = any(
             x in msg for x in ("PCI-", "CIS-", "NIST-", "HIPAA-", "SOC2-", "STIG-")
         )
-        if "[HIGH]" in msg and not is_comp:
+        if "[CRITICAL]" in msg and not is_comp:
             return 0
-        if "[MEDIUM]" in msg and not is_comp:
+        if "[HIGH]" in msg and not is_comp:
             return 1
+        if "[MEDIUM]" in msg and not is_comp:
+            return 2
         if "STIG-CAT-I" in msg:
-            return 2
+            return 3
         if "HIGH" in msg and is_comp:
-            return 2
+            return 3
         if "STIG-CAT-II" in msg:
-            return 3
+            return 4
         if "MEDIUM" in msg and is_comp:
-            return 3
-        return 4
+            return 4
+        return 5
 
     return sorted(findings, key=priority)
 
@@ -67,6 +69,12 @@ def _build_summary(findings):
         return len([f for f in findings if tag in _finding_msg(f)])
 
     _comp_tags = ["PCI-", "CIS-", "NIST-", "HIPAA-", "SOC2-", "STIG-"]
+    critical = [
+        f
+        for f in findings
+        if "[CRITICAL]" in _finding_msg(f)
+        and not any(x in _finding_msg(f) for x in _comp_tags)
+    ]
     high = [
         f
         for f in findings
@@ -79,8 +87,9 @@ def _build_summary(findings):
         if "[MEDIUM]" in _finding_msg(f)
         and not any(x in _finding_msg(f) for x in _comp_tags)
     ]
-    score = max(0, 100 - len(high) * 10 - len(medium) * 3)
+    score = max(0, 100 - len(critical) * 20 - len(high) * 10 - len(medium) * 3)
     return {
+        "critical": len(critical),
         "high": len(high),
         "medium": len(medium),
         "pci_high": _count("PCI-HIGH"),
