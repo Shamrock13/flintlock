@@ -10,6 +10,8 @@ _BORDER = (208, 213, 234)  # card border
 _TEXT = (26, 26, 46)  # body text
 _MUTED = (107, 107, 138)  # secondary text
 
+_CRITICAL = (204, 0, 0)  # #CC0000
+_CRITICAL_BG = (255, 230, 230)
 _HIGH = (204, 34, 0)  # #CC2200
 _HIGH_BG = (255, 240, 238)
 _MEDIUM = (153, 102, 0)  # #996600
@@ -121,9 +123,8 @@ def _draw_meta(pdf, filename, vendor, compliance):
     pdf.set_y(y + 13)
 
 
-def _draw_summary_boxes(pdf, high, medium, total, score=None):
-    """Four bordered summary boxes side by side (3 + optional score)."""
-    # Determine score color
+def _draw_summary_boxes(pdf, high, medium, total, score=None, critical=0):
+    """Summary boxes side by side — Critical / High / Medium / Total / Score."""
     _SCORE_GREEN = (26, 128, 85)
     _SCORE_GREEN_BG = (235, 250, 244)
     _SCORE_AMBER = (153, 102, 0)
@@ -139,21 +140,23 @@ def _draw_summary_boxes(pdf, high, medium, total, score=None):
             if score >= 50
             else (_SCORE_RED, _SCORE_RED_BG)
         )
-        box_w, box_h = 43, 24
-        positions = [10, 57, 104, 151]
+        box_w, box_h = 34, 24
+        positions = [10, 48, 86, 124, 162]
         styles = [
-            (_HIGH_BG, _HIGH, _HIGH, str(high), "High Severity"),
-            (_MEDIUM_BG, _MEDIUM, _MEDIUM, str(medium), "Medium Severity"),
-            (_LIGHT_BG, _BORDER, _NAVY, str(total), "Total Issues"),
+            (_CRITICAL_BG, _CRITICAL, _CRITICAL, str(critical), "Critical"),
+            (_HIGH_BG, _HIGH, _HIGH, str(high), "High"),
+            (_MEDIUM_BG, _MEDIUM, _MEDIUM, str(medium), "Medium"),
+            (_LIGHT_BG, _BORDER, _NAVY, str(total), "Total"),
             (sb, sc, sc, str(score) + "/100", "Score"),
         ]
     else:
-        box_w, box_h = 58, 24
-        positions = [10, 76, 142]
+        box_w, box_h = 43, 24
+        positions = [10, 57, 104, 151]
         styles = [
-            (_HIGH_BG, _HIGH, _HIGH, str(high), "High Severity"),
-            (_MEDIUM_BG, _MEDIUM, _MEDIUM, str(medium), "Medium Severity"),
-            (_LIGHT_BG, _BORDER, _NAVY, str(total), "Total Issues"),
+            (_CRITICAL_BG, _CRITICAL, _CRITICAL, str(critical), "Critical"),
+            (_HIGH_BG, _HIGH, _HIGH, str(high), "High"),
+            (_MEDIUM_BG, _MEDIUM, _MEDIUM, str(medium), "Medium"),
+            (_LIGHT_BG, _BORDER, _NAVY, str(total), "Total"),
         ]
     y = pdf.get_y()
 
@@ -291,6 +294,12 @@ def generate_report(
     def _contains(f, tag):
         return tag in _msg(f)
 
+    critical = [
+        f
+        for f in findings
+        if _contains(f, "[CRITICAL]")
+        and not any(_contains(f, x) for x in ("PCI-", "CIS-", "NIST-"))
+    ]
     high = [
         f
         for f in findings
@@ -310,6 +319,7 @@ def generate_report(
     nist_h = [f for f in findings if _contains(f, "NIST-HIGH")]
     nist_m = [f for f in findings if _contains(f, "NIST-MEDIUM")]
 
+    total_critical = len(critical)
     total_high = len(high) + len(pci_h) + len(cis_h) + len(nist_h)
     total_medium = len(medium) + len(pci_m) + len(cis_m) + len(nist_m)
 
@@ -320,7 +330,7 @@ def generate_report(
     pdf.add_page()
 
     _draw_meta(pdf, filename, vendor, compliance)
-    _draw_summary_boxes(pdf, total_high, total_medium, len(findings), score=score)
+    _draw_summary_boxes(pdf, total_high, total_medium, len(findings), score=score, critical=total_critical)
 
     # Divider
     pdf.set_draw_color(*_BORDER)

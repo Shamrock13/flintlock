@@ -113,16 +113,16 @@ _MAX_FINDINGS_IN_ALERT = 5
 # ── Message helpers ───────────────────────────────────────────────────────────
 
 
-def _top_high_findings(
+def _top_findings(
     findings: list, limit: int = _MAX_FINDINGS_IN_ALERT
 ) -> list[str]:
-    """Return up to *limit* plain-string HIGH findings."""
-    highs = [
-        (f.get("message") or f) if isinstance(f, dict) else f
-        for f in findings
-        if "[HIGH]" in (f.get("message", "") if isinstance(f, dict) else f)
-    ]
-    return [str(h) for h in highs[:limit]]
+    """Return up to *limit* most severe findings — CRITICAL first, then HIGH."""
+    def _msg(f):
+        return f.get("message", "") if isinstance(f, dict) else f
+
+    criticals = [_msg(f) for f in findings if "[CRITICAL]" in _msg(f)]
+    highs = [_msg(f) for f in findings if "[HIGH]" in _msg(f)]
+    return [str(m) for m in (criticals + highs)[:limit]]
 
 
 def _audit_subject(schedule: dict, summary: dict, error: str | None) -> str:
@@ -131,10 +131,13 @@ def _audit_subject(schedule: dict, summary: dict, error: str | None) -> str:
     label = f"{vendor}@{host}"
     if error:
         return f"[Cashel] ❌ Audit error on {label}"
+    crit = summary.get("critical", 0)
     high = summary.get("high", 0)
+    if crit:
+        return f"[Cashel] 🚨 {crit} CRITICAL finding(s) on {label}"
     if high:
         return f"[Cashel] 🔥 {high} HIGH finding(s) on {label}"
-    return f"[Cashel] ✅ Audit complete — {label} (no HIGH findings)"
+    return f"[Cashel] ✅ Audit complete — {label} (no HIGH/CRITICAL findings)"
 
 
 def _audit_body_text(
@@ -156,22 +159,23 @@ def _audit_body_text(
     if error:
         lines += [f"ERROR: {error}", ""]
     else:
+        crit = summary.get("critical", 0)
         high = summary.get("high", 0)
         med = summary.get("medium", 0)
         low = summary.get("low", 0)
         total = summary.get("total", 0)
         lines += [
-            f"Summary: {total} finding(s) — {high} HIGH · {med} MEDIUM · {low} LOW",
+            f"Summary: {total} finding(s) — {crit} CRITICAL · {high} HIGH · {med} MEDIUM · {low} LOW",
             "",
         ]
-        highs = _top_high_findings(findings)
-        if highs:
-            lines.append("Top HIGH findings:")
-            for h in highs:
+        top = _top_findings(findings)
+        if top:
+            lines.append("Top findings (CRITICAL/HIGH):")
+            for h in top:
                 lines.append(f"  • {h}")
-            extra = summary.get("high", 0) - len(highs)
+            extra = crit + high - len(top)
             if extra > 0:
-                lines.append(f"  … and {extra} more HIGH finding(s)")
+                lines.append(f"  … and {extra} more finding(s)")
             lines.append("")
         elif total == 0:
             lines.append("✅ No issues found.")
@@ -218,19 +222,20 @@ def send_slack(
     if error:
         text = f":x: *Cashel audit error* — {label}\n```{error}```"
     else:
+        crit = summary.get("critical", 0)
         high = summary.get("high", 0)
         med = summary.get("medium", 0)
         low = summary.get("low", 0)
         total = summary.get("total", 0)
-        icon = ":fire:" if high else ":white_check_mark:"
+        icon = ":rotating_light:" if crit else ":fire:" if high else ":white_check_mark:"
         text = (
             f"{icon} *Cashel audit complete* — {label}\n"
-            f"*{total} finding(s): {high} HIGH · {med} MEDIUM · {low} LOW*"
+            f"*{total} finding(s): {crit} CRITICAL · {high} HIGH · {med} MEDIUM · {low} LOW*"
         )
-        highs = _top_high_findings(findings)
-        if highs:
-            text += "\n\n*Top HIGH findings:*\n" + "\n".join(f"• {h}" for h in highs)
-            extra = summary.get("high", 0) - len(highs)
+        top = _top_findings(findings)
+        if top:
+            text += "\n\n*Top findings (CRITICAL/HIGH):*\n" + "\n".join(f"• {h}" for h in top)
+            extra = crit + high - len(top)
             if extra > 0:
                 text += f"\n_…and {extra} more_"
 
@@ -361,31 +366,35 @@ def send_teams(
         facts = [{"name": "Error", "value": error}]
         text = ""
     else:
+        crit = summary.get("critical", 0)
         high = summary.get("high", 0)
         med = summary.get("medium", 0)
         low = summary.get("low", 0)
         total = summary.get("total", 0)
-        theme_color = "CC2200" if high else "1A8055"
+        theme_color = "CC0000" if crit else "CC2200" if high else "1A8055"
         title = (
-            f"\U0001f525 {high} HIGH finding(s) — {label}"
+            f"\U0001f6a8 {crit} CRITICAL finding(s) — {label}"
+            if crit
+            else f"\U0001f525 {high} HIGH finding(s) — {label}"
             if high
             else f"\u2705 Audit complete — {label}"
         )
         facts = [
             {"name": "Completed", "value": now},
             {"name": "Total", "value": str(total)},
+            {"name": "CRITICAL", "value": str(crit)},
             {"name": "HIGH", "value": str(high)},
             {"name": "MEDIUM", "value": str(med)},
             {"name": "LOW", "value": str(low)},
         ]
-        highs = _top_high_findings(findings)
+        top = _top_findings(findings)
         text = ""
-        if highs:
-            bullet_list = "\n\n".join(f"- {h}" for h in highs)
-            extra = summary.get("high", 0) - len(highs)
+        if top:
+            bullet_list = "\n\n".join(f"- {h}" for h in top)
+            extra = crit + high - len(top)
             if extra > 0:
-                bullet_list += f"\n\n_\u2026and {extra} more HIGH finding(s)_"
-            text = f"**Top HIGH findings:**\n\n{bullet_list}"
+                bullet_list += f"\n\n_\u2026and {extra} more finding(s)_"
+            text = f"**Top findings (CRITICAL/HIGH):**\n\n{bullet_list}"
 
     card = {
         "@type": "MessageCard",
