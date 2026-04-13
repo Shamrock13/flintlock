@@ -1541,6 +1541,7 @@
     if (!activeFilter) return allFindings;
     return allFindings.filter(f => {
       const cls = findingClass(f);
+      if (activeFilter === "critical")   return cls === "finding-critical";
       if (activeFilter === "high")       return cls === "finding-high";
       if (activeFilter === "medium")     return cls === "finding-medium";
       if (activeFilter === "compliance") return cls === "finding-compliance-high" || cls === "finding-compliance-medium";
@@ -2123,7 +2124,7 @@
     el.innerHTML = entries.map(e => {
       const ts     = e.timestamp ? new Date(e.timestamp).toLocaleString() : "—";
       const vendor = VENDOR_LABELS[e.vendor] || e.vendor;
-      const hi = e.summary?.high || 0, med = e.summary?.medium || 0, tot = e.summary?.total || 0;
+      const crit = e.summary?.critical || 0, hi = e.summary?.high || 0, med = e.summary?.medium || 0, tot = e.summary?.total || 0;
       const primaryName = e.tag ? escHtml(e.tag) + " <span style='font-weight:400;color:var(--text-muted)'>v" + (e.version || 1) + "</span>" : escHtml(e.filename);
       const secondaryMeta = e.tag ? escHtml(e.filename) + " &bull; " + escHtml(vendor) + " &bull; " + escHtml(ts) : escHtml(vendor) + " &bull; " + escHtml(ts);
       return `<div class="history-entry" data-id="${escHtml(e.id)}">
@@ -2137,6 +2138,7 @@
           </div>
         </div>
         <div class="history-entry-right">
+          <span class="history-badge sev-critical" title="Critical">${crit}</span>
           <span class="history-badge sev-high" title="High">${hi}</span>
           <span class="history-badge sev-medium" title="Medium">${med}</span>
           <span class="history-badge sev-total" title="Total">${tot}</span>
@@ -2271,6 +2273,7 @@
           <div class="compare-filename">${escHtml(ea.filename)}</div>
           <div class="compare-ts">${escHtml(tsA)}</div>
           <div class="compare-stats">
+            <span class="sev-critical history-badge">${ea.summary.critical || 0} Crit</span>
             <span class="sev-high history-badge">${ea.summary.high} High</span>
             <span class="sev-medium history-badge">${ea.summary.medium} Med</span>
           </div>
@@ -2281,6 +2284,7 @@
           <div class="compare-filename">${escHtml(eb.filename)}</div>
           <div class="compare-ts">${escHtml(tsB)}</div>
           <div class="compare-stats">
+            <span class="sev-critical history-badge">${eb.summary.critical || 0} Crit</span>
             <span class="sev-high history-badge">${eb.summary.high} High</span>
             <span class="sev-medium history-badge">${eb.summary.medium} Med</span>
           </div>
@@ -2444,9 +2448,10 @@
   // ══════════════════════════════════════════════════════════ HELPERS ══
   function buildSummaryHTML(s) {
     const items = [
-      { label: "High",   value: s.high,   cls: "sev-high",   filter: "high" },
-      { label: "Medium", value: s.medium, cls: "sev-medium", filter: "medium" },
-      { label: "Total",  value: s.total,  cls: "sev-total",  filter: "all" },
+      { label: "Critical", value: s.critical || 0, cls: "sev-critical", filter: "critical" },
+      { label: "High",     value: s.high,           cls: "sev-high",     filter: "high" },
+      { label: "Medium",   value: s.medium,         cls: "sev-medium",   filter: "medium" },
+      { label: "Total",    value: s.total,           cls: "sev-total",    filter: "all" },
     ];
     if (s.cis_high    || s.cis_medium)   { items.push({ label:"CIS High",    value:s.cis_high,    cls:"sev-compliance",filter:"compliance"}); items.push({ label:"CIS Med",     value:s.cis_medium,   cls:"sev-compliance",filter:"compliance"}); }
     if (s.stig_cat_i  || s.stig_cat_ii || s.stig_cat_iii) {
@@ -2474,6 +2479,7 @@
 
   function findingClass(f) {
     const msg = typeof f === "object" ? f.message : f;
+    if (msg.includes("[CRITICAL]") && !msg.match(/PCI-|CIS-|NIST-|HIPAA-|SOC2-|STIG-/)) return "finding-critical";
     if (msg.includes("[HIGH]")   && !msg.match(/PCI-|CIS-|NIST-|HIPAA-|SOC2-|STIG-/)) return "finding-high";
     if (msg.includes("[MEDIUM]") && !msg.match(/PCI-|CIS-|NIST-|HIPAA-|SOC2-|STIG-/)) return "finding-medium";
     if (msg.match(/PCI-HIGH|CIS-HIGH|NIST-HIGH|HIPAA-HIGH|SOC2-HIGH|STIG-CAT-I\]/))   return "finding-compliance-high";
@@ -2581,6 +2587,7 @@
           <span class="bulk-status-badge badge-ok">&#10003; OK</span>
         </div>
         <div class="bulk-summary-row">
+          <span class="history-badge sev-critical" title="Critical">${s.critical||0} C</span>
           <span class="history-badge sev-high" title="High">${s.high||0} H</span>
           <span class="history-badge sev-medium" title="Medium">${s.medium||0} M</span>
           <span class="history-badge sev-total" title="Total">${s.total||0} Total</span>
@@ -3532,8 +3539,9 @@
       "change-window": '<span class="rem-badge rem-badge-change">Change Window</span>',
     };
     const SEV_BADGES = {
-      "HIGH":   '<span class="rem-badge rem-badge-high">HIGH</span>',
-      "MEDIUM": '<span class="rem-badge rem-badge-medium">MEDIUM</span>',
+      "CRITICAL": '<span class="rem-badge rem-badge-critical">CRITICAL</span>',
+      "HIGH":     '<span class="rem-badge rem-badge-high">HIGH</span>',
+      "MEDIUM":   '<span class="rem-badge rem-badge-medium">MEDIUM</span>',
     };
 
     function escH(s) { const d = document.createElement("div"); d.textContent = s; return d.innerHTML; }
