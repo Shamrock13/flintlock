@@ -13,7 +13,7 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "src"))
 from cashel.notify import (
     _audit_subject,
     _audit_body_text,
-    _top_high_findings,
+    _top_findings,
     send_slack,
     send_email,
 )
@@ -31,7 +31,7 @@ SCHEDULE = {
     "notify_email": "ops@example.com",
 }
 
-SUMMARY = {"high": 2, "medium": 1, "low": 0, "total": 3}
+SUMMARY = {"critical": 0, "high": 2, "medium": 1, "low": 0, "total": 3}
 
 FINDINGS = [
     {
@@ -61,34 +61,44 @@ PLAIN_FINDINGS = [
 ]
 
 
-# ══════════════════════════════════════ _top_high_findings ══
+# ══════════════════════════════════════════ _top_findings ══
 
 
-def test_top_high_enriched():
-    highs = _top_high_findings(FINDINGS)
-    assert len(highs) == 2
-    assert all("[HIGH]" in h for h in highs)
+def test_top_findings_enriched():
+    top = _top_findings(FINDINGS)
+    assert len(top) == 2
+    assert all("[HIGH]" in h for h in top)
 
 
-def test_top_high_plain():
-    highs = _top_high_findings(PLAIN_FINDINGS)
-    assert len(highs) == 2
+def test_top_findings_plain():
+    top = _top_findings(PLAIN_FINDINGS)
+    assert len(top) == 2
 
 
-def test_top_high_limit():
+def test_top_findings_limit():
     many = [
         {"severity": "HIGH", "message": f"[HIGH] finding {i}", "category": "x"}
         for i in range(10)
     ]
-    highs = _top_high_findings(many, limit=3)
-    assert len(highs) == 3
+    top = _top_findings(many, limit=3)
+    assert len(top) == 3
 
 
-def test_top_high_no_highs():
+def test_top_findings_critical_before_high():
+    mixed = [
+        {"severity": "HIGH", "message": "[HIGH] a high finding", "category": "x"},
+        {"severity": "CRITICAL", "message": "[CRITICAL] a critical finding", "category": "x"},
+    ]
+    top = _top_findings(mixed)
+    assert top[0] == "[CRITICAL] a critical finding"
+    assert top[1] == "[HIGH] a high finding"
+
+
+def test_top_findings_no_high_or_critical():
     low_only = [
         {"severity": "MEDIUM", "message": "[MEDIUM] something", "category": "x"}
     ]
-    assert _top_high_findings(low_only) == []
+    assert _top_findings(low_only) == []
 
 
 # ══════════════════════════════════════════ _audit_subject ══
@@ -108,8 +118,8 @@ def test_subject_error():
 
 
 def test_subject_no_findings():
-    subj = _audit_subject(SCHEDULE, {"high": 0, "total": 0}, error=None)
-    assert "no HIGH" in subj.lower() or "✅" in subj
+    subj = _audit_subject(SCHEDULE, {"critical": 0, "high": 0, "total": 0}, error=None)
+    assert "✅" in subj
 
 
 # ══════════════════════════════════════════ _audit_body_text ══
@@ -260,10 +270,11 @@ if __name__ == "__main__":
     import traceback
 
     tests = [
-        test_top_high_enriched,
-        test_top_high_plain,
-        test_top_high_limit,
-        test_top_high_no_highs,
+        test_top_findings_enriched,
+        test_top_findings_plain,
+        test_top_findings_limit,
+        test_top_findings_critical_before_high,
+        test_top_findings_no_high_or_critical,
         test_subject_high_findings,
         test_subject_error,
         test_subject_no_findings,
