@@ -2,7 +2,7 @@
 
 ![CI](https://github.com/Shamrock13/cashel/actions/workflows/ci.yml/badge.svg)
 
-**Cashel** is a firewall configuration auditing tool with a web UI and CLI. It detects security misconfigurations, generates scored severity reports, compares configs across time, connects directly to live devices via SSH, and runs automated scheduled audits with alerting. Deployable in minutes via Docker Compose.
+**Cashel** is a firewall configuration auditing tool built for network security engineers. Upload a config, get an instant security score, severity-graded findings with remediation guidance, compliance mapping, and export-ready reports — all from a clean web UI or CLI. Connect directly to live devices via SSH, schedule recurring audits, and track score trends across your fleet over time.
 
 **Try the live demo:** [demo.cashel.app](https://demo.cashel.app)
 
@@ -17,17 +17,17 @@ Cashel supports **11 vendor platforms** spanning on-premises firewalls and cloud
 
 > **Cisco note:** Cashel supports Cisco ASA and FTD under a single **Cisco** vendor option. The platform auto-detects which appliance type from the config content and applies the appropriate checks.
 
-| Vendor | Config Format | Live SSH | Notes |
-|---|---|---|---|
-| AWS Security Groups | JSON | — | `aws ec2 describe-security-groups` export |
-| Azure NSG | JSON | — | `az network nsg show` / `nsg list` export |
-| Cisco (ASA / FTD) | Text | ✓ | Running config (`show running-config`); FTD auto-detected |
-| Fortinet FortiGate | Text | ✓ | Running config (`show full-configuration`) |
-| GCP VPC Firewall | JSON | — | `gcloud compute firewall-rules list --format json` |
-| iptables / nftables (Linux) | Text | ✓ | `iptables-save` (iptables) or `nft list ruleset` (nftables) |
-| Juniper SRX | Text | ✓ | Set-format or hierarchical config |
-| Palo Alto Networks | XML | ✓ | Candidate or running config |
-| pfSense | XML | ✓ | Full config export (`config.xml`) |
+| Vendor | Config Format | Live SSH |
+|---|---|---|
+| AWS Security Groups | JSON | — |
+| Azure NSG | JSON | — |
+| Cisco (ASA / FTD) | Text | ✓ |
+| Fortinet FortiGate | Text | ✓ |
+| GCP VPC Firewall | JSON | — |
+| iptables / nftables (Linux) | Text | ✓ |
+| Juniper SRX | Text | ✓ |
+| Palo Alto Networks | XML | ✓ |
+| pfSense | XML | ✓ |
 
 ---
 
@@ -35,45 +35,48 @@ Cashel supports **11 vendor platforms** spanning on-premises firewalls and cloud
 
 ### Free (Open Source)
 
-**Core audit**
-- **Auto-detect vendor** — identifies vendor from file content; no manual selection required
-- **Security scoring** — 0–100 score per audit: `100 − (HIGH × 10) − (MEDIUM × 3)`
+**Audit engine**
+- **4-level severity** — CRITICAL / HIGH / MEDIUM / LOW, with findings sorted and color-coded by risk
+- **Security scoring** — 0–100 per audit: `100 − (CRITICAL×20) − (HIGH×10) − (MEDIUM×3)`
+- **Auto vendor detection** — identifies vendor from file content; no manual selection required
+- **Hostname extraction** — device hostname auto-populated from the config file into the Device Tag field
 - **Category badges** — findings tagged by type: Exposure, Protocol, Logging, Hygiene, Redundancy
 - **Remediation guidance** — every finding includes a plain-English fix recommendation
-- **Hostname extraction** — device hostname auto-populated from the config file into the Device Tag field
 
 **Audit modes**
-- **Single file audit** — upload one config, get instant results with filterable findings
-- **Bulk audit** — upload multiple configs at once; each is audited independently with per-file score and expandable findings
-- **Live SSH connection** — connect directly to any supported SSH-capable device to pull and audit its running config in real time (8 vendor types)
-- **Scheduled audits** — set up recurring SSH audits (hourly, daily, or weekly) with full CRUD management; results auto-save to Audit History
-
-**Alerts & integrations** — Slack webhook, Microsoft Teams webhook, Email (SMTP), and Syslog forwarding (UDP/TCP) are all supported on scheduled audits. Syslog streams all application events to a remote server for SIEM integration.
+- **Single file** — upload one config, get instant results with filterable findings
+- **Bulk** — upload multiple configs at once; each audited independently with per-file score and expandable findings
+- **Live SSH** — connect directly to any SSH-capable device to pull and audit its running config in real time (8 vendor types, PEM key support)
+- **Scheduled** — recurring SSH audits (hourly, daily, weekly) with full CRUD management; results auto-save to Audit History
 
 **Exports**
-- **PDF report** — download or view inline a color-coded findings report with score, categories, and remediation text
-- **JSON export** — structured findings with severity, category, remediation, and metadata
-- **CSV export** — tabular findings for import into spreadsheets or ticketing systems
-- **SARIF export** — Static Analysis Results Interchange Format for CI/CD pipeline and security tooling integration
-- **REST API for CI/CD pipeline integration** — POST `/api/v1/audit`, returns JSON findings
+- **PDF report** — color-coded findings with score, categories, and remediation text; view inline or download
+- **JSON** — structured findings with severity, category, remediation, and metadata
+- **CSV** — tabular findings for spreadsheets or ticketing systems
+- **SARIF** — Static Analysis Results Interchange Format for CI/CD and security tooling integration
+- **REST API** — `POST /api/v1/audit` returns JSON findings for pipeline integration
 
-**History & comparison**
-- **Audit History** — save, browse, filter (vendor/date/tag), and search past audits
-- **Score Trends chart** — visualize security score over time per device, with vendor and tag filters
-- **Archival comparisons** — select any two saved audits to see resolved issues, new issues, and HIGH/MEDIUM/Total deltas
-- **Activity Log** — complete record of every audit, SSH attempt, diff, and scheduled run — including failures
+**History & trends**
+- **Audit History** — save, browse, filter (vendor / date / tag), and search past audits
+- **Score Trends chart** — security score over time per device, with vendor and tag filters
+- **Archival comparisons** — diff any two saved audits: resolved issues, new issues, severity deltas
 - **Device tag system** — name devices (e.g. `ASA01`, `FortiGate-HQ`) for auto-versioned history and trend tracking
+- **Activity Log** — complete record of every audit, SSH attempt, diff, and scheduled run — including failures
 
 **Rule quality analysis**
 - **Shadow rule detection** — flags rules that can never match because an earlier rule already covers the same traffic
 - **Duplicate rule detection** — identifies exact duplicate rules that add no policy value
 
-**Platform & security**
-- **Rule change diff** — upload two configs of the same vendor to see added, removed, and unchanged rules
-- **Configurable SSH host key policy** — Warn (default), Strict (reject unknown), or Auto-add (lab use only)
-- **Webhook SSRF protection** — built-in hostname allowlist (Slack, Teams, Discord) + private IP blocking
-- **HTTP security headers** — X-Frame-Options, X-Content-Type-Options, X-XSS-Protection, Referrer-Policy, Permissions-Policy on every response
-- **XXE injection protection** — all XML parsing uses defusedxml
+**Alerts & integrations**
+- Slack webhook · Microsoft Teams webhook · Email (SMTP) · Syslog forwarding (UDP/TCP)
+- All alert channels are available on scheduled audits; Syslog streams all application events for SIEM integration
+
+**Platform**
+- Rule change diff — upload two configs of the same vendor to see added, removed, and unchanged rules
+- Configurable SSH host key policy — Warn (default), Strict, or Auto-add
+- Webhook SSRF protection — hostname allowlist + private IP blocking
+- HTTP security headers — X-Frame-Options, X-Content-Type-Options, Referrer-Policy, Permissions-Policy on every response
+- XXE injection protection — all XML parsing uses defusedxml
 - Light / dark / auto theme · CLI · Docker Compose deployment
 
 Full list of vendor-specific checks: [docs/checks.md](docs/checks.md)
@@ -160,17 +163,17 @@ Full CLI reference: [docs/cli.md](docs/cli.md)
 
 The interface is organized into six tabs with SVG navigation icons.
 
-**Audit** — Toggle between Single File and Bulk mode. Upload a config, optionally set a Device Tag and compliance framework, then click Run Audit. Results show a security score, severity counts, category-tagged findings with remediation, and export buttons (PDF, JSON, CSV, SARIF). Bulk mode audits each uploaded file independently with per-file scores and expandable findings.
+**Audit** — Toggle between Single File and Bulk mode. Upload a config, optionally set a Device Tag and compliance framework, then click Run Audit. Results show a security score, severity counts, category-tagged findings with remediation, and export buttons (PDF, JSON, CSV, SARIF).
 
 **Compare** — Upload two configs of the same vendor to diff added, removed, and unchanged rules. Vendor is auto-detected from the baseline file.
 
-**Live Connect** — SSH directly to a device (Cisco, Fortinet, iptables, Juniper, nftables, Palo Alto, pfSense) to pull and audit its running config. Credentials are used for the single connection only and are never stored.
+**Live Connect** — SSH directly to a device to pull and audit its running config. Credentials are used for the single connection only and are never stored.
 
-**Schedules** — Configure recurring SSH audits (hourly, daily, weekly) with optional Slack, Teams, or email alerts on HIGH findings or errors. Results are auto-saved to Audit History.
+**Schedules** — Configure recurring SSH audits (hourly, daily, weekly) with optional Slack, Teams, or email alerts on HIGH/CRITICAL findings or errors. Results are auto-saved to Audit History.
 
-**History** — Browse all saved audits with vendor/date/tag filters. Select any two entries to run a full diff. The Score Trends chart plots each device's security score over time. The Activity Log records every audit, SSH attempt, diff, and scheduled run — including failures.
+**History** — Browse all saved audits with vendor/date/tag filters. Select any two entries to run a full diff. The Score Trends chart plots each device's security score over time. The Activity Log records every audit, SSH attempt, diff, and scheduled run.
 
-**Settings** — Two-column panel covering: General (auto-PDF, auto-archive, default compliance), Email/SMTP (outbound mail with live test), Security (SSH host key policy, allowed webhook domains, error detail level), and Syslog (host, port, protocol, facility).
+**Settings** — Two-column panel covering: General (auto-PDF, auto-archive, default compliance), Email/SMTP, Security (SSH host key policy, webhook domains, error detail level), and Syslog (host, port, protocol, facility).
 
 ---
 
@@ -194,56 +197,18 @@ The `examples/` directory contains sample configurations for all supported vendo
 
 ---
 
-## Roadmap
+## Changelog
 
-- [x] Activity Log (usage monitoring)
-- [x] Archival reviews (compare historical audits)
-- [x] Auto vendor detection
-- [x] AWS Security Group support
-- [x] Azure NSG support
-- [x] Bulk multi-device audit
-- [x] Category badges and remediation guidance
-- [x] CIS Benchmark compliance framework
-- [x] Cisco FTD / Firepower Threat Defense support (auto-detected alongside ASA)
-- [x] Clickable severity filters
-- [x] Client-side vendor auto-detection on file upload
-- [x] CSRF protection (Flask-WTF)
-- [x] CSV and SARIF export
-- [x] Detailed / Compact results view toggle
-- [x] Device tag system with auto-versioning
-- [x] DISA STIG compliance framework
-- [x] Docker Compose deployment
-- [x] Email / webhook notifications for scheduled audit findings
-- [x] Fernet encryption for stored credentials
-- [x] Findings pagination with configurable page size
-- [x] Fortinet v2 checks
-- [x] GCP VPC Firewall support
-- [x] HIPAA Security Rule compliance framework
-- [x] Hostname auto-extraction from config files
-- [x] HTTP security hardening headers
-- [x] iptables / nftables (Linux) support with Live SSH
-- [x] JSON export
-- [x] Juniper SRX support with Live SSH
-- [x] Light / dark / auto theme
-- [x] Live SSH connection mode (8 vendors)
-- [x] Microsoft Teams webhook alerts
-- [x] NIST SP 800-41 compliance framework
-- [x] PCI-DSS compliance framework
-- [x] PDF report (score box, categories, remediation, inline view)
-- [x] Rule change diff (compare two configs)
-- [x] Rule quality analysis (shadow and duplicate detection)
-- [x] Scheduled automated SSH audits (APScheduler)
-- [x] Score Trends chart with device tag and vendor filters
-- [x] Security scoring (0–100 per audit)
-- [x] Settings panel (2-column: General, Email, Security, Syslog)
-- [x] Slack webhook alerts
-- [x] SOC2 compliance framework
-- [x] Syslog forwarding for SIEM integration
-- [x] Web UI with file upload and inline results
-- [x] XXE injection protection (defusedxml)
-- [x] API key authentication with session management
-- [x] Multi-factor SSH authentication (PEM key support)
-- [x] REST API for CI/CD pipeline integration
+What's shipped and where to find it:
+
+| Release | Highlights | PR |
+|---|---|---|
+| **v1.5.1** | CRITICAL severity level — engine, parsers, exports, CSS, UI, API | [#73](https://github.com/Shamrock13/cashel/pull/73) |
+| **v1.5.0** | Threshold-based alerting — CRUD UI, alert channels, scheduled evaluation | [#72](https://github.com/Shamrock13/cashel/pull/72) |
+| **v1.5.0** | Auth audit log, OpenAPI/Swagger docs, deployment guide | [#65](https://github.com/Shamrock13/cashel/pull/65) |
+| **v1.4.x** | RBAC (admin/viewer roles), SQLite persistence, multi-user auth, Render deploy hardening | [#40](https://github.com/Shamrock13/cashel/pull/40) |
+| **v1.4.0** | Blueprint decomposition, SQLite, session auth | [#31](https://github.com/Shamrock13/cashel/pull/31) |
+| **Earlier** | All prior features — scoring, vendors, compliance, exports, SSH, scheduling, diff, rule quality | [full history](https://github.com/Shamrock13/cashel/pulls?q=is%3Apr+is%3Aclosed) |
 
 ---
 
