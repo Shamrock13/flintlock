@@ -198,7 +198,7 @@ def test_any_any_detects_violation():
     policies = _parse_set_style(SET_STYLE_RISKY)
     findings = check_any_any_juniper(policies)
     assert len(findings) >= 1
-    assert all(f["severity"] == "HIGH" for f in findings)
+    assert all(f["severity"] == "CRITICAL" for f in findings)
 
 
 def test_any_any_clean_config():
@@ -224,7 +224,7 @@ def test_insecure_apps_detects_telnet():
     policies = _parse_set_style(SET_STYLE_RISKY)
     findings = check_insecure_apps_juniper(policies)
     assert any("junos-telnet" in f["message"] for f in findings)
-    assert all(f["severity"] == "HIGH" for f in findings)
+    assert all(f["severity"] == "CRITICAL" for f in findings)
 
 
 def test_insecure_apps_clean():
@@ -252,6 +252,8 @@ def test_system_detects_telnet():
     findings = check_system_juniper(SET_STYLE_RISKY)
     msgs = [f["message"] for f in findings]
     assert any("Telnet" in m for m in msgs)
+    telnet_findings = [f for f in findings if "Telnet" in f["message"]]
+    assert all(f["severity"] == "CRITICAL" for f in telnet_findings)
 
 
 def test_system_detects_snmp_community():

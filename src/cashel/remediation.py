@@ -257,7 +257,7 @@ _CATEGORY_ORDER = [
     "redundancy",
     "compliance",
 ]
-_SEVERITY_ORDER = {"HIGH": 0, "MEDIUM": 1, "LOW": 2}
+_SEVERITY_ORDER = {"CRITICAL": -1, "HIGH": 0, "MEDIUM": 1, "LOW": 2}
 
 _CATEGORY_LABELS = {
     "exposure": "Access Control & Exposure",
@@ -661,9 +661,16 @@ def plan_to_pdf(plan: dict, output_path: str) -> str:
             _section_header(pdf, phase["phase"], bar_color)
 
             for step in phase["steps"]:
-                sev_color = _HIGH if step["severity"] == "HIGH" else _MEDIUM
+                if step["severity"] == "CRITICAL":
+                    sev_color = (153, 0, 0)
+                    bg = (255, 230, 230)
+                elif step["severity"] == "HIGH":
+                    sev_color = _HIGH
+                    bg = _HIGH_BG
+                else:
+                    sev_color = _MEDIUM
+                    bg = _MEDIUM_BG
                 effort_color = _EFFORT_COLORS.get(step["effort"], _MUTED)
-                bg = _HIGH_BG if step["severity"] == "HIGH" else _MEDIUM_BG
 
                 # Estimate row height
                 desc = step["description"]

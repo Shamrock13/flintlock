@@ -96,6 +96,9 @@ def api_audit():
                 summary:
                   type: object
                   properties:
+                    critical:
+                      type: integer
+                      description: Count of CRITICAL-severity findings.
                     high:
                       type: integer
                     medium:

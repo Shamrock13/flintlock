@@ -161,6 +161,30 @@ def test_generate_plan_severity_ordering():
     assert len(medium_indices) > 0
 
 
+def test_generate_plan_critical_before_high():
+    """CRITICAL findings must appear before HIGH in the plan."""
+    findings = [
+        {
+            "severity": "HIGH",
+            "category": "exposure",
+            "message": "[HIGH] No deny-all rule.",
+            "remediation": "Add deny-all.",
+        },
+        {
+            "severity": "CRITICAL",
+            "category": "exposure",
+            "message": "[CRITICAL] permit any any found.",
+            "remediation": "Remove permit any any.",
+        },
+    ]
+    plan = generate_plan(findings, "asa")
+    all_steps = [step for phase in plan["phases"] for step in phase["steps"]]
+    severities = [s["severity"] for s in all_steps]
+    critical_idx = severities.index("CRITICAL")
+    high_idx = severities.index("HIGH")
+    assert critical_idx < high_idx
+
+
 def test_generate_plan_category_grouping():
     """Steps should be grouped by category into phases."""
     plan = generate_plan(SAMPLE_FINDINGS, "asa")

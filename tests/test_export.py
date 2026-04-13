@@ -66,6 +66,28 @@ ENTRY_EMPTY = {
     "findings": [],
 }
 
+ENTRY_WITH_CRITICAL = {
+    "filename": "asa-lab.cfg",
+    "vendor": "asa",
+    "timestamp": "2026-03-21T00:00:00Z",
+    "tag": "lab-device",
+    "summary": {"critical": 1, "high": 1, "medium": 0, "low": 0, "total": 2},
+    "findings": [
+        {
+            "severity": "CRITICAL",
+            "category": "exposure",
+            "message": "[CRITICAL] permit any any found — remove immediately.",
+            "remediation": "no access-list OUTSIDE_IN permit ip any any",
+        },
+        {
+            "severity": "HIGH",
+            "category": "hygiene",
+            "message": "[HIGH] No explicit deny-all rule.",
+            "remediation": "access-list OUTSIDE_IN deny ip any any log",
+        },
+    ],
+}
+
 
 # ══════════════════════════════════════════════════════════ JSON TESTS ══
 
@@ -197,6 +219,23 @@ def test_sarif_empty_findings():
     out = json.loads(to_sarif(ENTRY_EMPTY))
     assert out["runs"][0]["results"] == []
     assert out["runs"][0]["tool"]["driver"]["rules"] == []
+
+
+def test_sarif_critical_maps_to_error():
+    """CRITICAL findings must map to SARIF 'error' level."""
+    out = json.loads(to_sarif(ENTRY_WITH_CRITICAL))
+    results = out["runs"][0]["results"]
+    critical_results = [
+        r for r in results if "CRITICAL" in r.get("message", {}).get("text", "")
+    ]
+    assert len(critical_results) == 1
+    assert critical_results[0]["level"] == "error"
+
+
+def test_json_export_preserves_critical_severity():
+    out = json.loads(to_json(ENTRY_WITH_CRITICAL))
+    severities = [f["severity"] for f in out["findings"]]
+    assert "CRITICAL" in severities
 
 
 # ── standalone runner ─────────────────────────────────────────────────────────

@@ -14,9 +14,12 @@ TOOL_INFO_URI = "https://github.com/Shamrock13/cashel"
 
 
 def _sarif_level(severity: str) -> str:
-    return {"HIGH": "error", "MEDIUM": "warning", "LOW": "note"}.get(
-        (severity or "").upper(), "warning"
-    )
+    return {
+        "CRITICAL": "error",
+        "HIGH": "error",
+        "MEDIUM": "warning",
+        "LOW": "note",
+    }.get((severity or "").upper(), "warning")
 
 
 def _parse_plain(finding) -> tuple[str, str, str, str]:

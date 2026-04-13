@@ -241,9 +241,9 @@ def check_any_any_juniper(policies: list[dict]) -> list[dict]:
             label = f"{p['from_zone']}→{p['to_zone']} policy '{p['name']}'"
             findings.append(
                 _f(
-                    "HIGH",
+                    "CRITICAL",
                     "exposure",
-                    f"[HIGH] {label}: permits any source, any destination, any application.",
+                    f"[CRITICAL] {label}: permits any source, any destination, any application.",
                     f"Restrict source-address, destination-address, and application in policy '{p['name']}'. "
                     "Apply least-privilege — allow only the specific zones, addresses, and applications needed.",
                 )
@@ -280,11 +280,14 @@ def check_insecure_apps_juniper(policies: list[dict]) -> list[dict]:
         if not bad:
             continue
         label = f"{p['from_zone']}→{p['to_zone']} policy '{p['name']}'"
+        # Telnet is CRITICAL; other insecure apps are HIGH
+        has_telnet = any(a.lower() in ("telnet", "junos-telnet") for a in bad)
+        severity = "CRITICAL" if has_telnet else "HIGH"
         findings.append(
             _f(
-                "HIGH",
+                severity,
                 "protocol",
-                f"[HIGH] {label}: permits insecure application(s): {', '.join(bad)}.",
+                f"[{severity}] {label}: permits insecure application(s): {', '.join(bad)}.",
                 "Replace cleartext protocols with encrypted equivalents: "
                 "use SSH instead of Telnet, SFTP/SCP instead of FTP, and SNMPv3 instead of SNMP. "
                 f"Remove or restrict the application term in policy '{p['name']}'.",
@@ -341,9 +344,9 @@ def check_system_juniper(content: str) -> list[dict]:
     if has_telnet:
         findings.append(
             _f(
-                "HIGH",
+                "CRITICAL",
                 "management",
-                "[HIGH] Telnet management service is enabled.",
+                "[CRITICAL] Telnet management service is enabled.",
                 "Disable Telnet: 'delete system services telnet' (set style) or remove the "
                 "telnet stanza from 'system { services { ... } }'. Use SSH exclusively.",
             )
