@@ -10,10 +10,8 @@ os.environ.setdefault("CASHEL_DB", os.path.join(_TEST_DB_DIR, "test_cashel.db"))
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "src"))
 
-import cashel.web as web_mod
-
-
 def _make_client():
+    import cashel.web as web_mod
     app = web_mod.app
     app.config["TESTING"] = True
     app.config["WTF_CSRF_ENABLED"] = False
@@ -62,8 +60,8 @@ class TestRemediationPdfInline(unittest.TestCase):
         import cashel.blueprints.reports as r
         r.REPORTS_FOLDER = self.tmp_dir
 
-        _ensure_user_exists()
         self.client = _make_client()
+        _ensure_user_exists()
 
     def tearDown(self):
         import cashel.settings as settings_mod
@@ -73,6 +71,8 @@ class TestRemediationPdfInline(unittest.TestCase):
             os.environ.pop("REPORTS_FOLDER", None)
         else:
             os.environ["REPORTS_FOLDER"] = self._orig_folder
+        import cashel.blueprints.reports as r
+        r.REPORTS_FOLDER = self._orig_folder if self._orig_folder is not None else "/tmp/cashel_reports"
 
     def test_pdf_inline_returns_pdf_content_type(self):
         resp = self.client.post(
