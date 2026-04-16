@@ -3,6 +3,8 @@
 All blueprint code calls this module — nothing touches the DB directly.
 """
 
+from __future__ import annotations
+
 import re
 import secrets
 from datetime import datetime, timezone

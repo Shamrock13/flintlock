@@ -1,5 +1,7 @@
 """Vendor detection and validation helpers — pure functions, no Flask dependency."""
 
+from __future__ import annotations
+
 import json
 import re
 from defusedxml import ElementTree as ET

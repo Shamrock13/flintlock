@@ -17,6 +17,8 @@ Key differences from AWS SGs / Azure NSGs:
       priority 65535 deny-all ingress, priority 65536 allow-all egress.
 """
 
+from __future__ import annotations
+
 import json
 
 SENSITIVE_PORTS = {

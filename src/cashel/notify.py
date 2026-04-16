@@ -5,6 +5,8 @@ Both functions are fire-and-forget: they log errors but never raise, so a
 misconfigured webhook or SMTP server cannot crash the background scheduler.
 """
 
+from __future__ import annotations
+
 import ipaddress
 import json
 import logging

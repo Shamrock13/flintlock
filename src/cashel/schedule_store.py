@@ -6,6 +6,8 @@ generated automatically on first use. Legacy base64-encoded passwords
 are transparently migrated to Fernet on next write.
 """
 
+from __future__ import annotations
+
 import uuid
 from datetime import datetime
 
