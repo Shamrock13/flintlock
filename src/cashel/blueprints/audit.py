@@ -284,14 +284,19 @@ def demo_sample_report():
     os.makedirs(REPORTS_FOLDER, exist_ok=True)
     cached_path = os.path.join(REPORTS_FOLDER, "demo_sample_report.pdf")
     if not os.path.exists(cached_path):
-        generate_report(
-            _DEMO_SSH_FINDINGS,
-            "cisco_asa_demo.txt",
-            "asa",
-            compliance="cis",
-            output_path=cached_path,
-            summary=_DEMO_SSH_SUMMARY,
-        )
+        # NOTE: cached indefinitely — delete demo_sample_report.pdf manually
+        # if _DEMO_SSH_FINDINGS or _DEMO_SSH_SUMMARY change in a future release.
+        try:
+            generate_report(
+                _DEMO_SSH_FINDINGS,
+                "cisco_asa_demo.txt",
+                "asa",
+                compliance="cis",
+                output_path=cached_path,
+                summary=_DEMO_SSH_SUMMARY,
+            )
+        except Exception as exc:
+            return jsonify({"error": f"Could not generate sample report: {exc}"}), 500
     return send_file(
         cached_path,
         mimetype="application/pdf",
