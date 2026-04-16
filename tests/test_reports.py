@@ -1,4 +1,5 @@
 """Route tests for /remediation-plan and /demo/sample-report.pdf."""
+
 import os
 import sys
 import tempfile
@@ -6,8 +7,10 @@ import unittest
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "src"))
 
+
 def _make_client():
     import cashel.web as web_mod
+
     app = web_mod.app
     app.config["TESTING"] = True
     app.config["WTF_CSRF_ENABLED"] = False
@@ -64,6 +67,7 @@ class TestRemediationPdfInline(unittest.TestCase):
         self._orig_folder = os.environ.get("REPORTS_FOLDER")
         os.environ["REPORTS_FOLDER"] = self.tmp_dir
         import cashel.blueprints.reports as r
+
         r.REPORTS_FOLDER = self.tmp_dir
 
         self.client = _make_client()
@@ -90,7 +94,12 @@ class TestRemediationPdfInline(unittest.TestCase):
         else:
             os.environ["REPORTS_FOLDER"] = self._orig_folder
         import cashel.blueprints.reports as r
-        r.REPORTS_FOLDER = self._orig_folder if self._orig_folder is not None else "/tmp/cashel_reports"
+
+        r.REPORTS_FOLDER = (
+            self._orig_folder
+            if self._orig_folder is not None
+            else "/tmp/cashel_reports"
+        )
 
     def test_pdf_inline_returns_pdf_content_type(self):
         resp = self.client.post(
@@ -125,6 +134,7 @@ class TestDemoSampleReport(unittest.TestCase):
         self._orig_folder = os.environ.get("REPORTS_FOLDER")
         os.environ["REPORTS_FOLDER"] = self.tmp_dir
         import cashel.blueprints.audit as a
+
         a.REPORTS_FOLDER = self.tmp_dir
         self.client = _make_client()
 
@@ -134,7 +144,12 @@ class TestDemoSampleReport(unittest.TestCase):
         else:
             os.environ["REPORTS_FOLDER"] = self._orig_folder
         import cashel.blueprints.audit as a
-        a.REPORTS_FOLDER = self._orig_folder if self._orig_folder is not None else "/tmp/cashel_reports"
+
+        a.REPORTS_FOLDER = (
+            self._orig_folder
+            if self._orig_folder is not None
+            else "/tmp/cashel_reports"
+        )
 
     def test_sample_report_returns_200(self):
         resp = self.client.get("/demo/sample-report.pdf")
