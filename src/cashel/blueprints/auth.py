@@ -50,10 +50,14 @@ _LOCKOUT_SECONDS = 300  # 5 minutes
 
 
 def _get_lockout(username: str) -> tuple[int, float]:
-    row = get_conn().execute(
-        "SELECT attempts, lockout_until FROM login_attempts WHERE username = ?",
-        (username.lower(),),
-    ).fetchone()
+    row = (
+        get_conn()
+        .execute(
+            "SELECT attempts, lockout_until FROM login_attempts WHERE username = ?",
+            (username.lower(),),
+        )
+        .fetchone()
+    )
     if row:
         return row["attempts"], row["lockout_until"]
     return 0, 0.0
@@ -63,7 +67,9 @@ def _record_failed_login(username: str) -> None:
     conn = get_conn()
     attempts, _ = _get_lockout(username)
     attempts += 1
-    lockout_until = time.time() + _LOCKOUT_SECONDS if attempts >= _LOCKOUT_THRESHOLD else 0.0
+    lockout_until = (
+        time.time() + _LOCKOUT_SECONDS if attempts >= _LOCKOUT_THRESHOLD else 0.0
+    )
     conn.execute(
         "INSERT INTO login_attempts (username, attempts, lockout_until) VALUES (?, ?, ?) "
         "ON CONFLICT(username) DO UPDATE SET attempts=excluded.attempts, lockout_until=excluded.lockout_until",
@@ -194,7 +200,6 @@ def setup_post():
         target=username,
         details={"role": "admin", "context": "first_run_setup"},
     )
-
 
     settings = get_settings()
     save_settings({**settings, "auth_enabled": True})
