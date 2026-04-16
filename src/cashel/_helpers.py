@@ -44,6 +44,7 @@ _AUTH_EXEMPT_ENDPOINTS = {
     "auth.setup_post",
     "health",
     "static",
+    "audit.demo_sample_report",
 }
 
 # Path prefixes that bypass auth (Swagger UI and spec JSON — public API docs)

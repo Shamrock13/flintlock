@@ -99,3 +99,38 @@ class TestRemediationPdfInline(unittest.TestCase):
         self.assertEqual(resp.status_code, 200)
         cd = resp.headers.get("Content-Disposition", "")
         self.assertIn("attachment", cd)
+
+
+class TestDemoSampleReport(unittest.TestCase):
+    def setUp(self):
+        self.tmp_dir = tempfile.mkdtemp()
+        self._orig_folder = os.environ.get("REPORTS_FOLDER")
+        os.environ["REPORTS_FOLDER"] = self.tmp_dir
+        import cashel.blueprints.audit as a
+        a.REPORTS_FOLDER = self.tmp_dir
+        self.client = _make_client()
+
+    def tearDown(self):
+        if self._orig_folder is None:
+            os.environ.pop("REPORTS_FOLDER", None)
+        else:
+            os.environ["REPORTS_FOLDER"] = self._orig_folder
+        import cashel.blueprints.audit as a
+        a.REPORTS_FOLDER = self._orig_folder if self._orig_folder is not None else "/tmp/cashel_reports"
+
+    def test_sample_report_returns_200(self):
+        resp = self.client.get("/demo/sample-report.pdf")
+        self.assertEqual(resp.status_code, 200)
+
+    def test_sample_report_content_type_is_pdf(self):
+        resp = self.client.get("/demo/sample-report.pdf")
+        self.assertIn("application/pdf", resp.content_type)
+
+    def test_sample_report_is_inline_not_attachment(self):
+        resp = self.client.get("/demo/sample-report.pdf")
+        cd = resp.headers.get("Content-Disposition", "")
+        self.assertNotIn("attachment", cd)
+
+    def test_sample_report_returns_non_empty_pdf(self):
+        resp = self.client.get("/demo/sample-report.pdf")
+        self.assertTrue(resp.data[:4] == b"%PDF")

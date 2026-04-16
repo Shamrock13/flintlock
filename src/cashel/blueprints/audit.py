@@ -273,6 +273,32 @@ def demo_ssh_audit():
     )
 
 
+@audit_bp.route("/demo/sample-report.pdf")
+def demo_sample_report():
+    """Serve a sample audit report PDF for marketing preview.
+
+    Public — no authentication required (matches other /demo/* routes).
+    Renders from pre-canned Cisco ASA findings; result is cached on disk
+    so repeat requests are fast (re-generated if the file is missing).
+    """
+    os.makedirs(REPORTS_FOLDER, exist_ok=True)
+    cached_path = os.path.join(REPORTS_FOLDER, "demo_sample_report.pdf")
+    if not os.path.exists(cached_path):
+        generate_report(
+            _DEMO_SSH_FINDINGS,
+            "cisco_asa_demo.txt",
+            "asa",
+            compliance="cis",
+            output_path=cached_path,
+            summary=_DEMO_SSH_SUMMARY,
+        )
+    return send_file(
+        cached_path,
+        mimetype="application/pdf",
+        as_attachment=False,
+    )
+
+
 @audit_bp.route("/demo/bulk-audit", methods=["POST"])
 def demo_bulk_audit():
     """Run all demo sample configs through the audit engine and return bulk results."""
