@@ -22,11 +22,15 @@ html { overflow-y: scroll; }
   --btn-secondary-bg:  #E4E7F2;
   --btn-secondary-text:#1A1A2E;
 
+  --critical:    #CC0000;
   --high:        #CC2200;
   --medium:      #996600;
   --compliance:  #1A55CC;
   --pass:        #1A8055;
 
+  --finding-critical-bg:        rgba(204,0,0,0.13);
+  --finding-critical-border:    #CC0000;
+  --finding-critical-text:      #990000;
   --finding-high-bg:        rgba(204,34,0,0.07);
   --finding-high-border:    #CC2200;
   --finding-high-text:      #AA1100;
@@ -79,11 +83,15 @@ html { overflow-y: scroll; }
   --btn-secondary-bg:  #16213E;
   --btn-secondary-text:#E8E8F0;
 
+  --critical:    #FF2020;
   --high:        #FF6868;
   --medium:      #FFAA00;
   --compliance:  #4488FF;
   --pass:        #44BB88;
 
+  --finding-critical-bg:        rgba(255,32,32,0.17);
+  --finding-critical-border:    #FF2020;
+  --finding-critical-text:      #FFAAAA;
   --finding-high-bg:        rgba(255,104,104,0.08);
   --finding-high-border:    #FF6868;
   --finding-high-text:      #FFAAAA;
@@ -575,6 +583,7 @@ select:focus, input[type="text"]:focus {
 .summary-val { font-size: 1.8rem; font-weight: 700; line-height: 1; }
 .summary-lbl { font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.5px; margin-top: 0.25rem; }
 
+.sev-critical   { background: var(--finding-critical-bg); border: 2px solid var(--critical);    color: var(--critical); font-weight: 700; }
 .sev-high       { background: var(--finding-high-bg);    border: 1px solid var(--high);        color: var(--high); }
 .sev-medium     { background: var(--finding-medium-bg);  border: 1px solid var(--medium);      color: var(--medium); }
 .sev-total      { background: var(--sev-total-bg);        border: 1px solid var(--sev-total-border); color: var(--text); }
@@ -591,6 +600,7 @@ select:focus, input[type="text"]:focus {
   word-break: break-all;
 }
 
+.finding-critical         { background: var(--finding-critical-bg); border-color: var(--finding-critical-border); border-left-width: 4px; color: var(--finding-critical-text); }
 .finding-high             { background: var(--finding-high-bg);    border-color: var(--finding-high-border);    color: var(--finding-high-text); }
 .finding-medium           { background: var(--finding-medium-bg);  border-color: var(--finding-medium-border);  color: var(--finding-medium-text); }
 .finding-compliance-high  { background: var(--finding-comp-bg);    border-color: var(--finding-comp-border);    color: var(--finding-comp-text); }
@@ -1689,6 +1699,7 @@ select:focus, input[type="text"]:focus {
   font-weight: 700;
   letter-spacing: 0.3px;
 }
+.rem-badge-critical { background: rgba(204,0,0,0.18); color: #CC0000; }
 .rem-badge-high   { background: rgba(204,34,0,0.1); color: #CC2200; }
 .rem-badge-medium { background: rgba(153,102,0,0.1); color: #996600; }
 .rem-badge-quick  { background: rgba(26,128,85,0.1); color: #1A8055; }
