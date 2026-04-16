@@ -1,5 +1,7 @@
 """Activity log — record every user action (audits, SSH attempts, diffs) including failures."""
 
+from __future__ import annotations
+
 import json
 import uuid
 from datetime import datetime

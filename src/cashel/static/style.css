@@ -22,18 +22,18 @@ html { overflow-y: scroll; }
   --btn-secondary-bg:  #E4E7F2;
   --btn-secondary-text:#1A1A2E;
 
-  --high:        #CC2200;
   --critical:    #CC0000;
+  --high:        #CC2200;
   --medium:      #996600;
   --compliance:  #1A55CC;
   --pass:        #1A8055;
 
-  --finding-high-bg:        rgba(204,34,0,0.07);
-  --finding-high-border:    #CC2200;
-  --finding-high-text:      #AA1100;
   --finding-critical-bg:        rgba(204,0,0,0.13);
   --finding-critical-border:    #CC0000;
   --finding-critical-text:      #990000;
+  --finding-high-bg:        rgba(204,34,0,0.07);
+  --finding-high-border:    #CC2200;
+  --finding-high-text:      #AA1100;
   --finding-medium-bg:      rgba(153,102,0,0.07);
   --finding-medium-border:  #996600;
   --finding-medium-text:    #7A5200;
@@ -83,18 +83,18 @@ html { overflow-y: scroll; }
   --btn-secondary-bg:  #16213E;
   --btn-secondary-text:#E8E8F0;
 
-  --high:        #FF6868;
   --critical:    #FF2020;
+  --high:        #FF6868;
   --medium:      #FFAA00;
   --compliance:  #4488FF;
   --pass:        #44BB88;
 
-  --finding-high-bg:        rgba(255,104,104,0.08);
-  --finding-high-border:    #FF6868;
-  --finding-high-text:      #FFAAAA;
   --finding-critical-bg:        rgba(255,32,32,0.17);
   --finding-critical-border:    #FF2020;
   --finding-critical-text:      #FFAAAA;
+  --finding-high-bg:        rgba(255,104,104,0.08);
+  --finding-high-border:    #FF6868;
+  --finding-high-text:      #FFAAAA;
   --finding-medium-bg:      rgba(255,170,0,0.07);
   --finding-medium-border:  #FFAA00;
   --finding-medium-text:    #FFCC66;
@@ -224,7 +224,7 @@ body {
 
 /* ===== Header user / logout ===== */
 .header-username {
-  color: rgba(255,255,255,0.7);
+  color: rgba(255,255,255,0.55);
   font-size: 0.78rem;
   letter-spacing: 0.01em;
   white-space: nowrap;
@@ -583,8 +583,8 @@ select:focus, input[type="text"]:focus {
 .summary-val { font-size: 1.8rem; font-weight: 700; line-height: 1; }
 .summary-lbl { font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.5px; margin-top: 0.25rem; }
 
+.sev-critical   { background: var(--finding-critical-bg); border: 2px solid var(--critical);    color: var(--critical); font-weight: 700; }
 .sev-high       { background: var(--finding-high-bg);    border: 1px solid var(--high);        color: var(--high); }
-.sev-critical   { background: var(--finding-critical-bg);  border: 2px solid var(--critical);       color: var(--critical); font-weight: 700; }
 .sev-medium     { background: var(--finding-medium-bg);  border: 1px solid var(--medium);      color: var(--medium); }
 .sev-total      { background: var(--sev-total-bg);        border: 1px solid var(--sev-total-border); color: var(--text); }
 .sev-compliance { background: var(--finding-comp-bg);     border: 1px solid var(--compliance);  color: var(--compliance); }
@@ -600,8 +600,8 @@ select:focus, input[type="text"]:focus {
   word-break: break-all;
 }
 
+.finding-critical         { background: var(--finding-critical-bg); border-color: var(--finding-critical-border); border-left-width: 4px; color: var(--finding-critical-text); }
 .finding-high             { background: var(--finding-high-bg);    border-color: var(--finding-high-border);    color: var(--finding-high-text); }
-.finding-critical         { background: var(--finding-critical-bg);  border-color: var(--finding-critical-border);  border-left-width: 4px; color: var(--finding-critical-text); }
 .finding-medium           { background: var(--finding-medium-bg);  border-color: var(--finding-medium-border);  color: var(--finding-medium-text); }
 .finding-compliance-high  { background: var(--finding-comp-bg);    border-color: var(--finding-comp-border);    color: var(--finding-comp-text); }
 .finding-compliance-medium{ background: var(--finding-comp-bg);    border-color: var(--finding-comp-border);    color: var(--finding-comp-text); }
@@ -1594,7 +1594,6 @@ select:focus, input[type="text"]:focus {
 .demo-config-label { font-weight: 600; font-size: 0.88rem; color: var(--text); }
 .demo-config-desc { font-size: 0.78rem; color: var(--text-muted); line-height: 1.4; }
 .demo-config-action { font-size: 0.78rem; color: var(--btn-primary-bg); font-weight: 600; margin-top: 0.25rem; }
-.demo-config-compliance-badge { font-size: 0.7rem; font-weight: 700; color: var(--compliance); background: var(--finding-comp-bg); border: 1px solid var(--compliance); border-radius: 3px; padding: 0.1rem 0.4rem; align-self: flex-start; }
 .demo-loading, .demo-error { color: var(--text-muted); font-size: 0.85rem; }
 
 /* ===== Remediation Plan ===== */
@@ -1700,8 +1699,8 @@ select:focus, input[type="text"]:focus {
   font-weight: 700;
   letter-spacing: 0.3px;
 }
-.rem-badge-high   { background: rgba(204,34,0,0.1); color: #CC2200; }
 .rem-badge-critical { background: rgba(204,0,0,0.18); color: #CC0000; }
+.rem-badge-high   { background: rgba(204,34,0,0.1); color: #CC2200; }
 .rem-badge-medium { background: rgba(153,102,0,0.1); color: #996600; }
 .rem-badge-quick  { background: rgba(26,128,85,0.1); color: #1A8055; }
 .rem-badge-moderate { background: rgba(153,102,0,0.1); color: #996600; }

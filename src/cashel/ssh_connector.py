@@ -1,5 +1,7 @@
 """Live SSH connector — pull running configs from network devices."""
 
+from __future__ import annotations
+
 import os
 import time
 import uuid

@@ -9,6 +9,8 @@ Call ``configure_syslog(settings)`` once on startup (and again after settings
 are saved) to install or reconfigure the handler on the root logger.
 """
 
+from __future__ import annotations
+
 import logging
 import logging.handlers
 import socket

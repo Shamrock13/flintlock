@@ -3,6 +3,8 @@
 Follows the same pattern as activity_log.py but targets the auth_events table.
 """
 
+from __future__ import annotations
+
 import json
 import uuid
 from datetime import datetime

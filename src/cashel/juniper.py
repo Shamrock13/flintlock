@@ -8,6 +8,8 @@ Returns normalised policy dicts compatible with the rest of the Cashel
 audit pipeline plus system-level findings from management-plane checks.
 """
 
+from __future__ import annotations
+
 import re
 
 # Applications Juniper ships as insecure defaults

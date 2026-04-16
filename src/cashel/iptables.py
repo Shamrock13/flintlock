@@ -12,6 +12,8 @@ Key differences from stateful firewall vendors:
   - nftables uses priority-based hooks; policy is per-chain.
 """
 
+from __future__ import annotations
+
 import ipaddress
 import json
 import re
