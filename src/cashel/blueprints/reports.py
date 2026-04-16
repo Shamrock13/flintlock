@@ -93,14 +93,17 @@ def remediation_plan_inline():
             },
         )
     elif fmt == "pdf":
+        inline = request.args.get("inline") == "1"
         report_name = f"remediation_{uuid.uuid4().hex[:8]}.pdf"
         report_path = os.path.join(REPORTS_FOLDER, report_name)
+        os.makedirs(REPORTS_FOLDER, exist_ok=True)
         plan_to_pdf(plan, report_path)
+        download_name = f"{(filename or 'audit').rsplit('.', 1)[0]}_remediation.pdf"
         return send_file(
             report_path,
             mimetype="application/pdf",
-            as_attachment=True,
-            download_name=f"{(filename or 'audit').rsplit('.', 1)[0]}_remediation.pdf",
+            as_attachment=not inline,
+            download_name=download_name,
         )
     else:
         return jsonify(
