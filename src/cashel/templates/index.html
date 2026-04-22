@@ -866,6 +866,11 @@
             <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8 1.5a4.5 4.5 0 0 1 4.5 4.5c0 2 .8 3.2 1.5 4H2c.7-.8 1.5-2 1.5-4A4.5 4.5 0 0 1 8 1.5z"/><path d="M6.5 14a1.5 1.5 0 0 0 3 0"/></svg>
             Alert Thresholds
           </button>
+
+          <button class="settings-nav-item" data-pane="webhooks">
+            <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2 8a6 6 0 1 1 12 0"/><path d="M5 8a3 3 0 1 1 6 0"/><circle cx="8" cy="8" r="1" fill="currentColor" stroke="none"/><line x1="8" y1="9" x2="8" y2="14.5"/><line x1="5.5" y1="14.5" x2="10.5" y2="14.5"/></svg>
+            Webhooks
+          </button>
         </nav>
         {% endif %}
 
@@ -1262,6 +1267,61 @@
                 <div id="scheduleThresholdsList">
                   <p class="muted" id="noScheduleThresholds">No overrides for this schedule.</p>
                 </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Webhooks pane -->
+          <div class="settings-pane" id="spane-webhooks">
+            <div class="settings-pane-header">
+              <h2 class="settings-pane-title">Webhooks</h2>
+              <p class="settings-pane-desc">Send structured JSON events to external URLs when audits complete or alert thresholds are crossed. Each delivery includes an <code>X-Cashel-Signature</code> HMAC header when a secret is configured.</p>
+            </div>
+
+            <div class="settings-group">
+              <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:0.75rem">
+                <h3 class="settings-group-title" style="margin:0">Configured Webhooks</h3>
+                <button class="btn-secondary" id="addWebhookBtn">+ Add Webhook</button>
+              </div>
+              <div id="webhooksTable">
+                <p class="muted" id="noWebhooksMsg">No webhooks configured.</p>
+              </div>
+            </div>
+          </div>
+
+          <!-- Add/Edit Webhook modal -->
+          <div id="addWebhookModal" class="modal-overlay hidden" role="dialog" aria-modal="true">
+            <div class="modal-box" style="max-width:460px">
+              <div class="modal-header">
+                <h3 class="modal-title">Add Webhook</h3>
+                <button class="modal-close" id="addWebhookModalClose">&times;</button>
+              </div>
+              <div class="modal-body">
+                <div class="form-group">
+                  <label for="whName">Name</label>
+                  <input type="text" id="whName" placeholder="My Webhook" autocomplete="off" />
+                </div>
+                <div class="form-group">
+                  <label for="whUrl">URL <span style="color:var(--color-muted);font-weight:400">(HTTPS required)</span></label>
+                  <input type="url" id="whUrl" placeholder="https://hooks.example.com/cashel" autocomplete="off" />
+                </div>
+                <div class="form-group">
+                  <label>Events</label>
+                  <div style="display:flex;flex-direction:column;gap:0.4rem;margin-top:0.25rem">
+                    <label style="font-weight:400;display:flex;align-items:center;gap:0.5rem"><input type="checkbox" class="wh-event-cb" value="audit.complete" checked /> audit.complete</label>
+                    <label style="font-weight:400;display:flex;align-items:center;gap:0.5rem"><input type="checkbox" class="wh-event-cb" value="alert.threshold_breach" /> alert.threshold_breach</label>
+                    <label style="font-weight:400;display:flex;align-items:center;gap:0.5rem"><input type="checkbox" class="wh-event-cb" value="alert.threshold_clear" /> alert.threshold_clear</label>
+                  </div>
+                </div>
+                <div class="form-group">
+                  <label for="whSecret">Secret <span style="color:var(--color-muted);font-weight:400">(optional — used for HMAC signature)</span></label>
+                  <input type="password" id="whSecret" placeholder="Leave blank for no signature" autocomplete="off" />
+                </div>
+                <p class="muted" id="whError" style="color:var(--color-danger);display:none"></p>
+              </div>
+              <div class="modal-footer" style="display:flex;gap:0.5rem;justify-content:flex-end;padding:1rem 1.25rem 1.25rem">
+                <button class="btn-secondary" id="addWebhookModalCancel">Cancel</button>
+                <button class="btn-primary" id="saveWebhookBtn">Save</button>
               </div>
             </div>
           </div>
@@ -3183,6 +3243,85 @@
       loadAlertThresholds();
       loadAlertScheduleSelect();
     });
+  });
+
+  // ══════════════════════════════════════════════════ WEBHOOKS ══
+  async function loadWebhooks() {
+    const res = await fetch("/settings/webhooks");
+    if (!res.ok) return;
+    const rows = await res.json();
+    const container = document.getElementById("webhooksTable");
+    const noMsg = document.getElementById("noWebhooksMsg");
+    if (!rows.length) { if (noMsg) noMsg.style.display = ""; return; }
+    if (noMsg) noMsg.style.display = "none";
+    container.innerHTML = `
+      <table class="data-table" style="width:100%">
+        <thead><tr><th>Name</th><th>Events</th><th>Secret</th><th>Enabled</th><th></th></tr></thead>
+        <tbody>
+          ${rows.map(w => `
+            <tr>
+              <td>${w.name}</td>
+              <td style="font-size:0.8rem">${w.events.join(", ")}</td>
+              <td>${w.secret_set ? "&#10003;" : "—"}</td>
+              <td>${w.enabled ? "Yes" : "No"}</td>
+              <td style="display:flex;gap:0.4rem">
+                <button class="btn-secondary btn-xs wh-test-btn" data-id="${w.id}">Test</button>
+                <button class="btn-danger btn-xs wh-delete-btn" data-id="${w.id}">Delete</button>
+              </td>
+            </tr>`).join("")}
+        </tbody>
+      </table>`;
+    container.querySelectorAll(".wh-delete-btn").forEach(btn => {
+      btn.addEventListener("click", async () => {
+        if (!confirm("Delete this webhook?")) return;
+        await fetch(`/settings/webhooks/${btn.dataset.id}`, { method: "DELETE" });
+        loadWebhooks();
+      });
+    });
+    container.querySelectorAll(".wh-test-btn").forEach(btn => {
+      btn.addEventListener("click", async () => {
+        btn.disabled = true; btn.textContent = "Sending…";
+        const r = await fetch(`/settings/webhooks/${btn.dataset.id}/test`, { method: "POST" });
+        const j = await r.json();
+        btn.textContent = j.ok ? "✓ Sent" : "✗ Failed";
+        setTimeout(() => { btn.textContent = "Test"; btn.disabled = false; }, 2500);
+      });
+    });
+  }
+
+  document.getElementById("addWebhookBtn")?.addEventListener("click", () => {
+    document.getElementById("addWebhookModal").classList.remove("hidden");
+  });
+  ["addWebhookModalClose","addWebhookModalCancel"].forEach(id => {
+    document.getElementById(id)?.addEventListener("click", () => {
+      document.getElementById("addWebhookModal").classList.add("hidden");
+      document.getElementById("whError").style.display = "none";
+    });
+  });
+  document.getElementById("saveWebhookBtn")?.addEventListener("click", async () => {
+    const name   = document.getElementById("whName").value.trim();
+    const url    = document.getElementById("whUrl").value.trim();
+    const events = [...document.querySelectorAll(".wh-event-cb:checked")].map(c => c.value);
+    const secret = document.getElementById("whSecret").value;
+    const errEl  = document.getElementById("whError");
+    errEl.style.display = "none";
+    const res = await fetch("/settings/webhooks", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ name, url, events, secret: secret || null }),
+    });
+    const j = await res.json();
+    if (!res.ok) { errEl.textContent = j.error || "Save failed."; errEl.style.display = ""; return; }
+    document.getElementById("addWebhookModal").classList.add("hidden");
+    document.getElementById("whName").value = "";
+    document.getElementById("whUrl").value = "";
+    document.getElementById("whSecret").value = "";
+    document.querySelectorAll(".wh-event-cb").forEach(c => { c.checked = c.value === "audit.complete"; });
+    loadWebhooks();
+  });
+
+  document.querySelectorAll(".settings-nav-item[data-pane='webhooks']").forEach(btn => {
+    btn.addEventListener("click", () => loadWebhooks());
   });
 
   // ══════════════════════════════════════════════════ TEST SMTP ══

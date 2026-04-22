@@ -240,3 +240,107 @@ def alert_channels_save():
         }
     )
     return jsonify({"ok": True})
+
+
+# ── Webhooks ───────────────────────────────────────────────────────────────────
+
+from cashel import webhooks as _webhooks  # noqa: E402
+
+
+@settings_bp.route("/settings/webhooks", methods=["GET"])
+@_require_role("admin")
+def webhooks_list():
+    rows = _webhooks.list_webhooks()
+    # Mask secrets in list response — return only whether they are set
+    for row in rows:
+        row["secret_set"] = bool(row.pop("secret", ""))
+    return jsonify(rows)
+
+
+@settings_bp.route("/settings/webhooks", methods=["POST"])
+@_require_role("admin")
+def webhooks_add():
+    if DEMO_MODE:
+        return jsonify({"error": "Not available in demo mode."}), 403
+    data = request.get_json(silent=True) or {}
+    name = (data.get("name") or "").strip()
+    url = (data.get("url") or "").strip()
+    events = data.get("events") or []
+    secret = (data.get("secret") or "").strip() or None
+    if not name:
+        return jsonify({"error": "name is required"}), 400
+    if not url:
+        return jsonify({"error": "url is required"}), 400
+    try:
+        saved = _webhooks.add_webhook(name, url, events, secret)
+    except ValueError as exc:
+        return jsonify({"error": str(exc)}), 400
+    saved["secret_set"] = bool(saved.pop("secret", ""))
+    return jsonify(saved), 201
+
+
+@settings_bp.route("/settings/webhooks/<webhook_id>", methods=["PUT"])
+@_require_role("admin")
+def webhooks_update(webhook_id):
+    if DEMO_MODE:
+        return jsonify({"error": "Not available in demo mode."}), 403
+    data = request.get_json(silent=True) or {}
+    kwargs = {}
+    for field in ("name", "url", "events", "secret", "enabled"):
+        if field in data:
+            kwargs[field] = data[field]
+    try:
+        saved = _webhooks.update_webhook(webhook_id, **kwargs)
+    except KeyError as exc:
+        return jsonify({"error": str(exc)}), 404
+    except ValueError as exc:
+        return jsonify({"error": str(exc)}), 400
+    saved["secret_set"] = bool(saved.pop("secret", ""))
+    return jsonify(saved)
+
+
+@settings_bp.route("/settings/webhooks/<webhook_id>", methods=["DELETE"])
+@_require_role("admin")
+def webhooks_delete(webhook_id):
+    if DEMO_MODE:
+        return jsonify({"error": "Not available in demo mode."}), 403
+    existing = _webhooks.get_webhook(webhook_id)
+    if existing is None:
+        return jsonify({"error": "Webhook not found"}), 404
+    _webhooks.delete_webhook(webhook_id)
+    return jsonify({"ok": True})
+
+
+@settings_bp.route("/settings/webhooks/<webhook_id>/test", methods=["POST"])
+@_require_role("admin")
+def webhooks_test(webhook_id):
+    """Dispatch a synthetic audit.complete event to one webhook for delivery verification."""
+    if DEMO_MODE:
+        return jsonify({"error": "Not available in demo mode."}), 403
+    wh = _webhooks.get_webhook(webhook_id)
+    if wh is None:
+        return jsonify({"error": "Webhook not found"}), 404
+
+    from datetime import datetime, timezone
+
+    body = _webhooks._build_payload(
+        "audit.complete",
+        {
+            "audit_id": "test000000",
+            "filename": "test-config.conf",
+            "vendor": "test",
+            "score": 100,
+            "critical": 0,
+            "high": 0,
+            "medium": 0,
+            "low": 0,
+            "total": 0,
+            "tag": None,
+            "timestamp": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
+        },
+    )
+    secret = wh.get("secret") or None
+    success, detail = _webhooks._post(wh["url"], body, secret)
+    if success:
+        return jsonify({"ok": True, "detail": detail})
+    return jsonify({"ok": False, "error": detail}), 502
