@@ -143,7 +143,9 @@ def add_webhook(
         (webhook_id, name, url_enc, json.dumps(events), secret_enc, created_at),
     )
     conn.commit()
-    return get_webhook(webhook_id)
+    result = get_webhook(webhook_id)
+    assert result is not None
+    return result
 
 
 def update_webhook(webhook_id: str, **kwargs) -> dict:
@@ -189,7 +191,9 @@ def update_webhook(webhook_id: str, **kwargs) -> dict:
         [*updates.values(), webhook_id],
     )
     conn.commit()
-    return get_webhook(webhook_id)
+    result = get_webhook(webhook_id)
+    assert result is not None
+    return result
 
 
 def delete_webhook(webhook_id: str) -> None:
