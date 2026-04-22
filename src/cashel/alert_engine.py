@@ -255,6 +255,16 @@ def _check_thresholds_impl(
             _clear_state(state_key)
             result.cleared = True
             logger.info("Alert cleared for schedule=%s", state_key)
+            # Outbound webhook — threshold clear
+            from cashel import webhooks as _wh
+
+            _wh.dispatch_event(
+                "alert.threshold_clear",
+                {
+                    "schedule_id": schedule_id,
+                    "metric": ", ".join(sorted(prev_metrics)),
+                },
+            )
         return result
 
     # There are breached thresholds
@@ -271,8 +281,24 @@ def _check_thresholds_impl(
 
     _set_state(state_key, audit_id, current_metrics | prev_metrics)
 
-    # Dispatch
+    # Dispatch existing channels
     _dispatch_alert(result.breached_metrics, audit_summary, audit_id, hostname)
+
+    # Outbound webhook events — one dispatch per breached metric
+    from cashel import webhooks as _wh
+
+    for m in result.breached_metrics:
+        _wh.dispatch_event(
+            "alert.threshold_breach",
+            {
+                "schedule_id": schedule_id,
+                "metric": m["metric"],
+                "operator": m["operator"],
+                "threshold_value": m["threshold_value"],
+                "actual_value": m["actual_value"],
+                "audit_id": audit_id or "",
+            },
+        )
 
     return result
 

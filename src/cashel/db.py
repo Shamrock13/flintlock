@@ -132,6 +132,16 @@ def init_db() -> None:
             breach_audit_id     TEXT,
             breached_metrics    TEXT NOT NULL DEFAULT '[]'
         );
+
+        CREATE TABLE IF NOT EXISTS webhooks (
+            id          TEXT PRIMARY KEY,
+            name        TEXT NOT NULL,
+            url_enc     TEXT NOT NULL,          -- Fernet-encrypted URL
+            events      TEXT NOT NULL,           -- JSON list of event type strings
+            secret_enc  TEXT,                    -- Fernet-encrypted HMAC secret (optional)
+            enabled     INTEGER NOT NULL DEFAULT 1,
+            created_at  TEXT NOT NULL
+        );
     """)
     conn.commit()
     _migrate_json_to_sqlite()

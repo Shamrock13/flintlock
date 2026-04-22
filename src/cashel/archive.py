@@ -77,6 +77,26 @@ def save_audit(filename, vendor, findings, summary, config_path=None, tag=None):
         "tag": tag or None,
         "version": version,
     }
+
+    from cashel import webhooks
+
+    webhooks.dispatch_event(
+        "audit.complete",
+        {
+            "audit_id": entry_id,
+            "filename": filename,
+            "vendor": vendor,
+            "score": summary.get("score"),
+            "critical": summary.get("critical", 0),
+            "high": summary.get("high", 0),
+            "medium": summary.get("medium", 0),
+            "low": summary.get("low", 0),
+            "total": summary.get("total", 0),
+            "tag": tag,
+            "timestamp": entry.get("timestamp"),
+        },
+    )
+
     return entry_id, entry
 
 
