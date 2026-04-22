@@ -77,7 +77,6 @@ def test_asa_shadow():
     assert any("deny ip any any" in m for m in msgs)
 
 
-
 # ── Test 2: Fortinet shadow detection ────────────────────────────────────────
 
 
@@ -120,7 +119,6 @@ def test_fortinet_shadow():
     )
 
 
-
 # ── Test 3: Palo Alto shadow detection ───────────────────────────────────────
 
 
@@ -157,9 +155,9 @@ def test_paloalto_shadow():
     )
 
 
-
 # ── Entrypoint ────────────────────────────────────────────────────────────────
 
 if __name__ == "__main__":
     import pytest
+
     sys.exit(pytest.main([__file__, "-v"]))
