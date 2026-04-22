@@ -6,7 +6,7 @@ authors = [
     {name = "Your Name", email = "you@example.com"}
 ]
 readme = "README.md"
-requires-python = ">=3.10"
+requires-python = ">=3.9"
 dependencies = [
     "typer>=0.12,<1.0",
     "rich>=13.0,<15.0",
