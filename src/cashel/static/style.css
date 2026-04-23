@@ -2474,3 +2474,735 @@ html[data-theme="dark"] .run-row .rn-score.bad  { color: oklch(0.78 0.18 25); }
   .primary-nav { gap: 16px; overflow-x: auto; }
 }
 @keyframes v2spin { to { transform: rotate(360deg); } }
+
+/* =============================================================
+   v2 page re-skin — Compare / Live Connect / Schedules / History / Settings
+   Re-skins legacy classes scoped under the non-audit tab panels using
+   v2 OKLCH tokens, hairline dividers, and underline-only inputs.
+   HTML structure stays untouched; all IDs / handlers / Jinja preserved.
+   ============================================================= */
+
+/* ----- v2 page-head added at top of each non-audit tab ----- */
+.page-head-v2 {
+  padding: 36px 0 28px;
+  border-bottom: 1px solid var(--line);
+  display: flex;
+  align-items: end;
+  justify-content: space-between;
+  gap: 40px;
+  margin-bottom: 32px;
+}
+.page-head-v2 .eyebrow {
+  font-size: 13px;
+  color: var(--ink-3);
+  font-weight: 500;
+  margin-bottom: 8px;
+}
+.page-head-v2 h1 {
+  font-family: 'Geist', ui-sans-serif, system-ui, sans-serif;
+  font-size: clamp(30px, 3.6vw, 44px);
+  font-weight: 500;
+  line-height: 1;
+  letter-spacing: -0.035em;
+  margin: 0;
+  color: var(--ink);
+  max-width: 22ch;
+}
+.page-head-v2 h1 em {
+  font-style: normal;
+  color: var(--ink-3);
+  font-weight: 300;
+}
+.page-head-v2 .actions { display: flex; gap: 8px; align-items: center; }
+
+/* ----- Re-skin .card / .card-title / .card-desc inside non-audit tabs ----- */
+#tab-diff .card,
+#tab-connect .card,
+#tab-history .card,
+#tab-schedules .card,
+#tab-settings .card {
+  background: transparent;
+  border: 0;
+  border-radius: 0;
+  padding: 0;
+  margin-bottom: 40px;
+  border-bottom: 1px solid var(--line);
+  padding-bottom: 32px;
+}
+#tab-diff .card:last-child,
+#tab-connect .card:last-child,
+#tab-history .card:last-child,
+#tab-schedules .card:last-child {
+  border-bottom: 0;
+  padding-bottom: 0;
+}
+
+#tab-diff .card-title,
+#tab-connect .card-title,
+#tab-history .card-title,
+#tab-schedules .card-title,
+#tab-settings .card-title {
+  font-family: 'Geist', ui-sans-serif, system-ui, sans-serif;
+  font-size: 22px;
+  font-weight: 500;
+  letter-spacing: -0.02em;
+  text-transform: none;
+  color: var(--ink);
+  margin: 0 0 6px;
+}
+#tab-diff .card-desc,
+#tab-connect .card-desc,
+#tab-history .card-desc,
+#tab-schedules .card-desc,
+#tab-settings .card-desc {
+  color: var(--ink-2);
+  font-size: 14px;
+  line-height: 1.55;
+  margin: 0 0 24px;
+  max-width: 60ch;
+}
+
+/* results-header inside non-audit tabs */
+#tab-diff .results-header,
+#tab-connect .results-header,
+#tab-history .results-header,
+#tab-schedules .results-header {
+  margin-bottom: 8px;
+  align-items: baseline;
+  justify-content: space-between;
+}
+
+/* ----- Re-skin form-grid / form-group as v2 hairline rows ----- */
+#tab-diff .form-grid,
+#tab-connect .form-grid,
+#tab-schedules .form-grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 0;
+  margin-bottom: 0;
+  border-top: 1px solid var(--line);
+}
+#tab-diff .form-group,
+#tab-connect .form-group,
+#tab-schedules .form-group {
+  display: grid;
+  grid-template-columns: 220px 1fr;
+  gap: 24px;
+  padding: 20px 0;
+  border-bottom: 1px solid var(--line);
+  align-items: center;
+}
+#tab-diff .form-group label,
+#tab-connect .form-group label,
+#tab-schedules .form-group label {
+  font-size: 14px;
+  color: var(--ink);
+  font-weight: 500;
+  text-transform: none;
+  letter-spacing: 0;
+}
+#tab-diff .form-group .optional,
+#tab-connect .form-group .optional,
+#tab-schedules .form-group .optional {
+  font-size: 10px;
+  color: var(--ink-3);
+  font-weight: 400;
+  letter-spacing: 0.04em;
+  padding: 1px 6px;
+  border-radius: 3px;
+  background: var(--tint);
+  margin-left: 6px;
+  text-transform: uppercase;
+}
+
+/* Re-skin native inputs / selects scoped to these tabs */
+#tab-diff input[type="text"],
+#tab-diff input[type="number"],
+#tab-diff input[type="email"],
+#tab-diff input[type="password"],
+#tab-diff input[type="url"],
+#tab-diff select,
+#tab-connect input[type="text"],
+#tab-connect input[type="number"],
+#tab-connect input[type="email"],
+#tab-connect input[type="password"],
+#tab-connect input[type="url"],
+#tab-connect select,
+#tab-schedules input[type="text"],
+#tab-schedules input[type="number"],
+#tab-schedules input[type="email"],
+#tab-schedules input[type="password"],
+#tab-schedules input[type="url"],
+#tab-schedules select,
+#tab-history input[type="text"],
+#tab-history select,
+#tab-settings input[type="text"]:not([readonly]),
+#tab-settings input[type="email"],
+#tab-settings input[type="number"],
+#tab-settings input[type="password"],
+#tab-settings input[type="url"],
+#tab-settings select,
+#tab-settings textarea {
+  background: transparent;
+  border: 0;
+  border-bottom: 1px solid var(--line-2);
+  border-radius: 0;
+  padding: 8px 0;
+  font-size: 14.5px;
+  color: var(--ink);
+  outline: none;
+  transition: border-color .15s;
+  letter-spacing: -0.005em;
+}
+#tab-diff input:focus,
+#tab-diff select:focus,
+#tab-connect input:focus,
+#tab-connect select:focus,
+#tab-schedules input:focus,
+#tab-schedules select:focus,
+#tab-history input:focus,
+#tab-history select:focus,
+#tab-settings input:focus,
+#tab-settings select:focus,
+#tab-settings textarea:focus {
+  border-bottom-color: var(--ink);
+}
+#tab-diff select,
+#tab-connect select,
+#tab-schedules select,
+#tab-history select,
+#tab-settings select {
+  appearance: none;
+  -webkit-appearance: none;
+  background-image: linear-gradient(45deg, transparent 50%, var(--ink-3) 50%),
+                    linear-gradient(135deg, var(--ink-3) 50%, transparent 50%);
+  background-position: calc(100% - 10px) calc(50% - 2px), calc(100% - 5px) calc(50% - 2px);
+  background-size: 5px 5px, 5px 5px;
+  background-repeat: no-repeat;
+  padding-right: 24px;
+  cursor: pointer;
+}
+
+/* file-input-wrapper as v2 file-field */
+#tab-diff .file-input-wrapper {
+  position: relative;
+  border: 0;
+  border-bottom: 1px solid var(--line-2);
+  border-radius: 0;
+  background: transparent;
+  padding: 8px 0;
+  transition: border-color .15s;
+}
+#tab-diff .file-input-wrapper:hover { border-bottom-color: var(--ink); }
+#tab-diff .file-input-wrapper.has-file { border-bottom-color: var(--ink); }
+#tab-diff .file-label {
+  padding: 0;
+  font-size: 14.5px;
+  color: var(--ink);
+}
+#tab-diff .file-input-wrapper:not(.has-file) .file-label { color: var(--ink-4); }
+
+/* checkbox-label v2 inside settings/schedules */
+#tab-schedules .checkbox-label,
+#tab-settings .checkbox-label {
+  font-size: 13.5px;
+  color: var(--ink);
+}
+#tab-schedules .checkbox-label input[type="checkbox"],
+#tab-settings .checkbox-label input[type="checkbox"] {
+  accent-color: var(--acc);
+}
+
+/* alert/banner inside tabs */
+#tab-diff .alert,
+#tab-connect .alert,
+#tab-history .alert,
+#tab-schedules .alert,
+#tab-settings .alert {
+  padding: 12px 16px;
+  border-radius: 10px;
+  background: color-mix(in oklab, var(--low) 10%, var(--surface));
+  border: 1px solid color-mix(in oklab, var(--low) 30%, var(--line));
+  font-size: 13px;
+  color: var(--ink-2);
+  margin: 0 0 24px;
+}
+#tab-diff .alert-info,
+#tab-connect .alert-info,
+#tab-history .alert-info,
+#tab-schedules .alert-info,
+#tab-settings .alert-info { background: color-mix(in oklab, var(--low) 10%, var(--surface)); }
+#tab-diff .alert-warning,
+#tab-connect .alert-warning,
+#tab-history .alert-warning,
+#tab-schedules .alert-warning,
+#tab-settings .alert-warning {
+  background: color-mix(in oklab, var(--med) 10%, var(--surface));
+  border-color: color-mix(in oklab, var(--med) 35%, var(--line));
+}
+#tab-diff .alert-error,
+#tab-connect .alert-error,
+#tab-history .alert-error,
+#tab-schedules .alert-error,
+#tab-settings .alert-error {
+  background: color-mix(in oklab, var(--crit) 8%, var(--surface));
+  border-color: color-mix(in oklab, var(--crit) 30%, var(--line));
+}
+
+/* ----- Re-skin buttons inside non-audit tabs ----- */
+#tab-diff .btn-primary,
+#tab-connect .btn-primary,
+#tab-history .btn-primary,
+#tab-schedules .btn-primary,
+#tab-settings .btn-primary {
+  background: var(--acc);
+  color: var(--acc-ink);
+  border: none;
+  border-radius: 999px;
+  padding: 12px 22px;
+  font-weight: 500;
+  font-size: 14px;
+  letter-spacing: -0.005em;
+  transition: filter .15s, transform .08s;
+}
+#tab-diff .btn-primary:hover:not(:disabled),
+#tab-connect .btn-primary:hover:not(:disabled),
+#tab-history .btn-primary:hover:not(:disabled),
+#tab-schedules .btn-primary:hover:not(:disabled),
+#tab-settings .btn-primary:hover:not(:disabled) {
+  filter: brightness(1.03);
+  background: var(--acc);
+  box-shadow: none;
+}
+#tab-diff .btn-primary:active,
+#tab-connect .btn-primary:active,
+#tab-history .btn-primary:active,
+#tab-schedules .btn-primary:active,
+#tab-settings .btn-primary:active { transform: translateY(1px); }
+
+#tab-diff .btn-secondary,
+#tab-connect .btn-secondary,
+#tab-history .btn-secondary,
+#tab-schedules .btn-secondary,
+#tab-settings .btn-secondary {
+  padding: 8px 14px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: transparent;
+  color: var(--ink-2);
+  font-size: 12.5px;
+  font-weight: 500;
+  transition: border-color .15s, color .15s;
+}
+#tab-diff .btn-secondary:hover,
+#tab-connect .btn-secondary:hover,
+#tab-history .btn-secondary:hover,
+#tab-schedules .btn-secondary:hover,
+#tab-settings .btn-secondary:hover {
+  border-color: var(--ink);
+  color: var(--ink);
+}
+
+#tab-diff .btn-danger,
+#tab-connect .btn-danger,
+#tab-history .btn-danger,
+#tab-schedules .btn-danger,
+#tab-settings .btn-danger {
+  padding: 8px 14px;
+  border-radius: 999px;
+  background: transparent;
+  color: var(--crit);
+  border: 1px solid color-mix(in oklab, var(--crit) 40%, transparent);
+  font-size: 12.5px;
+  font-weight: 500;
+}
+#tab-diff .btn-danger:hover,
+#tab-connect .btn-danger:hover,
+#tab-history .btn-danger:hover,
+#tab-schedules .btn-danger:hover,
+#tab-settings .btn-danger:hover {
+  background: color-mix(in oklab, var(--crit) 10%, transparent);
+  opacity: 1;
+}
+
+#tab-diff .btn-download,
+#tab-connect .btn-download,
+#tab-history .btn-download {
+  padding: 8px 14px;
+  border-radius: 999px;
+  background: transparent;
+  border: 1px solid var(--line);
+  color: var(--ink-2);
+  font-size: 12.5px;
+  font-weight: 500;
+}
+#tab-diff .btn-download:hover,
+#tab-connect .btn-download:hover,
+#tab-history .btn-download:hover {
+  border-color: var(--ink);
+  color: var(--ink);
+  background: transparent;
+}
+
+/* ----- v2 history sub-tabs (re-skin .sub-tab-nav) ----- */
+#tab-history .sub-tab-nav {
+  display: flex;
+  gap: 22px;
+  padding: 0;
+  margin: 0 0 28px;
+  border-bottom: 1px solid var(--line);
+}
+#tab-history .sub-tab-btn {
+  padding: 10px 0;
+  font-size: 13px;
+  font-weight: 400;
+  color: var(--ink-3);
+  background: transparent;
+  border: 0;
+  border-bottom: 1px solid transparent;
+  margin-bottom: -1px;
+  transition: color .15s, border-color .15s;
+}
+#tab-history .sub-tab-btn:hover { color: var(--ink); }
+#tab-history .sub-tab-btn.sub-tab-active {
+  color: var(--ink);
+  font-weight: 500;
+  border-bottom-color: var(--ink);
+}
+
+/* History filters row */
+#tab-history .history-filters {
+  display: flex;
+  gap: 16px;
+  padding: 14px 0;
+  border-bottom: 1px solid var(--line);
+  margin-bottom: 16px;
+  flex-wrap: wrap;
+  align-items: end;
+}
+#tab-history .history-filter-group {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 140px;
+}
+#tab-history .filter-label {
+  font-size: 11px;
+  color: var(--ink-3);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  font-weight: 500;
+}
+
+/* History list / activity / security log rows (rendered via JS into .history-list) */
+#tab-history .history-list,
+#tab-history .schedules-list,
+#tab-schedules .schedules-list { padding: 0; }
+
+/* Schedules card list (rendered via JS into .schedules-list) */
+.schedules-list .schedule-card,
+#schedulesList .schedule-card,
+#schedulesList .sched-row {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 24px;
+  padding: 18px 22px;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: var(--surface);
+  margin-bottom: 10px;
+  align-items: center;
+}
+
+/* ----- Settings v2 polish ----- */
+#tab-settings .settings-shell {
+  display: grid;
+  grid-template-columns: 220px 1fr;
+  gap: 48px;
+  margin-top: 8px;
+}
+#tab-settings .settings-sidebar {
+  border-right: 1px solid var(--line);
+  padding-right: 24px;
+  background: transparent;
+}
+#tab-settings .settings-nav-group-label {
+  font-size: 11px;
+  color: var(--ink-3);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  margin: 0 0 12px;
+  font-weight: 500;
+}
+#tab-settings .settings-nav-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 8px 0;
+  background: transparent;
+  border: 0;
+  color: var(--ink-2);
+  font-size: 14px;
+  text-align: left;
+  cursor: pointer;
+  position: relative;
+  transition: color .15s;
+}
+#tab-settings .settings-nav-item:hover { color: var(--ink); }
+#tab-settings .settings-nav-item svg {
+  width: 14px;
+  height: 14px;
+  color: var(--ink-3);
+  flex-shrink: 0;
+}
+#tab-settings .settings-nav-item.settings-nav-active {
+  color: var(--ink);
+  font-weight: 500;
+  background: transparent;
+}
+#tab-settings .settings-nav-item.settings-nav-active::before {
+  content: "";
+  position: absolute;
+  left: -25px;
+  top: 50%;
+  width: 2px;
+  height: 16px;
+  background: var(--acc);
+  transform: translateY(-50%);
+}
+#tab-settings .settings-nav-item.settings-nav-active svg { color: var(--ink); }
+
+#tab-settings .settings-content { min-width: 0; }
+#tab-settings .settings-pane { display: none; }
+#tab-settings .settings-pane.active { display: block; }
+#tab-settings .settings-pane-header { margin-bottom: 24px; }
+#tab-settings .settings-pane-title {
+  font-size: 24px;
+  font-weight: 500;
+  letter-spacing: -0.02em;
+  margin: 0 0 8px;
+  color: var(--ink);
+}
+#tab-settings .settings-pane-desc {
+  color: var(--ink-2);
+  font-size: 14px;
+  line-height: 1.55;
+  max-width: 60ch;
+  margin: 0;
+}
+
+#tab-settings .settings-group {
+  margin-bottom: 32px;
+}
+#tab-settings .settings-group-title {
+  font-size: 11px;
+  color: var(--ink-3);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  margin: 24px 0 4px;
+  padding-top: 20px;
+  border-top: 1px solid var(--line);
+  font-weight: 500;
+}
+#tab-settings .settings-group:first-child .settings-group-title {
+  border-top: 0;
+  padding-top: 0;
+  margin-top: 0;
+}
+
+#tab-settings .settings-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 24px;
+  padding: 16px 0;
+  border-bottom: 1px solid var(--line);
+  cursor: pointer;
+}
+#tab-settings .settings-row-info {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+#tab-settings .settings-row-label {
+  font-size: 14px;
+  color: var(--ink);
+  font-weight: 500;
+}
+#tab-settings .settings-row-desc {
+  font-size: 12.5px;
+  color: var(--ink-3);
+  line-height: 1.45;
+}
+
+/* iOS-style switch (.toggle-switch / track / thumb) */
+#tab-settings .toggle-switch {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  flex-shrink: 0;
+  cursor: pointer;
+}
+#tab-settings .toggle-switch input { display: none; }
+#tab-settings .toggle-track {
+  display: inline-block;
+  width: 36px;
+  height: 20px;
+  border-radius: 999px;
+  background: var(--line);
+  position: relative;
+  transition: background .15s;
+}
+#tab-settings .toggle-thumb {
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: var(--surface);
+  box-shadow: 0 1px 2px oklch(0 0 0 / .25);
+  transition: left .15s;
+}
+#tab-settings .toggle-switch input:checked + .toggle-track {
+  background: var(--acc);
+}
+#tab-settings .toggle-switch input:checked + .toggle-track .toggle-thumb {
+  left: 18px;
+}
+
+/* Settings-saved confirmation message */
+#tab-settings .settings-saved-msg,
+#tab-schedules .settings-saved-msg {
+  font-size: 12.5px;
+  color: var(--ok);
+  font-weight: 500;
+}
+#tab-settings .alert-inline,
+#tab-schedules .alert-inline {
+  font-size: 12.5px;
+  color: var(--crit);
+}
+
+/* ----- Demo picker re-skin ----- */
+#tab-diff .demo-picker-card .card-subtitle,
+#tab-diff .demo-config-desc {
+  color: var(--ink-3);
+}
+#tab-diff .demo-config-card {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  padding: 16px;
+  transition: border-color .15s;
+}
+#tab-diff .demo-config-card:hover {
+  border-color: var(--ink);
+  box-shadow: none;
+  background: var(--surface);
+}
+#tab-diff .demo-config-card.demo-config-selected {
+  border-color: var(--ink);
+  background: var(--tint);
+}
+#tab-diff .demo-config-label { color: var(--ink); }
+#tab-diff .demo-config-action { color: var(--ink-2); }
+
+/* ----- Diff results: chips and lines ----- */
+#tab-diff .diff-summary-row,
+#tab-diff #diffSummary {
+  display: flex;
+  gap: 8px;
+  margin: 16px 0;
+  flex-wrap: wrap;
+}
+
+/* ----- Misc utility re-skins ----- */
+#tab-diff .text-muted,
+#tab-connect .text-muted,
+#tab-history .text-muted,
+#tab-schedules .text-muted,
+#tab-settings .text-muted { color: var(--ink-3); }
+
+#tab-diff .link-btn,
+#tab-connect .link-btn,
+#tab-history .link-btn,
+#tab-schedules .link-btn,
+#tab-settings .link-btn {
+  color: var(--ink-2);
+  text-decoration: underline;
+  background: transparent;
+  border: 0;
+  font-size: 13px;
+  cursor: pointer;
+  padding: 0;
+}
+#tab-diff .link-btn:hover,
+#tab-connect .link-btn:hover,
+#tab-history .link-btn:hover,
+#tab-schedules .link-btn:hover,
+#tab-settings .link-btn:hover { color: var(--ink); }
+
+#tab-diff .archive-saved-msg,
+#tab-connect .archive-saved-msg {
+  font-size: 12.5px;
+  color: var(--ok);
+}
+
+/* Detected vendor pill v2 */
+#tab-diff .detected-vendor,
+#tab-connect .detected-vendor,
+#tab-history .detected-vendor {
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  padding: 3px 10px;
+  border-radius: 999px;
+  background: var(--tint);
+  border: 1px solid var(--line);
+  color: var(--ink-2);
+}
+
+/* Connect grid retain 2-col but re-style as hairline rows */
+#tab-connect .connect-grid {
+  grid-template-columns: 1fr 1fr;
+}
+#tab-connect .connect-grid .form-group[style*="grid-column"] {
+  grid-column: 1 / -1 !important;
+}
+@media (max-width: 720px) {
+  #tab-connect .connect-grid { grid-template-columns: 1fr; }
+  #tab-diff .form-group,
+  #tab-connect .form-group,
+  #tab-schedules .form-group {
+    grid-template-columns: 1fr;
+    gap: 8px;
+  }
+  #tab-settings .settings-shell { grid-template-columns: 1fr; gap: 24px; }
+  #tab-settings .settings-sidebar {
+    border-right: 0;
+    border-bottom: 1px solid var(--line);
+    padding: 0 0 16px;
+  }
+}
+
+/* History list rendered rows (JS-rendered, target by structure) */
+#tab-history #historyList p,
+#tab-history #activityList p,
+#tab-history #secLogList p,
+#tab-schedules #schedulesList p {
+  color: var(--ink-3);
+  font-size: 13px;
+  padding: 16px 0;
+}
+
+/* Spinner color v2 */
+#tab-diff .btn-primary .spinner,
+#tab-connect .btn-primary .spinner,
+#tab-schedules .btn-primary .spinner {
+  border-color: color-mix(in oklab, var(--acc-ink) 30%, transparent);
+  border-top-color: var(--acc-ink);
+}
