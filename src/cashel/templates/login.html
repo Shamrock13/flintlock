@@ -1,118 +1,230 @@
 <!DOCTYPE html>
-<html lang="en" data-theme="dark">
+<html lang="en" data-theme="light">
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <meta name="csrf-token" content="{{ csrf_token() }}" />
-  <title>Cashel — Login</title>
+  <title>Cashel &mdash; Login</title>
   <link rel="icon" type="image/svg+xml" href="{{ url_for('static', filename='favicon.svg') }}" />
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Geist:wght@300;400;500;600;700&family=Geist+Mono:wght@400;500&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}" />
   <style>
-    .login-wrap {
+    /* Force light tokens — login is always light */
+    :root {
+      --acc:     oklch(0.86 0.19 128);
+      --acc-ink: oklch(0.22 0.08 140);
+    }
+
+    .auth-wrap {
       display: flex;
       align-items: center;
       justify-content: center;
       min-height: 100vh;
       background: var(--bg);
+      padding: 40px 20px;
     }
-    .login-card {
-      background: var(--card-bg);
-      border: 1px solid var(--border);
-      border-radius: 12px;
-      padding: 2.5rem 2rem;
+
+    .auth-card {
       width: 100%;
-      max-width: 380px;
-      box-shadow: 0 4px 24px rgba(0,0,0,0.3);
+      max-width: 400px;
     }
-    .login-logo {
-      font-size: 1.5rem;
-      font-weight: 700;
-      color: var(--accent);
-      margin-bottom: 0.25rem;
-    }
-    .login-sub {
-      font-size: 0.85rem;
-      color: var(--text-muted);
-      margin-bottom: 2rem;
-    }
-    .login-field {
+
+    /* Brand */
+    .auth-brand {
       display: flex;
-      flex-direction: column;
-      gap: 0.4rem;
-      margin-bottom: 1.25rem;
+      align-items: center;
+      gap: 10px;
+      margin-bottom: 36px;
     }
-    .login-field label {
-      font-size: 0.82rem;
+    .auth-logomark { width: 32px; height: 32px; flex-shrink: 0; display: block; }
+    .auth-wordmark {
+      font-size: 20px;
       font-weight: 600;
-      color: var(--text-muted);
+      color: var(--ink);
+      letter-spacing: -0.02em;
+    }
+
+    /* Header */
+    .auth-eyebrow {
+      font-size: 12px;
+      color: var(--ink-3);
+      font-weight: 500;
+      letter-spacing: 0.04em;
+      margin-bottom: 8px;
+    }
+    .auth-heading {
+      font-size: clamp(26px, 4vw, 34px);
+      font-weight: 500;
+      letter-spacing: -0.03em;
+      line-height: 1.05;
+      color: var(--ink);
+      margin: 0 0 12px;
+    }
+    .auth-heading em {
+      font-style: normal;
+      color: var(--ink-3);
+      font-weight: 300;
+    }
+    .auth-desc {
+      font-size: 13.5px;
+      color: var(--ink-2);
+      line-height: 1.55;
+      margin: 0 0 36px;
+    }
+
+    /* Error */
+    .auth-error {
+      display: flex;
+      align-items: flex-start;
+      gap: 8px;
+      padding: 12px 14px;
+      border-radius: 10px;
+      background: color-mix(in oklab, var(--crit) 8%, var(--surface));
+      border: 1px solid color-mix(in oklab, var(--crit) 30%, var(--line));
+      color: var(--crit);
+      font-size: 13px;
+      line-height: 1.45;
+      margin-bottom: 24px;
+    }
+    .auth-error svg { flex-shrink: 0; margin-top: 1px; }
+
+    /* Form fields */
+    .auth-form { display: grid; border-top: 1px solid var(--line); }
+    .auth-field {
+      padding: 22px 0;
+      border-bottom: 1px solid var(--line);
+      display: grid;
+      gap: 6px;
+    }
+    .auth-label {
+      font-size: 11px;
+      color: var(--ink-3);
+      font-weight: 500;
+      letter-spacing: 0.06em;
       text-transform: uppercase;
-      letter-spacing: 0.5px;
     }
-    .login-field input {
+    .auth-input {
       width: 100%;
-      padding: 0.65rem 0.85rem;
-      background: var(--input-bg);
-      border: 1px solid var(--border);
-      border-radius: 6px;
-      color: var(--text);
-      font-size: 0.95rem;
-      font-family: monospace;
-      box-sizing: border-box;
-    }
-    .login-field input:focus {
+      background: transparent;
+      border: 0;
+      border-bottom: 1px solid var(--line-2);
+      padding: 10px 0;
+      font-size: 15px;
+      font-family: 'Geist', ui-sans-serif, system-ui, sans-serif;
+      color: var(--ink);
       outline: none;
-      border-color: var(--accent);
+      transition: border-color .15s;
+      letter-spacing: -0.005em;
     }
-    .login-btn {
-      width: 100%;
-      padding: 0.7rem;
-      background: var(--accent);
-      color: #fff;
+    .auth-input::placeholder { color: var(--ink-4); }
+    .auth-input:focus { border-bottom-color: var(--ink); }
+
+    /* Actions row */
+    .auth-actions {
+      display: flex;
+      align-items: center;
+      justify-content: flex-end;
+      padding-top: 28px;
+    }
+
+    /* Submit — pill, matches .btn-run */
+    .auth-btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 10px;
+      background: var(--acc);
+      color: var(--acc-ink);
+      padding: 13px 22px;
+      border-radius: 999px;
+      font-weight: 500;
+      font-size: 14px;
+      font-family: 'Geist', ui-sans-serif, system-ui, sans-serif;
+      letter-spacing: -0.005em;
       border: none;
-      border-radius: 6px;
-      font-size: 0.95rem;
-      font-weight: 600;
       cursor: pointer;
-      transition: opacity 0.15s;
+      transition: filter .15s, transform .08s;
     }
-    .login-btn:hover { opacity: 0.88; }
-    .login-error {
-      background: var(--finding-high-bg);
-      border: 1px solid var(--high);
-      color: var(--high);
-      border-radius: 6px;
-      padding: 0.6rem 0.85rem;
-      font-size: 0.88rem;
-      margin-bottom: 1.25rem;
+    .auth-btn:hover { filter: brightness(1.04); }
+    .auth-btn:active { transform: translateY(1px); }
+    .auth-btn svg { width: 12px; height: 12px; }
+
+    /* Footer */
+    .auth-footer {
+      margin-top: 40px;
+      font-size: 12px;
+      color: var(--ink-4);
+      display: flex;
+      gap: 16px;
     }
+    .auth-footer a { color: inherit; text-decoration: none; }
+    .auth-footer a:hover { color: var(--ink-2); }
   </style>
 </head>
 <body>
-  <div class="login-wrap">
-    <div class="login-card">
-      <div class="login-logo">&#128274; Cashel</div>
-      <div class="login-sub">Firewall Configuration Auditor</div>
+  <div class="auth-wrap">
+    <div class="auth-card">
+
+      <!-- Brand -->
+      <div class="auth-brand">
+        <svg class="auth-logomark" viewBox="0 0 120 120" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+          <rect x="0" y="0" width="120" height="120" rx="22" fill="var(--ink)"/>
+          <path d="M24 86 V42 H38 V58 H52 V42 H68 V58 H82 V42 H96 V86 Z" fill="var(--acc)"/>
+        </svg>
+        <span class="auth-wordmark">Cashel</span>
+      </div>
+
+      <!-- Header -->
+      <div class="auth-eyebrow">Firewall audit</div>
+      <h1 class="auth-heading">Welcome<br/><em>back.</em></h1>
+      <p class="auth-desc">Sign in to continue to your audit dashboard.</p>
 
       {% if error %}
-      <div class="login-error">{{ error }}</div>
+      <div class="auth-error" role="alert">
+        <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" width="14" height="14" aria-hidden="true">
+          <circle cx="8" cy="8" r="6.5"/>
+          <line x1="8" y1="5" x2="8" y2="8.5"/>
+          <circle cx="8" cy="11" r=".6" fill="currentColor" stroke="none"/>
+        </svg>
+        {{ error }}
+      </div>
       {% endif %}
 
-      <form method="POST" action="{{ url_for('auth.login_post', next=request.args.get('next', '')) }}">
+      <!-- Form -->
+      <form class="auth-form" method="POST" action="{{ url_for('auth.login_post', next=request.args.get('next', '')) }}">
         <input type="hidden" name="csrf_token" value="{{ csrf_token() }}" />
-        <div class="login-field">
-          <label for="username">Username</label>
-          <input type="text" id="username" name="username"
+
+        <div class="auth-field">
+          <label class="auth-label" for="username">Username</label>
+          <input class="auth-input" type="text" id="username" name="username"
                  autocomplete="username" autofocus required
                  placeholder="Username" />
         </div>
-        <div class="login-field">
-          <label for="password">Password</label>
-          <input type="password" id="password" name="password"
+
+        <div class="auth-field">
+          <label class="auth-label" for="password">Password</label>
+          <input class="auth-input" type="password" id="password" name="password"
                  autocomplete="current-password" required
                  placeholder="Password" />
         </div>
-        <button type="submit" class="login-btn">Sign In</button>
+
+        <div class="auth-actions">
+          <button type="submit" class="auth-btn">
+            Sign in
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+              <path d="M5 12h14"/><path d="M13 6l6 6-6 6"/>
+            </svg>
+          </button>
+        </div>
       </form>
+
+      <div class="auth-footer">
+        <span>Cashel</span>
+        <a href="https://github.com/shamrock13/cashel" target="_blank" rel="noopener">Docs</a>
+        <a href="https://github.com/shamrock13/cashel" target="_blank" rel="noopener">GitHub</a>
+      </div>
+
     </div>
   </div>
 </body>
