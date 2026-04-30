@@ -143,13 +143,13 @@
     <section class="tab-panel" id="tab-audit">
 
       <!-- Page head -->
-      <section class="hero-v2">
+      <section class="hero">
         <div>
           <div class="hero-eyebrow">Audit runner</div>
           <h1>Review a firewall<br/><em>in one pass.</em></h1>
         </div>
         <div style="display:flex;align-items:flex-end;padding-bottom:8px">
-          <div class="seg-v2" role="group" aria-label="Audit mode" id="auditModeSegmented">
+          <div class="seg" role="group" aria-label="Audit mode" id="auditModeSegmented">
             <button aria-pressed="true" data-mode="single">Single file</button>
             <button aria-pressed="false" data-mode="bulk">Bulk</button>
           </div>
@@ -226,7 +226,7 @@
                 </div>
 
                 <!-- Vendor + Compliance (split) -->
-                <div class="field split-v2">
+                <div class="field split">
                   <div>
                     <div class="label">Vendor &amp; compliance</div>
                     <div class="help">Cashel auto-detects vendor from syntax; override if needed.</div>
@@ -264,14 +264,14 @@
                     <div class="help">Toggle what happens when the audit completes.</div>
                   </div>
                   <div class="ctrl">
-                    <div class="toggles-v2">
-                      <label class="tgl-v2" id="tglReport" data-key="report">
+                    <div class="toggles">
+                      <label class="tgl" id="tglReport" data-key="report">
                         <input type="checkbox" id="report" name="report" value="1" />
-                        <span class="tgl-mark"></span>PDF report
+                        <span class="mark"></span>PDF report
                       </label>
-                      <label class="tgl-v2" id="tglArchive" data-key="archive">
+                      <label class="tgl" id="tglArchive" data-key="archive">
                         <input type="checkbox" id="archive" name="archive" value="1" />
-                        <span class="tgl-mark"></span>Save to history
+                        <span class="mark"></span>Save to history
                       </label>
                     </div>
                   </div>
@@ -279,8 +279,8 @@
 
               </div><!-- /form -->
 
-              <div class="form-actions-v2">
-                <div class="meta-v2" id="auditFormMeta">Ready</div>
+              <div class="form-actions">
+                <div class="meta" id="auditFormMeta">Ready</div>
                 <div style="display:flex;gap:4px;align-items:center">
                   <button type="submit" class="btn-run" id="submitBtn">
                     <span id="submitText">Run audit</span>
@@ -384,7 +384,7 @@
                     </label>
                   </div>
                 </div>
-                <div class="field split-v2">
+                <div class="field split">
                   <div>
                     <div class="label">Vendor &amp; compliance</div>
                   </div>
@@ -416,17 +416,17 @@
                 <div class="field">
                   <div><div class="label">Options</div></div>
                   <div class="ctrl">
-                    <div class="toggles-v2">
-                      <label class="tgl-v2" data-key="bulkArchive">
+                    <div class="toggles">
+                      <label class="tgl" data-key="bulkArchive">
                         <input type="checkbox" id="bulkArchive" name="archive" value="1" />
-                        <span class="tgl-mark"></span>Save all to history
+                        <span class="mark"></span>Save all to history
                       </label>
                     </div>
                   </div>
                 </div>
               </div>
-              <div class="form-actions-v2">
-                <div class="meta-v2">Upload multiple configs to audit in batch</div>
+              <div class="form-actions">
+                <div class="meta">Upload multiple configs to audit in batch</div>
                 <button type="submit" class="btn-run" id="bulkBtn">
                   <span id="bulkText">Run Bulk Audit</span>
                   <span id="bulkSpinner" class="spinner hidden" style="border-color:rgba(0,0,0,0.2);border-top-color:var(--acc-ink)"></span>
@@ -511,7 +511,7 @@
 
     <!-- ═════════════════════════════════════════ COMPARE CONFIGS ══ -->
     <section class="tab-panel hidden" id="tab-diff">
-      <header class="page-head-v2">
+      <header class="page-head">
         <div>
           <div class="eyebrow">Diff tool</div>
           <h1>Compare<br/><em>two configs.</em></h1>
@@ -592,7 +592,7 @@
 
     <!-- ══════════════════════════════════════════ LIVE CONNECT ══════ -->
     <section class="tab-panel hidden" id="tab-connect">
-      <header class="page-head-v2">
+      <header class="page-head">
         <div>
           <div class="eyebrow">Live SSH</div>
           <h1>Pull config<br/><em>in real time.</em></h1>
@@ -713,7 +713,7 @@
 
     <!-- ═══════════════════════════════════════════════ HISTORY ══════ -->
     <section class="tab-panel hidden" id="tab-history">
-      <header class="page-head-v2">
+      <header class="page-head">
         <div>
           <div class="eyebrow">History</div>
           <h1>Everything<br/><em>that ran.</em></h1>
@@ -858,7 +858,7 @@
 
     <!-- ═══════════════════════════════════════════════ SCHEDULES ══════ -->
     <section class="tab-panel hidden" id="tab-schedules">
-      <header class="page-head-v2">
+      <header class="page-head">
         <div>
           <div class="eyebrow">Recurring audits</div>
           <h1>Schedule<br/><em>everything.</em></h1>
@@ -1007,7 +1007,7 @@
 
     <!-- ════════════════════════════════════════════════ SETTINGS ══════ -->
     <section class="tab-panel hidden" id="tab-settings">
-      <header class="page-head-v2">
+      <header class="page-head">
         <div>
           <div class="eyebrow">Configuration</div>
           <h1>Settings</h1>
@@ -1082,9 +1082,9 @@
                   <span class="settings-row-label">Always generate PDF report</span>
                   <span class="settings-row-desc">Pre-check &ldquo;Generate PDF Report&rdquo; on every file audit.</span>
                 </div>
-                <label class="toggle-switch">
+                <label class="sw-toggle">
                   <input type="checkbox" id="setting-auto-pdf" />
-                  <span class="toggle-track"><span class="toggle-thumb"></span></span>
+                  <span class="track"></span>
                 </label>
               </label>
               <label class="settings-row">
@@ -1092,9 +1092,9 @@
                   <span class="settings-row-label">Always save to Audit History</span>
                   <span class="settings-row-desc">Pre-check &ldquo;Save to Audit History&rdquo; on every file audit.</span>
                 </div>
-                <label class="toggle-switch">
+                <label class="sw-toggle">
                   <input type="checkbox" id="setting-auto-archive" />
-                  <span class="toggle-track"><span class="toggle-thumb"></span></span>
+                  <span class="track"></span>
                 </label>
               </label>
             </div>
@@ -1199,9 +1199,9 @@
                   <span class="settings-row-label">Enable Authentication</span>
                   <span class="settings-row-desc">Require an API key to access the web UI and all API endpoints.</span>
                 </div>
-                <label class="toggle-switch">
+                <label class="sw-toggle">
                   <input type="checkbox" id="setting-auth-enabled" />
-                  <span class="toggle-track"><span class="toggle-thumb"></span></span>
+                  <span class="track"></span>
                 </label>
               </label>
               <div class="settings-row">
@@ -1375,9 +1375,9 @@
                   <span class="settings-row-label">Enable Syslog Forwarding</span>
                   <span class="settings-row-desc">Send application log events to the configured syslog target.</span>
                 </div>
-                <label class="toggle-switch">
+                <label class="sw-toggle">
                   <input type="checkbox" id="setting-syslog-enabled" />
-                  <span class="toggle-track"><span class="toggle-thumb"></span></span>
+                  <span class="track"></span>
                 </label>
               </label>
             </div>
@@ -1487,7 +1487,7 @@
               <p class="settings-pane-desc">Cashel runs a free hygiene engine out of the box. A license unlocks compliance frameworks (HIPAA, CIS Benchmark v8, NIST 800-53, PCI-DSS 4.0) and removes the per-run watermark on PDF reports.</p>
             </div>
 
-            <div class="sub-head-v2">Current license</div>
+            <div class="sub-head">Current license</div>
             <div class="lic-card">
               <div class="lic-card-row">
                 <div>
@@ -1505,9 +1505,9 @@
               </div>
             </div>
 
-            <div class="sub-head-v2">Activate a license key</div>
+            <div class="sub-head">Activate a license key</div>
             <div class="form">
-              <div class="field split-v2">
+              <div class="field split">
                 <div>
                   <div class="label">License key</div>
                   <div class="help">Paste the key from your purchase email. Activation is local — no telemetry.</div>
@@ -1527,14 +1527,14 @@
                 </div>
                 <div class="ctrl">
                   <div style="display:flex;gap:8px;flex-wrap:wrap;">
-                    <button type="button" class="btn-ghost-v2" style="border:1px solid var(--line-2);border-radius:999px;padding:8px 14px;font-size:13px;color:var(--ink-2)">Download request</button>
-                    <button type="button" class="btn-ghost-v2" style="border:1px solid var(--line-2);border-radius:999px;padding:8px 14px;font-size:13px;color:var(--ink-2)">Import response</button>
+                    <button type="button" class="btn-ghost" style="border:1px solid var(--line-2);border-radius:999px;padding:8px 14px;font-size:13px;color:var(--ink-2)">Download request</button>
+                    <button type="button" class="btn-ghost" style="border:1px solid var(--line-2);border-radius:999px;padding:8px 14px;font-size:13px;color:var(--ink-2)">Import response</button>
                   </div>
                 </div>
               </div>
             </div>
 
-            <div class="sub-head-v2" style="margin-top:2rem">What a license unlocks</div>
+            <div class="sub-head" style="margin-top:2rem">What a license unlocks</div>
             <div class="lic-features">
               <div class="lic-feat"><span class="dot"></span><div><div class="t">Compliance frameworks</div><div class="d">HIPAA Security Rule, CIS Benchmark v8, NIST 800-53, PCI-DSS 4.0.</div></div></div>
               <div class="lic-feat"><span class="dot"></span><div><div class="t">Bulk + scheduled audits</div><div class="d">Run more than 3 configs at once and schedule recurring audits.</div></div></div>
@@ -1543,8 +1543,8 @@
             </div>
 
             <div style="padding-top:28px;display:flex;gap:8px;flex-wrap:wrap;align-items:center;">
-              <button type="button" class="btn-ghost-v2" id="deactivateLicenseBtn" style="{% if not licensed %}display:none;{% endif %}border:1px solid color-mix(in oklab,var(--crit) 40%,transparent);border-radius:999px;padding:8px 14px;font-size:13px;color:var(--crit)">Deactivate license</button>
-              <a href="https://cashel.dev" target="_blank" rel="noopener" class="btn-ghost-v2" style="border:1px solid var(--line-2);border-radius:999px;padding:8px 14px;font-size:13px;color:var(--ink-2)">Buy a license &rarr;</a>
+              <button type="button" class="btn-ghost" id="deactivateLicenseBtn" style="{% if not licensed %}display:none;{% endif %}border:1px solid color-mix(in oklab,var(--crit) 40%,transparent);border-radius:999px;padding:8px 14px;font-size:13px;color:var(--crit)">Deactivate license</button>
+              <a href="https://cashel.dev" target="_blank" rel="noopener" class="btn-ghost" style="border:1px solid var(--line-2);border-radius:999px;padding:8px 14px;font-size:13px;color:var(--ink-2)">Buy a license &rarr;</a>
               <span style="margin-left:auto;color:var(--ink-3);font-size:13px;">Need help? <a href="mailto:support@cashel.dev" style="color:var(--ink-2);text-decoration:underline">support@cashel.dev</a></span>
             </div>
 
@@ -1688,7 +1688,7 @@
     </h4>
     <div class="tweaks-row">
       <label>Theme</label>
-      <div class="seg-v2">
+      <div class="seg">
         <button id="twLight" aria-pressed="true" onclick="applyTheme('light')">Light</button>
         <button id="twDark"  aria-pressed="false" onclick="applyTheme('dark')">Dark</button>
       </div>
@@ -2081,7 +2081,7 @@
 
   // v2 toggle pills — sync .on class with checkbox state
   (function() {
-    document.querySelectorAll('.tgl-v2').forEach(function(tgl) {
+    document.querySelectorAll('.tgl').forEach(function(tgl) {
       const cb = tgl.querySelector('input[type="checkbox"]');
       if (!cb) return;
       // set initial state
