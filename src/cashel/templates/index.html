@@ -1021,7 +1021,7 @@
 
         <!-- ── Left sidebar — admin only ─────────────────────────────────── -->
         {% if not current_user or current_user.role == 'admin' %}
-        <nav class="settings-sidebar" role="navigation" aria-label="Settings sections">
+        <nav class="settings-nav" role="navigation" aria-label="Settings sections">
           <div class="settings-nav-group-label">Configuration</div>
 
           <a class="active" data-pane="general" onclick="showSettingsPane('general'); return false;" href="#">
