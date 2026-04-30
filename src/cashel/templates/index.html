@@ -721,15 +721,15 @@
       </header>
 
       <!-- History sub-tabs: Audit History / Activity Log -->
-      <div class="sub-tab-nav">
-        <button class="sub-tab-btn sub-tab-active" data-subtab="audits">&#128337; Audit History</button>
+      <nav class="subnav">
+        <a class="active" data-subtab="audits" onclick="switchHistorySubTab('audits'); return false;" href="#">&#128337; Audit History</a>
         {% if not current_user or current_user.role == 'admin' %}
-        <button class="sub-tab-btn" data-subtab="activity">&#128203; Activity Log</button>
+        <a data-subtab="activity" onclick="switchHistorySubTab('activity'); return false;" href="#">&#128203; Activity Log</a>
         {% endif %}
         {% if not current_user or current_user.role in ('admin', 'auditor') %}
-        <button class="sub-tab-btn" data-subtab="seclog">&#128274; Security Log</button>
+        <a data-subtab="seclog" onclick="switchHistorySubTab('seclog'); return false;" href="#">&#128274; Security Log</a>
         {% endif %}
-      </div>
+      </nav>
 
       <!-- ── Audit History sub-tab ── -->
       <div id="sub-audits">
@@ -1940,7 +1940,7 @@
 
   // ═══════════════════════════════════════ HISTORY SUB-TABS (audits/activity) ══
   function switchHistorySubTab(subtab) {
-    document.querySelectorAll(".sub-tab-btn").forEach(b => b.classList.toggle("sub-tab-active", b.dataset.subtab === subtab));
+    document.querySelectorAll(".subnav a[data-subtab]").forEach(a => a.classList.toggle("active", a.dataset.subtab === subtab));
     const subAudits = document.getElementById("sub-audits");
     const subActivity = document.getElementById("sub-activity");
     const subSecLog = document.getElementById("sub-seclog");
@@ -1950,9 +1950,6 @@
     if (subtab === "activity") loadActivity();
     if (subtab === "seclog") loadSecLog();
   }
-  document.querySelectorAll(".sub-tab-btn").forEach(btn =>
-    btn.addEventListener("click", () => switchHistorySubTab(btn.dataset.subtab))
-  );
 
   // ═════════════════════════════════════════════════════ FILE AUDIT ══════
   // ── CSRF: attach token to every non-GET fetch automatically ─────────────────
@@ -2709,21 +2706,22 @@
       const crit = e.summary?.critical || 0, hi = e.summary?.high || 0, med = e.summary?.medium || 0, tot = e.summary?.total || 0;
       const primaryName = e.tag ? escHtml(e.tag) + " <span style='font-weight:400;color:var(--text-muted)'>v" + (e.version || 1) + "</span>" : escHtml(e.filename);
       const secondaryMeta = e.tag ? escHtml(e.filename) + " &bull; " + escHtml(vendor) + " &bull; " + escHtml(ts) : escHtml(vendor) + " &bull; " + escHtml(ts);
-      return `<div class="history-entry" data-id="${escHtml(e.id)}">
-        <div class="history-entry-left">
-          <label class="history-check-wrap" title="Select to compare">
-            <input type="checkbox" class="history-check" data-id="${escHtml(e.id)}" />
-          </label>
-          <div class="history-entry-info">
-            <span class="history-filename">${primaryName}</span>
-            <span class="history-meta">${secondaryMeta}</span>
-          </div>
+      return `<div class="list-row" data-id="${escHtml(e.id)}">
+        <label class="check" title="Select to compare">
+          <input type="checkbox" class="history-check" data-id="${escHtml(e.id)}" style="display:none" />
+          <svg viewBox="0 0 10 8"><polyline points="1,4 4,7 9,1" fill="none" stroke="currentColor" stroke-width="1.5"/></svg>
+        </label>
+        <div>
+          <div class="title">${primaryName}</div>
+          <div class="meta">${secondaryMeta}</div>
         </div>
-        <div class="history-entry-right">
+        <div class="sev-chips">
           <span class="sev-chip crit" title="Critical">${crit}</span>
           <span class="sev-chip high" title="High">${hi}</span>
           <span class="sev-chip med" title="Medium">${med}</span>
           <span class="sev-chip total" title="Total">${tot}</span>
+        </div>
+        <div style="display:flex;gap:0.4rem;align-items:center;flex-wrap:wrap;">
           <button class="btn-secondary btn-sm" data-rem-archive="${escHtml(e.id)}" title="View Remediation Plan">&#9881; Plan</button>
           <a class="btn-secondary btn-sm" href="/archive/${escHtml(e.id)}/export?fmt=json"  download title="Download JSON">JSON</a>
           <a class="btn-secondary btn-sm" href="/archive/${escHtml(e.id)}/export?fmt=csv"   download title="Download CSV">CSV</a>
@@ -2750,11 +2748,13 @@
           if (compareSelections.length >= 2) {
             const old = compareSelections.shift();
             const oldCb = el.querySelector(`.history-check[data-id="${old}"]`);
-            if (oldCb) oldCb.checked = false;
+            if (oldCb) { oldCb.checked = false; oldCb.closest(".check")?.classList.remove("on"); }
           }
           compareSelections.push(this.dataset.id);
+          this.closest(".check")?.classList.add("on");
         } else {
           compareSelections = compareSelections.filter(id => id !== this.dataset.id);
+          this.closest(".check")?.classList.remove("on");
         }
         updateCompareBar();
       });
@@ -2965,17 +2965,14 @@
       const vendor = VENDOR_LABELS[e.vendor] || e.vendor || "";
       const ok     = e.success;
       const errMsg = e.error ? `<span class="activity-error">${escHtml(e.error)}</span>` : "";
-      return `<div class="activity-entry ${ok ? "" : "activity-entry-fail"}">
-        <div class="activity-entry-left">
-          <span class="activity-action-badge">${escHtml(action)}</span>
-          <div class="history-entry-info">
-            <span class="history-filename">${escHtml(e.label)}</span>
-            <span class="history-meta">${vendor ? escHtml(vendor) + " &bull; " : ""}${escHtml(ts)}</span>
-            ${errMsg}
-          </div>
+      return `<div class="log-row ${ok ? "" : "log-row-fail"}">
+        <span class="log-tag ${e.action ? escHtml(e.action) : ""}">${escHtml(action)}</span>
+        <div>
+          <div class="log-body">${escHtml(e.label)}</div>
+          <div class="log-meta">${vendor ? escHtml(vendor) + " &bull; " : ""}${escHtml(ts)}${errMsg ? " &bull; " + errMsg : ""}</div>
         </div>
-        <div class="activity-entry-right">
-          <span class="${ok ? "activity-ok" : "activity-fail"}">${ok ? "&#10003; OK" : "&#10007; Failed"}</span>
+        <div style="display:flex;gap:0.4rem;align-items:center;">
+          <span class="status ${ok ? "" : "status-fail"}">${ok ? "&#10003; OK" : "&#10007; Failed"}</span>
           <button class="btn-danger btn-sm" data-delete-activity="${escHtml(e.id)}" title="Delete">&#128465;</button>
         </div>
       </div>`;
@@ -3040,19 +3037,14 @@
       const ok     = e.success;
       const actor  = e.actor ? `<strong>${escHtml(e.actor)}</strong>` : "<em>unknown</em>";
       const target = e.target ? ` → ${escHtml(e.target)}` : "";
-      const ip     = e.ip_address ? `<span class="history-meta">${escHtml(e.ip_address)}</span>` : "";
-      return `<div class="activity-entry ${ok ? "" : "activity-entry-fail"}">
-        <div class="activity-entry-left">
-          <span class="activity-action-badge">${escHtml(label)}</span>
-          <div class="history-entry-info">
-            <span class="history-filename">${actor}${target}</span>
-            <span class="history-meta">${escHtml(ts)}</span>
-            ${ip}
-          </div>
+      const ip     = e.ip_address ? escHtml(e.ip_address) : "";
+      return `<div class="log-row ${ok ? "" : "log-row-fail"}">
+        <span class="log-tag ${ok ? "" : "fail"}">${escHtml(label)}</span>
+        <div>
+          <div class="log-body">${actor}${target}</div>
+          <div class="log-meta">${escHtml(ts)}${ip ? " &bull; " + ip : ""}</div>
         </div>
-        <div class="activity-entry-right">
-          <span class="${ok ? "activity-ok" : "activity-fail"}">${ok ? "&#10003;" : "&#10007;"}</span>
-        </div>
+        <span class="status ${ok ? "" : "status-fail"}">${ok ? "&#10003;" : "&#10007;"}</span>
       </div>`;
     }).join("");
   }
