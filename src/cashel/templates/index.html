@@ -1079,6 +1079,52 @@
               <p class="settings-pane-desc">Global defaults applied to every audit. Individual audit options always override these defaults.</p>
             </div>
 
+            <div class="sub-head">Appearance</div>
+
+            <div class="form">
+              <div class="field">
+                <label class="label">Theme</label>
+                <div class="seg" id="themeSegGeneral">
+                  <button id="setThemeLight" aria-pressed="true">Light</button>
+                  <button id="setThemeDark" aria-pressed="false">Dark</button>
+                </div>
+              </div>
+
+              <div class="field">
+                <label class="label">Accent Color</label>
+                <div class="accent-swatches" id="accentSwatchesGeneral">
+                  <div class="accent-swatch-wrap">
+                    <button class="accent-swatch active" data-accent="acid" aria-label="Acid" title="Acid"></button>
+                    <span class="swatch-label">Acid</span>
+                  </div>
+                  <div class="accent-swatch-wrap">
+                    <button class="accent-swatch" data-accent="blue" aria-label="Blue" title="Blue"></button>
+                    <span class="swatch-label">Blue</span>
+                  </div>
+                  <div class="accent-swatch-wrap">
+                    <button class="accent-swatch" data-accent="violet" aria-label="Violet" title="Violet"></button>
+                    <span class="swatch-label">Violet</span>
+                  </div>
+                  <div class="accent-swatch-wrap">
+                    <button class="accent-swatch" data-accent="amber" aria-label="Amber" title="Amber"></button>
+                    <span class="swatch-label">Amber</span>
+                  </div>
+                  <div class="accent-swatch-wrap">
+                    <button class="accent-swatch" data-accent="rose" aria-label="Rose" title="Rose"></button>
+                    <span class="swatch-label">Rose</span>
+                  </div>
+                  <div class="accent-swatch-wrap">
+                    <button class="accent-swatch" data-accent="teal" aria-label="Teal" title="Teal"></button>
+                    <span class="swatch-label">Teal</span>
+                  </div>
+                  <div class="accent-swatch-wrap">
+                    <button class="accent-swatch" data-accent="mono" aria-label="Mono" title="Mono"></button>
+                    <span class="swatch-label">Mono</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+
             <div class="settings-group">
               <h3 class="settings-group-title">File Audit Defaults</h3>
               <label class="settings-row">
@@ -1806,6 +1852,44 @@
     });
   });
   _updateAccentDot();
+
+  // ═══════════════════════════════ APPEARANCE SECTION (settings pane) ══
+  function _syncAppearanceUI() {
+    // Theme seg buttons
+    const curTheme = html.getAttribute('data-theme') || 'light';
+    const btnLight = document.getElementById('setThemeLight');
+    const btnDark  = document.getElementById('setThemeDark');
+    if (btnLight) btnLight.setAttribute('aria-pressed', String(curTheme === 'light'));
+    if (btnDark)  btnDark.setAttribute('aria-pressed',  String(curTheme === 'dark'));
+
+    // Accent swatches — set colors from _ACCENTS map and mark active
+    const curAccent = localStorage.getItem('cashel.accent') || 'acid';
+    document.querySelectorAll('#accentSwatchesGeneral .accent-swatch').forEach(btn => {
+      const key = btn.dataset.accent;
+      const v = window._ACCENTS?.[key];
+      if (v) btn.style.background = v.a;
+      btn.classList.toggle('active', key === curAccent);
+    });
+  }
+
+  document.getElementById('setThemeLight')?.addEventListener('click', () => {
+    window._applyTheme('light');
+    _syncAppearanceUI();
+    _updateAccentDot();
+  });
+  document.getElementById('setThemeDark')?.addEventListener('click', () => {
+    window._applyTheme('dark');
+    _syncAppearanceUI();
+    _updateAccentDot();
+  });
+  document.querySelectorAll('#accentSwatchesGeneral .accent-swatch').forEach(btn => {
+    btn.addEventListener('click', () => {
+      window._applyAccent(btn.dataset.accent);
+      _syncAppearanceUI();
+      _updateAccentDot();
+    });
+  });
+  _syncAppearanceUI();
 
   function maskLicenseKey(key) {
     const parts = key.split("-");
@@ -3469,6 +3553,7 @@
     if (link) link.classList.add('active');
     if (pane) pane.classList.add('active');
     /* Side-effects for specific panes */
+    if (id === 'general') _syncAppearanceUI();
     if (id === 'alerts') {
       loadAlertChannels();
       loadAlertThresholds();
