@@ -2111,6 +2111,8 @@
       if (activeFilter === "critical")   return cls === "crit";
       if (activeFilter === "high")       return cls === "high";
       if (activeFilter === "medium")     return cls === "med";
+      if (activeFilter === "low")        return cls === "low";
+      if (activeFilter === "info")       return cls === "info";
       if (activeFilter === "compliance") return cls === "compliance-high" || cls === "compliance-med";
       return true;
     });
@@ -3119,7 +3121,7 @@
     const remediation= typeof f === "object" ? f.remediation  : null;
     const cls        = findingClass(f);
     const catInfo    = category ? (CATEGORY_LABELS[category] || { label: category, cls: "cat-hygiene" }) : null;
-    const tagSpan    = catInfo ? `<span class="tag ${catInfo.cls}">${catInfo.label}</span>` : "";
+    const tagSpan    = catInfo ? `<span class="tag ${escHtml(catInfo.cls)}">${escHtml(catInfo.label)}</span>` : "";
     const fixDiv     = (!compactView && remediation)
       ? `<div class="fix">&#8618; ${escHtml(remediation)}</div>`
       : "";
