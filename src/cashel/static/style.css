@@ -131,15 +131,11 @@ button { cursor: pointer; border: 0; background: transparent; }
 }
 
 /* File field */
-.file-field { display: flex; align-items: center; justify-content: space-between; padding: 10px 0; border-bottom: 1px solid var(--line-2); gap: 20px; min-width: 0; }
-.file-field > div:first-child { min-width: 0; flex: 1 1 auto; overflow: hidden; }
+.file-field { display: flex; flex-direction: column; padding: 10px 0; border-bottom: 1px solid var(--line-2); gap: 4px; min-width: 0; }
 .file-field:hover { border-bottom-color: var(--ink); }
 .file-field.has-file { border-bottom-color: var(--ink); }
-.file-field .fname { font-size: 15px; color: var(--ink); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.file-field.empty .fname { color: var(--ink-4); }
-.file-field .fmeta { font-size: 12px; color: var(--ink-3); margin-top: 2px; }
-.file-field .browse { padding: 6px 12px; border: 1px solid var(--line-2); border-radius: 999px; font-size: 12px; color: var(--ink-2); flex: 0 0 auto; transition: border-color .15s, color .15s; }
-.file-field .browse:hover { border-color: var(--ink); color: var(--ink); }
+.file-field .file-label { display: flex; align-items: center; gap: 10px; flex: 1 1 auto; min-width: 0; cursor: pointer; font-size: 15px; color: var(--ink); }
+.file-field .file-name { font-size: 12px; color: var(--ink-3); margin-top: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 
 /* Toggle pills */
 .toggles { display: flex; flex-wrap: wrap; gap: 8px; }
