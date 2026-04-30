@@ -3268,16 +3268,16 @@
         : s.frequency === "hourly"
         ? `Every hour at :${String(s.minute).padStart(2,"0")}`
         : `${String(s.hour).padStart(2,"0")}:${String(s.minute).padStart(2,"0")} UTC`;
-      return `<div class="schedule-entry ${s.enabled ? "" : "schedule-disabled"}">
-        <div class="schedule-entry-left">
-          <div class="schedule-entry-info">
-            <span class="schedule-name">${escHtml(s.name)}</span>
-            <span class="history-meta">${escHtml(vendor)} &bull; ${escHtml(s.host)} &bull; ${freq} @ ${timing} &bull; Compliance: ${escHtml(comp)}</span>
-            <span class="history-meta">Last run: ${escHtml(lastRun)} ${lastSt}${s.last_error ? ` &mdash; <span class="activity-error">${escHtml(s.last_error)}</span>` : ""}</span>
-          </div>
+      const statusClass = s.last_status === "error" ? "status err" : s.enabled ? "status" : "status off";
+      const statusLabel = s.last_status === "error" ? "Error" : s.enabled ? "Enabled" : "Disabled";
+      return `<div class="sched-card${s.enabled ? "" : " disabled"}" data-id="${escHtml(s.id)}">
+        <div>
+          <span class="name">${escHtml(s.name)}</span>
+          <div class="meta">${escHtml(vendor)} &bull; ${escHtml(s.host)} &bull; ${freq} @ ${timing} &bull; Compliance: ${escHtml(comp)}</div>
+          <div class="last-run">Last run: ${escHtml(lastRun)}${s.last_error ? ` &mdash; <span class="activity-error">${escHtml(s.last_error)}</span>` : ""}</div>
         </div>
-        <div class="schedule-entry-right">
-          <span class="schedule-status-pill ${s.enabled ? "pill-enabled" : "pill-disabled"}">${s.enabled ? "Enabled" : "Disabled"}</span>
+        <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;justify-content:flex-end">
+          <span class="${statusClass}">${statusLabel}</span>
           ${(!DEMO_MODE && canManageSchedules) ? `
           <button class="btn-secondary btn-sm" data-sched-run="${escHtml(s.id)}" title="Run now">&#9654; Run Now</button>
           <button class="btn-secondary btn-sm" data-sched-edit="${escHtml(s.id)}" title="Edit">&#9998; Edit</button>
