@@ -214,14 +214,14 @@
                     <div class="help">.conf, .cfg, .xml, .set, or .txt up to 25&nbsp;MB.</div>
                   </div>
                   <div class="ctrl">
-                    <div class="file-field" id="configFileField">
-                      <input type="file" id="config" name="config" required class="hidden">
-                      <label for="config" class="file-label">
-                        <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
-                        <span>Drop config file or <strong>click to browse</strong></span>
-                        <span class="file-name" id="fileName">No file selected</span>
-                      </label>
-                    </div>
+                    <label for="config" class="file-field empty" id="configFileField">
+                      <div>
+                        <div class="fname" id="fileName">No file selected</div>
+                        <div class="fmeta" id="fileMeta"></div>
+                      </div>
+                      <span class="browse">Browse</span>
+                      <input id="config" type="file" name="config" required hidden accept=".txt,.conf,.xml,.json,.yaml,.log">
+                    </label>
                   </div>
                 </div>
 
@@ -374,14 +374,14 @@
                     <div class="help">Select one or more .conf, .cfg, .xml, .set, or .txt files.</div>
                   </div>
                   <div class="ctrl">
-                    <div class="file-field" id="bulkFileField">
-                      <input type="file" id="bulkConfigs" name="configs[]" multiple required class="hidden">
-                      <label for="bulkConfigs" class="file-label">
-                        <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
-                        <span>Drop config files or <strong>click to browse</strong></span>
-                        <span class="file-name" id="bulkFileName">No files selected</span>
-                      </label>
-                    </div>
+                    <label for="bulkConfigs" class="file-field empty" id="bulkFileField">
+                      <div>
+                        <div class="fname" id="bulkFileName">No files selected</div>
+                        <div class="fmeta" id="bulkFileMeta"></div>
+                      </div>
+                      <span class="browse">Browse</span>
+                      <input id="bulkConfigs" type="file" name="configs[]" multiple required hidden accept=".txt,.conf,.xml,.json,.yaml,.log">
+                    </label>
                   </div>
                 </div>
                 <div class="field split">
@@ -1017,12 +1017,12 @@
           <h1>Settings</h1>
         </div>
       </header>
-      <div class="settings-shell">
+      <div class="settings">
 
         <!-- ── Left sidebar — admin only ─────────────────────────────────── -->
         {% if not current_user or current_user.role == 'admin' %}
         <nav class="settings-nav" role="navigation" aria-label="Settings sections">
-          <div class="settings-nav-group-label">Configuration</div>
+          <div class="group">Configuration</div>
 
           <a class="active" data-pane="general" onclick="showSettingsPane('general'); return false;" href="#">
             <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" aria-hidden="true"><line x1="2" y1="5" x2="14" y2="5"/><line x1="2" y1="9" x2="14" y2="9"/><line x1="2" y1="13" x2="14" y2="13"/><circle cx="6" cy="5" r="1.75"/><circle cx="10" cy="9" r="1.75"/><circle cx="6" cy="13" r="1.75"/></svg>
@@ -1069,15 +1069,13 @@
         {% endif %}
 
         <!-- ── Right content ─────────────────────────────────────────────── -->
-        <div class="settings-content">
+        <div class="settings-main">
 
           {% if not current_user or current_user.role == 'admin' %}
           <!-- General pane -->
           <div class="settings-pane active" id="spane-general">
-            <div class="settings-pane-header">
-              <h2 class="settings-pane-title">General</h2>
-              <p class="settings-pane-desc">Global defaults applied to every audit. Individual audit options always override these defaults.</p>
-            </div>
+            <h2>General</h2>
+            <p class="section-desc">Global defaults applied to every audit. Individual audit options always override these defaults.</p>
 
             <div class="sub-head">Appearance</div>
 
@@ -1190,10 +1188,8 @@
 
           <!-- Email pane -->
           <div class="settings-pane" id="spane-email">
-            <div class="settings-pane-header">
-              <h2 class="settings-pane-title">Email (SMTP)</h2>
-              <p class="settings-pane-desc">Configure outbound email for scheduled audit alerts. Leave SMTP Host blank to disable email notifications.</p>
-            </div>
+            <h2>Email (SMTP)</h2>
+            <p class="section-desc">Configure outbound email for scheduled audit alerts. Leave SMTP Host blank to disable email notifications.</p>
 
             <div class="form-grid" style="margin-top:0">
               <div class="form-group">
@@ -1236,10 +1232,8 @@
           <!-- Authentication pane — hidden in demo mode -->
           {% if not demo_mode %}
           <div class="settings-pane{% if current_user and current_user.role != 'admin' %} active{% endif %}" id="spane-auth">
-            <div class="settings-pane-header">
-              <h2 class="settings-pane-title">{% if current_user and current_user.role != 'admin' %}My Account{% else %}Authentication{% endif %}</h2>
-              <p class="settings-pane-desc">Protect the Cashel web UI and API with an API key. When enabled, all routes require the key — via browser login or <code>X-API-Key</code> header for CI/CD clients.</p>
-            </div>
+            <h2>{% if current_user and current_user.role != 'admin' %}My Account{% else %}Authentication{% endif %}</h2>
+            <p class="section-desc">Protect the Cashel web UI and API with an API key. When enabled, all routes require the key — via browser login or <code>X-API-Key</code> header for CI/CD clients.</p>
 
             {% if not current_user or current_user.role == 'admin' %}
             <div class="settings-group">
@@ -1334,7 +1328,7 @@
                   <button class="btn-secondary" id="btnCopyKey">Copy</button>
                 </div>
               </div>
-              <p class="settings-pane-desc" style="margin-top:0.75rem">Use this key in the <code>X-API-Key</code> header for CLI or CI/CD access:<br><code>curl -H "X-API-Key: csh_..." https://your-cashel/api/v1/audit</code></p>
+              <p class="section-desc" style="margin-top:0.75rem">Use this key in the <code>X-API-Key</code> header for CLI or CI/CD access:<br><code>curl -H "X-API-Key: csh_..." https://your-cashel/api/v1/audit</code></p>
             </div>
 
             <!-- Change password — all roles -->
@@ -1363,10 +1357,8 @@
           {% if not current_user or current_user.role == 'admin' %}
           <!-- Security pane -->
           <div class="settings-pane" id="spane-security">
-            <div class="settings-pane-header">
-              <h2 class="settings-pane-title">Security</h2>
-              <p class="settings-pane-desc">Controls for SSH host verification, outbound webhook restrictions, and error reporting exposure.</p>
-            </div>
+            <h2>Security</h2>
+            <p class="section-desc">Controls for SSH host verification, outbound webhook restrictions, and error reporting exposure.</p>
 
             <div class="settings-group">
               <h3 class="settings-group-title">SSH Host Key Verification</h3>
@@ -1413,10 +1405,8 @@
 
           <!-- Syslog pane -->
           <div class="settings-pane" id="spane-syslog">
-            <div class="settings-pane-header">
-              <h2 class="settings-pane-title">Syslog</h2>
-              <p class="settings-pane-desc">Forward all Cashel application events to a remote syslog server for SIEM integration and centralised log management.</p>
-            </div>
+            <h2>Syslog</h2>
+            <p class="section-desc">Forward all Cashel application events to a remote syslog server for SIEM integration and centralised log management.</p>
 
             <div class="settings-group">
               <h3 class="settings-group-title">Syslog Server</h3>
@@ -1468,10 +1458,8 @@
 
           <!-- Alert Thresholds pane -->
           <div class="settings-pane" id="spane-alerts">
-            <div class="settings-pane-header">
-              <h2 class="settings-pane-title">Alert Thresholds</h2>
-              <p class="settings-pane-desc">Fire a consolidated notification when an audit result crosses a configured threshold. Alerts fire once on first breach and re-arm after the condition clears.</p>
-            </div>
+            <h2>Alert Thresholds</h2>
+            <p class="section-desc">Fire a consolidated notification when an audit result crosses a configured threshold. Alerts fire once on first breach and re-arm after the condition clears.</p>
 
             <div class="settings-group">
               <h3 class="settings-group-title">Alert Channels</h3>
@@ -1532,10 +1520,8 @@
 
           <!-- Licensing pane -->
           <div class="settings-pane" id="spane-licensing">
-            <div class="settings-pane-header">
-              <h2 class="settings-pane-title">Licensing</h2>
-              <p class="settings-pane-desc">Cashel runs a free hygiene engine out of the box. A license unlocks compliance frameworks (HIPAA, CIS Benchmark v8, NIST 800-53, PCI-DSS 4.0) and removes the per-run watermark on PDF reports.</p>
-            </div>
+            <h2>Licensing</h2>
+            <p class="section-desc">Cashel runs a free hygiene engine out of the box. A license unlocks compliance frameworks (HIPAA, CIS Benchmark v8, NIST 800-53, PCI-DSS 4.0) and removes the per-run watermark on PDF reports.</p>
 
             <div class="sub-head">Current license</div>
             <div class="lic-card">
@@ -1603,10 +1589,8 @@
 
           <!-- Webhooks pane -->
           <div class="settings-pane" id="spane-webhooks">
-            <div class="settings-pane-header">
-              <h2 class="settings-pane-title">Webhooks</h2>
-              <p class="settings-pane-desc">Send structured JSON events to external URLs when audits complete or alert thresholds are crossed. Each delivery includes an <code>X-Cashel-Signature</code> HMAC header when a secret is configured.</p>
-            </div>
+            <h2>Webhooks</h2>
+            <p class="section-desc">Send structured JSON events to external URLs when audits complete or alert thresholds are crossed. Each delivery includes an <code>X-Cashel-Signature</code> HMAC header when a secret is configured.</p>
 
             <div class="settings-group">
               <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:0.75rem">
@@ -1716,8 +1700,8 @@
           </div>
           {% endif %}
 
-        </div><!-- /.settings-content -->
-      </div><!-- /.settings-shell -->
+        </div><!-- /.settings-main -->
+      </div><!-- /.settings -->
     </section>
 
   </main>
@@ -2093,12 +2077,17 @@
     const field = document.getElementById(fieldId);
     if (!field) return;
     const nameEl = document.getElementById(fileNameId);
+    const metaEl = field.querySelector('.fmeta');
     if (file) {
+      field.classList.remove('empty');
       field.classList.add('has-file');
-      if (nameEl) nameEl.textContent = file.name + ' \u00b7 ' + (file.size / 1024).toFixed(1) + ' KB';
+      if (nameEl) nameEl.textContent = file.name;
+      if (metaEl) metaEl.textContent = (file.size / 1024).toFixed(1) + ' KB · ready';
     } else {
+      field.classList.add('empty');
       field.classList.remove('has-file');
       if (nameEl) nameEl.textContent = 'No file selected';
+      if (metaEl) metaEl.textContent = '';
     }
   }
 
@@ -2136,15 +2125,16 @@
     const files = this.files;
     const field = document.getElementById('bulkFileField');
     const nameEl = document.getElementById('bulkFileName');
+    const metaEl = field ? field.querySelector('.fmeta') : null;
     if (files && files.length) {
-      if (field) field.classList.add('has-file');
-      if (nameEl) {
-        const total = Array.from(files).reduce((s, f) => s + f.size, 0);
-        nameEl.textContent = (files.length === 1 ? files[0].name : files.length + ' files selected') + ' \u00b7 ' + (total / 1024).toFixed(1) + ' KB';
-      }
+      if (field) { field.classList.remove('empty'); field.classList.add('has-file'); }
+      const total = Array.from(files).reduce((s, f) => s + f.size, 0);
+      if (nameEl) nameEl.textContent = files.length === 1 ? files[0].name : files.length + ' files selected';
+      if (metaEl) metaEl.textContent = (total / 1024).toFixed(1) + ' KB · ready';
     } else {
-      if (field) field.classList.remove('has-file');
+      if (field) { field.classList.add('empty'); field.classList.remove('has-file'); }
       if (nameEl) nameEl.textContent = 'No files selected';
+      if (metaEl) metaEl.textContent = '';
     }
   });
 

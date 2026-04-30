@@ -110,7 +110,7 @@ button { cursor: pointer; border: 0; background: transparent; }
 .field .help { font-size: 13px; color: var(--ink-2); margin-top: 6px; max-width: 34ch; line-height: 1.5; }
 .field .ctrl { display: grid; gap: 10px; }
 .field.split .ctrl { grid-template-columns: 1fr 1fr; gap: 10px; }
-.field.triple .ctrl { grid-template-columns: 1fr 1fr 1fr; gap: 10px; }
+
 
 .input, .select, .textarea {
   width: 100%; background: transparent; border: 0;
@@ -131,11 +131,15 @@ button { cursor: pointer; border: 0; background: transparent; }
 }
 
 /* File field */
-.file-field { display: flex; flex-direction: column; padding: 10px 0; border-bottom: 1px solid var(--line-2); gap: 4px; min-width: 0; }
+.file-field { display: flex; align-items: center; justify-content: space-between; padding: 10px 0; border-bottom: 1px solid var(--line-2); gap: 20px; min-width: 0; cursor: pointer; }
+.file-field > div:first-child { min-width: 0; flex: 1 1 auto; overflow: hidden; }
 .file-field:hover { border-bottom-color: var(--ink); }
 .file-field.has-file { border-bottom-color: var(--ink); }
-.file-field .file-label { display: flex; align-items: center; gap: 10px; flex: 1 1 auto; min-width: 0; cursor: pointer; font-size: 15px; color: var(--ink); }
-.file-field .file-name { font-size: 12px; color: var(--ink-3); margin-top: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.file-field .fname { font-size: 15px; color: var(--ink); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.file-field.empty .fname { color: var(--ink-4); }
+.file-field .fmeta { font-size: 12px; color: var(--ink-3); margin-top: 2px; }
+.file-field .browse { padding: 6px 12px; border: 1px solid var(--line-2); border-radius: 999px; font-size: 12px; color: var(--ink-2); flex: 0 0 auto; transition: border-color .15s, color .15s; }
+.file-field .browse:hover { border-color: var(--ink); color: var(--ink); }
 
 /* Toggle pills */
 .toggles { display: flex; flex-wrap: wrap; gap: 8px; }
@@ -233,6 +237,8 @@ button { cursor: pointer; border: 0; background: transparent; }
 .settings-nav a.active::before { content: ""; position: absolute; left: -25px; top: 50%; width: 2px; height: 16px; background: var(--acc); transform: translateY(-50%); }
 .settings-nav a svg { width: 14px; height: 14px; color: var(--ink-3); }
 .settings-nav a.active svg { color: var(--ink); }
+.settings-pane { display: none; }
+.settings-pane.active { display: block; }
 
 .settings-main h2 { font-size: 24px; font-weight: 500; letter-spacing: -0.02em; margin: 0 0 8px; }
 .settings-main .section-desc { color: var(--ink-2); font-size: 14px; max-width: 60ch; margin-bottom: 0; }
@@ -443,23 +449,13 @@ html[data-theme="dark"] .log-tag.diff { color: var(--acc); }
 .status.warn { color: var(--med); }
 .status.err  { color: var(--crit); }
 
-.stats { display: grid; grid-template-columns: repeat(5, 1fr); border: 1px solid var(--line); border-radius: 10px; margin: 24px 0; overflow: hidden; }
-.stat { padding: 20px 24px; }
-.stat:not(:last-child) { border-right: 1px solid var(--line); }
-.stat.featured { background: var(--tint); }
-.stat .lbl { font-size: 11px; color: var(--ink-3); text-transform: uppercase; letter-spacing: 0.06em; font-weight: 500; margin-bottom: 8px; }
-.stat .num { font-size: 28px; font-weight: 500; letter-spacing: -0.03em; color: var(--ink); }
-.stat .num.crit { color: var(--crit); }
-.stat .num.high { color: var(--high); }
-.stat .num.med  { color: var(--med); }
-.stat .num.ok   { color: var(--ok); }
-
 .field.triple .ctrl { grid-template-columns: 1fr 1fr 80px; }
 
-@media (max-width: 960px) {
-  .stats { grid-template-columns: repeat(2, 1fr); }
-  .stat { border-right: 0; border-bottom: 1px solid var(--line); }
-}
+.bulk-item { border: 1px solid var(--line); border-radius: 14px; padding: 20px 24px; margin-bottom: 12px; background: var(--surface); }
+.bulk-item-head { display: flex; align-items: center; justify-content: space-between; gap: 16px; }
+.bulk-item-head .fname { font-family: 'Geist Mono', monospace; font-size: 14px; font-weight: 500; }
+.bulk-item-head .score-big { font-size: 22px; font-weight: 500; letter-spacing: -0.02em; color: var(--ink); }
+.bulk-item .summary-row { display: flex; align-items: center; gap: 8px; margin-top: 12px; }
 
 /* === SECTION 3: Designer additions === */
 
