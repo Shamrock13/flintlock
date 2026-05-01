@@ -89,6 +89,7 @@
           <path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/>
         </svg>
       </button>
+      <!-- TODO(codex): Move engine online status and uptime into this topbar status control. -->
       <button class="accent-cycle-btn" id="accentCycleBtn" aria-label="Change accent color" title="Cycle accent color">
         <span class="dot" id="accentDot"></span>
       </button>
@@ -137,6 +138,7 @@
     {% endif %}
     <div class="tail">
       <span class="dot"></span>
+      Engine online &middot; 14d uptime
     </div>
   </nav>
 
@@ -1240,67 +1242,51 @@
               </div>
             </div>
 
-            <div class="settings-group">
-              <h3 class="settings-group-title">File Audit Defaults</h3>
-              <label class="settings-row">
-                <div class="settings-row-info">
-                  <span class="settings-row-label">Always generate PDF report</span>
-                  <span class="settings-row-desc">Pre-check &ldquo;Generate PDF Report&rdquo; on every file audit.</span>
+            <div class="sub-head">File audit defaults</div>
+            <div class="form">
+              <div class="field">
+                <div>
+                  <div class="label">PDF report</div>
+                  <div class="help">Pre-check &ldquo;Generate PDF Report&rdquo; on every file audit.</div>
                 </div>
-                <label class="sw-toggle">
-                  <input type="checkbox" id="setting-auto-pdf" />
-                  <span class="track"></span>
-                </label>
-              </label>
-              <label class="settings-row">
-                <div class="settings-row-info">
-                  <span class="settings-row-label">Always save to Audit History</span>
-                  <span class="settings-row-desc">Pre-check &ldquo;Save to Audit History&rdquo; on every file audit.</span>
+                <div class="ctrl" style="justify-items:start">
+                  <label class="sw-toggle">
+                    <input type="checkbox" id="setting-auto-pdf" />
+                    <span class="track"></span>
+                  </label>
                 </div>
-                <label class="sw-toggle">
-                  <input type="checkbox" id="setting-auto-archive" />
-                  <span class="track"></span>
-                </label>
-              </label>
-            </div>
-
-            <div class="settings-group">
-              <h3 class="settings-group-title">Compliance Default</h3>
-              <label class="settings-row">
-                <div class="settings-row-info">
-                  <span class="settings-row-label">Default compliance framework</span>
-                  <span class="settings-row-desc">Pre-select a framework on the File Audit and Live Connect forms.</span>
+              </div>
+              <div class="field">
+                <div>
+                  <div class="label">Audit history</div>
+                  <div class="help">Pre-check &ldquo;Save to Audit History&rdquo; on every file audit.</div>
                 </div>
-                <select id="setting-default-compliance" class="settings-select">
-                  <option value="">None</option>
-                  <option value="cis">CIS Benchmark</option>
-                  <option value="stig">DISA STIG</option>
-                  <option value="hipaa">HIPAA Security Rule</option>
-                  <option value="nist">NIST SP 800-41</option>
-                  <option value="pci">PCI-DSS</option>
-                  <option value="soc2">SOC2</option>
-                </select>
-              </label>
-            </div>
-
-            <div class="settings-group">
-              <h3 class="settings-group-title">Accent Color</h3>
-              <div class="settings-row">
-                <div class="settings-row-info">
-                  <span class="settings-row-label">Interface accent</span>
-                  <span class="settings-row-desc">Applied to buttons, active states, and the brand mark merlon.</span>
+                <div class="ctrl" style="justify-items:start">
+                  <label class="sw-toggle">
+                    <input type="checkbox" id="setting-auto-archive" />
+                    <span class="track"></span>
+                  </label>
                 </div>
-                <div class="accent-swatches" id="accentSwatches">
-                  <button class="accent-swatch" data-accent="acid"   title="Acid"   style="background:oklch(0.86 0.19 128)"></button>
-                  <button class="accent-swatch" data-accent="blue"   title="Blue"   style="background:oklch(0.72 0.17 245)"></button>
-                  <button class="accent-swatch" data-accent="violet" title="Violet" style="background:oklch(0.72 0.17 295)"></button>
-                  <button class="accent-swatch" data-accent="amber"  title="Amber"  style="background:oklch(0.82 0.17 75)"></button>
-                  <button class="accent-swatch" data-accent="rose"   title="Rose"   style="background:oklch(0.74 0.17 15)"></button>
-                  <button class="accent-swatch" data-accent="teal"   title="Teal"   style="background:oklch(0.78 0.14 185)"></button>
-                  <button class="accent-swatch" data-accent="mono"   title="Mono"   style="background:oklch(0.78 0.01 260)"></button>
+              </div>
+              <div class="field">
+                <div>
+                  <div class="label">Default compliance framework</div>
+                  <div class="help">Pre-select a framework on the File Audit and Live Connect forms.</div>
+                </div>
+                <div class="ctrl">
+                  <select class="select" id="setting-default-compliance">
+                    <option value="">None</option>
+                    <option value="cis">CIS Benchmark</option>
+                    <option value="stig">DISA STIG</option>
+                    <option value="hipaa">HIPAA Security Rule</option>
+                    <option value="nist">NIST SP 800-41</option>
+                    <option value="pci">PCI-DSS</option>
+                    <option value="soc2">SOC2</option>
+                  </select>
                 </div>
               </div>
             </div>
+
           </div>
 
           <!-- Email pane -->
@@ -1308,32 +1294,40 @@
             <h2>Email (SMTP)</h2>
             <p class="section-desc">Configure outbound email for scheduled audit alerts. Leave SMTP Host blank to disable email notifications.</p>
 
-            <div class="form-grid" style="margin-top:0">
-              <div class="form-group">
-                <label for="setting-smtp-host">SMTP Host</label>
-                <input type="text" id="setting-smtp-host" placeholder="smtp.gmail.com" autocomplete="off" />
+            <div class="form">
+              <div class="field split">
+                <div>
+                  <div class="label">Server</div>
+                  <div class="help">Leave SMTP host blank to disable outbound email notifications.</div>
+                </div>
+                <div class="ctrl">
+                  <input class="input" type="text" id="setting-smtp-host" placeholder="smtp.gmail.com" autocomplete="off" />
+                  <input class="input" type="number" id="setting-smtp-port" value="587" min="1" max="65535" />
+                </div>
               </div>
-              <div class="form-group">
-                <label for="setting-smtp-port">SMTP Port</label>
-                <input type="number" id="setting-smtp-port" value="587" min="1" max="65535" />
+              <div class="field split">
+                <div>
+                  <div class="label">Credentials</div>
+                  <div class="help">Password is stored encrypted; leave blank to keep an existing value.</div>
+                </div>
+                <div class="ctrl">
+                  <input class="input" type="text" id="setting-smtp-user" placeholder="alerts@example.com" autocomplete="off" />
+                  <input class="input" type="password" id="setting-smtp-password" placeholder="leave blank to keep existing" autocomplete="new-password" />
+                </div>
               </div>
-              <div class="form-group">
-                <label for="setting-smtp-user">SMTP Username</label>
-                <input type="text" id="setting-smtp-user" placeholder="alerts@example.com" autocomplete="off" />
-              </div>
-              <div class="form-group">
-                <label for="setting-smtp-password">SMTP Password</label>
-                <input type="password" id="setting-smtp-password" placeholder="leave blank to keep existing" autocomplete="new-password" />
-              </div>
-              <div class="form-group">
-                <label for="setting-smtp-from">From Address</label>
-                <input type="email" id="setting-smtp-from" placeholder="cashel@example.com" autocomplete="off" />
-              </div>
-              <div class="form-group form-group-check" style="align-self:flex-end">
-                <label class="checkbox-label">
-                  <input type="checkbox" id="setting-smtp-tls" checked />
-                  <span>Use STARTTLS</span>
-                </label>
+              <div class="field split">
+                <div>
+                  <div class="label">Sender &amp; TLS</div>
+                  <div class="help">Use STARTTLS unless your SMTP relay requires a plain local connection.</div>
+                </div>
+                <div class="ctrl">
+                  <input class="input" type="email" id="setting-smtp-from" placeholder="cashel@example.com" autocomplete="off" />
+                  <label class="tgl on" id="setting-smtp-tls-toggle">
+                    <input type="checkbox" id="setting-smtp-tls" checked />
+                    <span class="mark"></span>
+                    Use STARTTLS
+                  </label>
+                </div>
               </div>
             </div>
             <div style="margin-top:1.25rem;display:flex;align-items:center;gap:0.75rem">
@@ -1353,23 +1347,27 @@
             <p class="section-desc">Protect the Cashel web UI and API with an API key. When enabled, all routes require the key — via browser login or <code>X-API-Key</code> header for CI/CD clients.</p>
 
             {% if not current_user or current_user.role == 'admin' %}
-            <div class="settings-group">
-              <h3 class="settings-group-title">Access Control</h3>
-              <label class="settings-row">
-                <div class="settings-row-info">
-                  <span class="settings-row-label">Enable Authentication</span>
-                  <span class="settings-row-desc">Require an API key to access the web UI and all API endpoints.</span>
+            <div class="sub-head">Access control</div>
+            <div class="form">
+              <div class="field">
+                <div>
+                  <div class="label">Enable authentication</div>
+                  <div class="help">Require an API key to access the web UI and all API endpoints.</div>
                 </div>
-                <label class="sw-toggle">
-                  <input type="checkbox" id="setting-auth-enabled" />
-                  <span class="track"></span>
-                </label>
-              </label>
-              <div class="settings-row">
-                <span class="settings-row-label">Session Lifetime</span>
-                <div style="display:flex;align-items:center;gap:0.5rem">
-                  <input type="number" id="setting-session-lifetime" class="settings-input" style="width:80px" min="5" max="10080" />
-                  <span class="text-muted" style="font-size:0.82rem">minutes</span>
+                <div class="ctrl" style="justify-items:start">
+                  <label class="sw-toggle">
+                    <input type="checkbox" id="setting-auth-enabled" />
+                    <span class="track"></span>
+                  </label>
+                </div>
+              </div>
+              <div class="field">
+                <div>
+                  <div class="label">Session lifetime</div>
+                  <div class="help">Browser session timeout in minutes.</div>
+                </div>
+                <div class="ctrl">
+                  <input class="input" type="number" id="setting-session-lifetime" min="5" max="10080" />
                 </div>
               </div>
             </div>
@@ -1377,96 +1375,95 @@
 
             <!-- Users table — admin only -->
             {% if current_user and current_user.role == 'admin' %}
-            <div class="settings-group" id="authUsersGroup">
-              <h3 class="settings-group-title">Users</h3>
-              <table style="width:100%;border-collapse:collapse;font-size:0.88rem" id="authUsersTable">
+            <div class="sub-head">Users</div>
+            <div id="authUsersGroup">
+              <table class="table" id="authUsersTable">
                 <thead>
-                  <tr style="border-bottom:1px solid var(--border);text-align:left">
-                    <th style="padding:0.4rem 0.6rem;color:var(--text-muted);font-weight:600">Username</th>
-                    <th style="padding:0.4rem 0.6rem;color:var(--text-muted);font-weight:600">Role</th>
-                    <th style="padding:0.4rem 0.6rem;color:var(--text-muted);font-weight:600">API Key</th>
-                    <th style="padding:0.4rem 0.6rem;color:var(--text-muted);font-weight:600">Created</th>
-                    <th style="padding:0.4rem 0.6rem;color:var(--text-muted);font-weight:600">Actions</th>
+                  <tr>
+                    <th>Username</th>
+                    <th>Role</th>
+                    <th>API Key</th>
+                    <th>Created</th>
+                    <th>Actions</th>
                   </tr>
                 </thead>
                 <tbody id="authUsersTbody">
-                  <tr><td colspan="5" style="padding:0.6rem;color:var(--text-muted)">Loading…</td></tr>
+                  <tr><td colspan="5" class="muted">Loading&hellip;</td></tr>
                 </tbody>
               </table>
 
-              <div style="margin-top:1.25rem;padding:1rem;background:var(--input-bg);border:1px solid var(--border);border-radius:8px">
-                <h4 style="margin:0 0 0.75rem;font-size:0.88rem;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.5px">Add User</h4>
-                <div style="display:flex;gap:0.5rem;flex-wrap:wrap;align-items:flex-end">
-                  <div style="display:flex;flex-direction:column;gap:0.3rem">
-                    <label style="font-size:0.78rem;color:var(--text-muted)">Username</label>
-                    <input type="text" id="newUserUsername" placeholder="username" style="padding:0.45rem 0.65rem;font-size:0.88rem" autocomplete="off" />
+              <div class="sub-head">Add user</div>
+              <div class="form">
+                <div class="field triple">
+                  <div>
+                    <div class="label">User details</div>
+                    <div class="help">Create a local account for Cashel access.</div>
                   </div>
-                  <div style="display:flex;flex-direction:column;gap:0.3rem">
-                    <label style="font-size:0.78rem;color:var(--text-muted)">Password</label>
-                    <input type="password" id="newUserPassword" placeholder="12+ chars" style="padding:0.45rem 0.65rem;font-size:0.88rem" autocomplete="new-password" />
-                  </div>
-                  <div style="display:flex;flex-direction:column;gap:0.3rem">
-                    <label style="font-size:0.78rem;color:var(--text-muted)">Role</label>
-                    <select id="newUserRole" style="padding:0.45rem 0.65rem;font-size:0.88rem">
+                  <div class="ctrl">
+                    <input class="input" type="text" id="newUserUsername" placeholder="username" autocomplete="off" />
+                    <input class="input" type="password" id="newUserPassword" placeholder="12+ chars" autocomplete="new-password" />
+                    <select class="select" id="newUserRole">
                       <option value="viewer">Viewer</option>
                       <option value="auditor">Auditor</option>
                       <option value="admin">Admin</option>
                     </select>
                   </div>
-                  <button class="btn-outline" id="btnAddUser" style="padding:0.45rem 0.9rem">Add User</button>
                 </div>
-                <div id="addUserError" style="margin-top:0.5rem;font-size:0.82rem;color:var(--high);display:none"></div>
+              </div>
+              <div style="margin-top:1rem;display:flex;gap:10px;align-items:center">
+                <button class="btn-outline" id="btnAddUser">Add User</button>
+                <span id="addUserError" class="field-error" style="display:none"></span>
               </div>
             </div>
             {% endif %}
 
             <!-- Per-user API key — all roles -->
-            <div class="settings-group">
-              <h3 class="settings-group-title">Your API Key</h3>
-              <div class="settings-row">
-                <span class="settings-row-label">Status</span>
-                <span class="text-muted" id="authKeyHint" style="font-family:monospace;font-size:0.88rem">
-                  {% if current_user and current_user.has_api_key %}key active{% else %}not set{% endif %}
-                </span>
-              </div>
-              <div style="margin-top:0.75rem;display:flex;gap:0.75rem;flex-wrap:wrap">
-                <button class="btn-outline" id="btnGenerateKey">Generate New Key</button>
-                <button class="btn-outline" id="btnRevokeKey" style="{% if not current_user or not current_user.has_api_key %}display:none{% endif %}">Revoke Key</button>
-              </div>
-              <div id="authNewKeyBox" class="hidden" style="margin-top:1rem;background:var(--card-bg);border:1px solid var(--accent);border-radius:8px;padding:1rem">
-                <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:0.5rem">
-                  <p style="font-size:0.82rem;color:var(--high);font-weight:600;margin:0">&#9888; Copy this key now — it will not be shown again. Auto-hides in <span id="authKeyCountdown">60</span>s.</p>
-                  <button class="btn-outline" id="btnDismissKey" style="padding:0.2rem 0.6rem;font-size:0.78rem">Dismiss</button>
+            <div class="sub-head">Your API key</div>
+            <div class="form">
+              <div class="field">
+                <div>
+                  <div class="label">Status</div>
+                  <div class="help">Use this key in the <code>X-API-Key</code> header for CLI or CI/CD access.</div>
                 </div>
-                <div style="display:flex;align-items:center;gap:0.5rem">
-                  <input type="password" id="authNewKeyVal" readonly
-                         style="flex:1;padding:0.5rem;background:var(--input-bg);border:1px solid var(--border);border-radius:4px;word-break:break-all;font-size:0.88rem;color:var(--text);font-family:monospace" />
-                  <button class="btn-outline" id="btnRevealKey">Show</button>
-                  <button class="btn-outline" id="btnCopyKey">Copy</button>
+                <div class="ctrl">
+                  <div class="code-bar" id="authKeyHint">{% if current_user and current_user.has_api_key %}key active{% else %}not set{% endif %}</div>
                 </div>
               </div>
-              <p class="section-desc" style="margin-top:0.75rem">Use this key in the <code>X-API-Key</code> header for CLI or CI/CD access:<br><code>curl -H "X-API-Key: csh_..." https://your-cashel/api/v1/audit</code></p>
+            </div>
+            <div style="margin-top:1rem;display:flex;gap:8px;flex-wrap:wrap">
+              <button class="btn-outline" id="btnGenerateKey">Generate New Key</button>
+              <button class="btn-outline" id="btnRevokeKey" style="{% if not current_user or not current_user.has_api_key %}display:none{% endif %}">Revoke Key</button>
+            </div>
+            <div id="authNewKeyBox" class="hidden" style="margin-top:1rem">
+              <div class="banner warn">
+                Copy this key now. It will not be shown again. Auto-hides in <span id="authKeyCountdown">60</span>s.
+              </div>
+              <div class="api-key-field" style="margin-top:10px">
+                <input class="input" type="password" id="authNewKeyVal" readonly />
+                <button class="btn-outline" id="btnRevealKey">Show</button>
+                <button class="btn-outline" id="btnCopyKey">Copy</button>
+                <button class="btn-outline" id="btnDismissKey">Dismiss</button>
+              </div>
+              <div class="code-bar" style="margin-top:10px">curl -H "X-API-Key: csh_..." https://your-cashel/api/v1/audit</div>
             </div>
 
             <!-- Change password — all roles -->
-            <div class="settings-group">
-              <h3 class="settings-group-title">Change Password</h3>
-              <div style="display:flex;flex-direction:column;gap:0.75rem;max-width:360px">
-                <div style="display:flex;flex-direction:column;gap:0.3rem">
-                  <label style="font-size:0.78rem;color:var(--text-muted)">New Password</label>
-                  <input type="password" id="chpwNew" placeholder="12+ characters" autocomplete="new-password"
-                         style="padding:0.55rem 0.75rem;font-size:0.88rem" />
-                </div>
-                <div style="display:flex;flex-direction:column;gap:0.3rem">
-                  <label style="font-size:0.78rem;color:var(--text-muted)">Confirm New Password</label>
-                  <input type="password" id="chpwConfirm" placeholder="Repeat password" autocomplete="new-password"
-                         style="padding:0.55rem 0.75rem;font-size:0.88rem" />
-                </div>
+            <div class="sub-head">Change password</div>
+            <div class="form">
+              <div class="field split">
                 <div>
-                  <button class="btn-outline" id="btnChangePassword">Update Password</button>
-                  <span id="chpwMsg" style="margin-left:0.75rem;font-size:0.82rem"></span>
+                  <div class="label">New password</div>
+                  <div class="help">Use at least 12 characters.</div>
+                </div>
+                <div class="ctrl">
+                  <input class="input" type="password" id="chpwNew" placeholder="12+ characters" autocomplete="new-password" />
+                  <input class="input" type="password" id="chpwConfirm" placeholder="Repeat password" autocomplete="new-password" />
                 </div>
               </div>
+            </div>
+            <div style="margin-top:1rem;display:flex;gap:10px;align-items:center">
+              <button class="btn-outline" id="btnChangePassword">Update Password</button>
+              <span id="chpwMsg" style="font-size:13px"></span>
             </div>
           </div>
           {% endif %}
@@ -1477,46 +1474,42 @@
             <h2>Security</h2>
             <p class="section-desc">Controls for SSH host verification, outbound webhook restrictions, and error reporting exposure.</p>
 
-            <div class="settings-group">
-              <h3 class="settings-group-title">SSH Host Key Verification</h3>
-              <label class="settings-row">
-                <div class="settings-row-info">
-                  <span class="settings-row-label">SSH Host Key Policy</span>
-                  <span class="settings-row-desc">Controls how Cashel handles unrecognised SSH host keys during Live Connect. <strong>Strict</strong> is most secure but requires hosts to be pre-approved in known_hosts.</span>
+            <div class="sub-head">SSH host key verification</div>
+            <div class="form">
+              <div class="field">
+                <div>
+                  <div class="label">SSH host key policy</div>
+                  <div class="help">Controls how Cashel handles unrecognised SSH host keys during Live Connect.</div>
                 </div>
-                <select id="setting-ssh-host-key-policy" class="settings-select">
-                  <option value="warn">Warn — log and continue</option>
-                  <option value="strict">Strict — reject unknown</option>
-                  <option value="auto_add">Auto-add (lab only)</option>
-                </select>
-              </label>
-            </div>
-
-            <div class="settings-group">
-              <h3 class="settings-group-title">Outbound Webhooks</h3>
-              <label class="settings-row" style="flex-direction:column;align-items:flex-start;gap:0.5rem">
-                <div class="settings-row-info">
-                  <span class="settings-row-label">Allowed Webhook Domains</span>
-                  <span class="settings-row-desc">Extra hostname suffixes (comma-separated) permitted as webhook targets beyond the built-in allowlist (Slack, Teams, Discord). RFC-1918 addresses are always blocked.</span>
+                <div class="ctrl">
+                  <select class="select" id="setting-ssh-host-key-policy">
+                    <option value="warn">Warn - log and continue</option>
+                    <option value="strict">Strict - reject unknown</option>
+                    <option value="auto_add">Auto-add (lab only)</option>
+                  </select>
                 </div>
-                <input type="text" id="setting-webhook-allowlist"
-                       placeholder="webhooks.mycorp.com, hooks.internal.net"
-                       autocomplete="off" style="width:100%;max-width:500px" />
-              </label>
-            </div>
-
-            <div class="settings-group">
-              <h3 class="settings-group-title">Error Reporting</h3>
-              <label class="settings-row">
-                <div class="settings-row-info">
-                  <span class="settings-row-label">Error Detail Level</span>
-                  <span class="settings-row-desc">In <strong>Sanitized</strong> mode only generic messages reach the browser; full exception details are always written to the server log.</span>
+              </div>
+              <div class="field">
+                <div>
+                  <div class="label">Allowed webhook domains</div>
+                  <div class="help">Extra hostname suffixes permitted as webhook targets beyond Slack, Teams, and Discord.</div>
                 </div>
-                <select id="setting-error-detail" class="settings-select">
-                  <option value="sanitized">Sanitized (production)</option>
-                  <option value="full">Full (development only)</option>
-                </select>
-              </label>
+                <div class="ctrl">
+                  <input class="input" type="text" id="setting-webhook-allowlist" placeholder="webhooks.mycorp.com, hooks.internal.net" autocomplete="off" />
+                </div>
+              </div>
+              <div class="field">
+                <div>
+                  <div class="label">Error detail level</div>
+                  <div class="help">Full exception details are always written to the server log.</div>
+                </div>
+                <div class="ctrl">
+                  <select class="select" id="setting-error-detail">
+                    <option value="sanitized">Sanitized (production)</option>
+                    <option value="full">Full (development only)</option>
+                  </select>
+                </div>
+              </div>
             </div>
           </div>
 
@@ -1525,50 +1518,53 @@
             <h2>Syslog</h2>
             <p class="section-desc">Forward all Cashel application events to a remote syslog server for SIEM integration and centralised log management.</p>
 
-            <div class="settings-group">
-              <h3 class="settings-group-title">Syslog Server</h3>
-              <label class="settings-row">
-                <div class="settings-row-info">
-                  <span class="settings-row-label">Enable Syslog Forwarding</span>
-                  <span class="settings-row-desc">Send application log events to the configured syslog target.</span>
+            <div class="sub-head">Syslog server</div>
+            <div class="form">
+              <div class="field">
+                <div>
+                  <div class="label">Enable syslog forwarding</div>
+                  <div class="help">Send application log events to the configured syslog target.</div>
                 </div>
-                <label class="sw-toggle">
-                  <input type="checkbox" id="setting-syslog-enabled" />
-                  <span class="track"></span>
-                </label>
-              </label>
-            </div>
-
-            <div class="form-grid" style="margin-top:0">
-              <div class="form-group">
-                <label for="setting-syslog-host">Syslog Host</label>
-                <input type="text" id="setting-syslog-host" placeholder="192.168.1.100 or siem.corp.net" autocomplete="off" />
+                <div class="ctrl" style="justify-items:start">
+                  <label class="sw-toggle">
+                    <input type="checkbox" id="setting-syslog-enabled" />
+                    <span class="track"></span>
+                  </label>
+                </div>
               </div>
-              <div class="form-group">
-                <label for="setting-syslog-port">Port</label>
-                <input type="number" id="setting-syslog-port" value="514" min="1" max="65535" />
+              <div class="field split">
+                <div>
+                  <div class="label">Endpoint</div>
+                  <div class="help">Host and port for the remote SIEM or syslog collector.</div>
+                </div>
+                <div class="ctrl">
+                  <input class="input" type="text" id="setting-syslog-host" placeholder="192.168.1.100 or siem.corp.net" autocomplete="off" />
+                  <input class="input" type="number" id="setting-syslog-port" value="514" min="1" max="65535" />
+                </div>
               </div>
-              <div class="form-group">
-                <label for="setting-syslog-protocol">Protocol</label>
-                <select id="setting-syslog-protocol">
-                  <option value="udp">UDP — RFC 3164</option>
-                  <option value="tcp">TCP — reliable delivery</option>
-                </select>
-              </div>
-              <div class="form-group">
-                <label for="setting-syslog-facility">Facility</label>
-                <select id="setting-syslog-facility">
-                  <option value="local0">LOCAL0</option>
-                  <option value="local1">LOCAL1</option>
-                  <option value="local2">LOCAL2</option>
-                  <option value="local3">LOCAL3</option>
-                  <option value="local4">LOCAL4</option>
-                  <option value="local5">LOCAL5</option>
-                  <option value="local6">LOCAL6</option>
-                  <option value="local7">LOCAL7</option>
-                  <option value="daemon">DAEMON</option>
-                  <option value="user">USER</option>
-                </select>
+              <div class="field split">
+                <div>
+                  <div class="label">Routing</div>
+                  <div class="help">Choose the transport protocol and syslog facility.</div>
+                </div>
+                <div class="ctrl">
+                  <select class="select" id="setting-syslog-protocol">
+                    <option value="udp">UDP - RFC 3164</option>
+                    <option value="tcp">TCP - reliable delivery</option>
+                  </select>
+                  <select class="select" id="setting-syslog-facility">
+                    <option value="local0">LOCAL0</option>
+                    <option value="local1">LOCAL1</option>
+                    <option value="local2">LOCAL2</option>
+                    <option value="local3">LOCAL3</option>
+                    <option value="local4">LOCAL4</option>
+                    <option value="local5">LOCAL5</option>
+                    <option value="local6">LOCAL6</option>
+                    <option value="local7">LOCAL7</option>
+                    <option value="daemon">DAEMON</option>
+                    <option value="user">USER</option>
+                  </select>
+                </div>
               </div>
             </div>
           </div>
@@ -1578,60 +1574,65 @@
             <h2>Alert Thresholds</h2>
             <p class="section-desc">Fire a consolidated notification when an audit result crosses a configured threshold. Alerts fire once on first breach and re-arm after the condition clears.</p>
 
-            <div class="settings-group">
-              <h3 class="settings-group-title">Alert Channels</h3>
-              <p class="settings-row-desc" style="margin-bottom:0.75rem">Separate from per-schedule notifications — these channels receive threshold breach alerts only.</p>
-              <div class="form-grid">
-                <div class="form-group">
-                  <label for="alert-slack-webhook">Slack Webhook URL</label>
-                  <input type="password" id="alert-slack-webhook" placeholder="https://hooks.slack.com/services/…" autocomplete="off" />
-                  <span class="form-hint" id="alert-slack-set-hint" style="display:none">&#10003; Webhook configured (enter new URL to replace)</span>
+            <div class="sub-head">Alert channels</div>
+            <div class="form">
+              <div class="field split">
+                <div>
+                  <div class="label">Webhook channels</div>
+                  <div class="help">These channels receive threshold breach alerts only.</div>
                 </div>
-                <div class="form-group">
-                  <label for="alert-teams-webhook">Teams Webhook URL</label>
-                  <input type="password" id="alert-teams-webhook" placeholder="https://webhook.office.com/…" autocomplete="off" />
-                  <span class="form-hint" id="alert-teams-set-hint" style="display:none">&#10003; Webhook configured (enter new URL to replace)</span>
-                </div>
-                <div class="form-group" style="grid-column:1/-1">
-                  <label for="alert-email-recipients">Email Recipients</label>
-                  <input type="text" id="alert-email-recipients" placeholder="ops@example.com, security@example.com" autocomplete="off" />
-                  <span class="form-hint">Comma-separated. Uses the SMTP settings from the Email pane.</span>
+                <div class="ctrl">
+                  <input class="input" type="password" id="alert-slack-webhook" placeholder="https://hooks.slack.com/services/..." autocomplete="off" />
+                  <input class="input" type="password" id="alert-teams-webhook" placeholder="https://webhook.office.com/..." autocomplete="off" />
+                  <span class="help" id="alert-slack-set-hint" style="display:none">Slack webhook configured. Enter a new URL to replace.</span>
+                  <span class="help" id="alert-teams-set-hint" style="display:none">Teams webhook configured. Enter a new URL to replace.</span>
                 </div>
               </div>
-              <button class="btn-outline" id="saveAlertChannelsBtn" style="margin-top:0.75rem">Save Channels</button>
-              <span class="settings-saved-msg hidden" id="alertChannelsSavedMsg">&#10003; Saved</span>
+              <div class="field">
+                <div>
+                  <div class="label">Email recipients</div>
+                  <div class="help">Comma-separated. Uses the SMTP settings from the Email pane.</div>
+                </div>
+                <div class="ctrl">
+                  <input class="input" type="text" id="alert-email-recipients" placeholder="ops@example.com, security@example.com" autocomplete="off" />
+                </div>
+              </div>
+            </div>
+            <div style="margin-top:1rem;display:flex;gap:10px;align-items:center">
+              <button class="btn-outline" id="saveAlertChannelsBtn">Save Channels</button>
+              <span class="settings-saved-msg hidden" id="alertChannelsSavedMsg">Saved</span>
             </div>
 
-            <div class="settings-group" style="margin-top:1.5rem">
-              <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:0.75rem">
-                <h3 class="settings-group-title" style="margin:0">Global Thresholds</h3>
-                <button class="btn-outline" id="addGlobalThresholdBtn">+ Add Threshold</button>
-              </div>
-              <p class="settings-row-desc">Applied to all audits. Per-schedule overrides (below) take precedence on a per-metric basis.</p>
+            <div class="sub-head" style="margin-top:2rem">Global thresholds</div>
+            <div style="display:flex;align-items:center;justify-content:space-between;gap:16px;margin-bottom:1rem">
+              <p class="section-desc" style="margin:0">Applied to all audits. Per-schedule overrides take precedence on a per-metric basis.</p>
+              <button class="btn-outline" id="addGlobalThresholdBtn">+ Add Threshold</button>
+            </div>
               <div id="globalThresholdsTable">
                 <p class="muted" id="noGlobalThresholds">No global thresholds configured.</p>
               </div>
-            </div>
 
-            <div class="settings-group" style="margin-top:1.5rem">
-              <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:0.75rem">
-                <h3 class="settings-group-title" style="margin:0">Per-Schedule Overrides</h3>
-              </div>
-              <p class="settings-row-desc">Select a schedule to view or add overrides. An override replaces the global threshold for that metric on that schedule only.</p>
-              <div class="form-group" style="max-width:300px;margin-bottom:1rem">
-                <label for="alertScheduleSelect">Schedule</label>
-                <select id="alertScheduleSelect">
-                  <option value="">— Select a schedule —</option>
-                </select>
-              </div>
-              <div id="scheduleThresholdsTable" style="display:none">
-                <div style="display:flex;justify-content:flex-end;margin-bottom:0.5rem">
-                  <button class="btn-outline" id="addScheduleThresholdBtn">+ Add Override</button>
+            <div class="sub-head" style="margin-top:2rem">Per-schedule overrides</div>
+            <div class="form">
+              <div class="field">
+                <div>
+                  <div class="label">Schedule</div>
+                  <div class="help">An override replaces the global threshold for that metric on one schedule.</div>
                 </div>
-                <div id="scheduleThresholdsList">
-                  <p class="muted" id="noScheduleThresholds">No overrides for this schedule.</p>
+                <div class="ctrl">
+                  <select class="select" id="alertScheduleSelect">
+                    <option value="">Select a schedule</option>
+                  </select>
                 </div>
               </div>
+            </div>
+            <div id="scheduleThresholdsTable" style="display:none;margin-top:1rem">
+              <div style="display:flex;justify-content:flex-end;margin-bottom:0.5rem">
+                <button class="btn-outline" id="addScheduleThresholdBtn">+ Add Override</button>
+              </div>
+              <div id="scheduleThresholdsList">
+                <p class="muted" id="noScheduleThresholds">No overrides for this schedule.</p>
+                </div>
             </div>
           </div>
 
@@ -1710,48 +1711,64 @@
             <h2>Webhooks</h2>
             <p class="section-desc">Send structured JSON events to external URLs when audits complete or alert thresholds are crossed. Each delivery includes an <code>X-Cashel-Signature</code> HMAC header when a secret is configured.</p>
 
-            <div class="settings-group">
-              <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:0.75rem">
-                <h3 class="settings-group-title" style="margin:0">Configured Webhooks</h3>
-                <button class="btn-outline" id="addWebhookBtn">+ Add Webhook</button>
-              </div>
-              <div id="webhooksTable">
-                <p class="muted" id="noWebhooksMsg">No webhooks configured.</p>
-              </div>
+            <div class="sub-head">Configured webhooks</div>
+            <div style="display:flex;justify-content:flex-end;margin-bottom:1rem">
+              <button class="btn-outline" id="addWebhookBtn">+ Add Webhook</button>
+            </div>
+            <div id="webhooksTable">
+              <p class="muted" id="noWebhooksMsg">No webhooks configured.</p>
             </div>
           </div>
 
           <!-- Add/Edit Webhook modal -->
           <div id="addWebhookModal" class="modal-overlay hidden" role="dialog" aria-modal="true">
-            <div class="modal-box" style="max-width:460px">
-              <div class="modal-header">
-                <h3 class="modal-title">Add Webhook</h3>
+            <div class="modal" style="max-width:520px">
+              <div style="display:flex;align-items:center;justify-content:space-between;gap:16px;margin-bottom:18px">
+                <h3>Add Webhook</h3>
                 <button class="modal-close" id="addWebhookModalClose">&times;</button>
               </div>
-              <div class="modal-body">
-                <div class="form-group">
-                  <label for="whName">Name</label>
-                  <input type="text" id="whName" placeholder="My Webhook" autocomplete="off" />
-                </div>
-                <div class="form-group">
-                  <label for="whUrl">URL <span style="color:var(--color-muted);font-weight:400">(HTTPS required)</span></label>
-                  <input type="url" id="whUrl" placeholder="https://hooks.example.com/cashel" autocomplete="off" />
-                </div>
-                <div class="form-group">
-                  <label>Events</label>
-                  <div style="display:flex;flex-direction:column;gap:0.4rem;margin-top:0.25rem">
-                    <label style="font-weight:400;display:flex;align-items:center;gap:0.5rem"><input type="checkbox" class="wh-event-cb" value="audit.complete" checked /> audit.complete</label>
-                    <label style="font-weight:400;display:flex;align-items:center;gap:0.5rem"><input type="checkbox" class="wh-event-cb" value="alert.threshold_breach" /> alert.threshold_breach</label>
-                    <label style="font-weight:400;display:flex;align-items:center;gap:0.5rem"><input type="checkbox" class="wh-event-cb" value="alert.threshold_clear" /> alert.threshold_clear</label>
+              <div class="form">
+                <div class="field">
+                  <div>
+                    <div class="label">Name</div>
+                    <div class="help">A short label for this endpoint.</div>
+                  </div>
+                  <div class="ctrl">
+                    <input class="input" type="text" id="whName" placeholder="My Webhook" autocomplete="off" />
                   </div>
                 </div>
-                <div class="form-group">
-                  <label for="whSecret">Secret <span style="color:var(--color-muted);font-weight:400">(optional — used for HMAC signature)</span></label>
-                  <input type="password" id="whSecret" placeholder="Leave blank for no signature" autocomplete="off" />
+                <div class="field">
+                  <div>
+                    <div class="label">URL</div>
+                    <div class="help">HTTPS is required.</div>
+                  </div>
+                  <div class="ctrl">
+                    <input class="input" type="url" id="whUrl" placeholder="https://hooks.example.com/cashel" autocomplete="off" />
+                  </div>
                 </div>
-                <p class="muted" id="whError" style="color:var(--color-danger);display:none"></p>
+                <div class="field">
+                  <div>
+                    <div class="label">Events</div>
+                    <div class="help">Choose which events trigger delivery.</div>
+                  </div>
+                  <div class="ctrl" style="justify-items:start">
+                    <label class="tgl on"><input type="checkbox" class="wh-event-cb" value="audit.complete" checked /><span class="mark"></span>audit.complete</label>
+                    <label class="tgl"><input type="checkbox" class="wh-event-cb" value="alert.threshold_breach" /><span class="mark"></span>alert.threshold_breach</label>
+                    <label class="tgl"><input type="checkbox" class="wh-event-cb" value="alert.threshold_clear" /><span class="mark"></span>alert.threshold_clear</label>
+                  </div>
+                </div>
+                <div class="field">
+                  <div>
+                    <div class="label">Secret <span class="opt-tag">optional</span></div>
+                    <div class="help">Used for the HMAC signature header.</div>
+                  </div>
+                  <div class="ctrl">
+                    <input class="input" type="password" id="whSecret" placeholder="Leave blank for no signature" autocomplete="off" />
+                  </div>
+                </div>
               </div>
-              <div class="modal-footer" style="display:flex;gap:0.5rem;justify-content:flex-end;padding:1rem 1.25rem 1.25rem">
+              <p class="field-error" id="whError" style="display:none"></p>
+              <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:18px">
                 <button class="btn-outline" id="addWebhookModalCancel">Cancel</button>
                 <button class="btn-primary" id="saveWebhookBtn">Save</button>
               </div>
@@ -1760,51 +1777,52 @@
 
           <!-- Hidden threshold add form -->
           <div id="addThresholdModal" class="modal-overlay hidden" role="dialog" aria-modal="true">
-            <div class="modal-box" style="max-width:420px">
-              <div class="modal-header">
-                <h3 class="modal-title" id="addThresholdModalTitle">Add Threshold</h3>
+            <div class="modal" style="max-width:500px">
+              <div style="display:flex;align-items:center;justify-content:space-between;gap:16px;margin-bottom:18px">
+                <h3 id="addThresholdModalTitle">Add Threshold</h3>
                 <button class="modal-close" id="addThresholdModalClose">&times;</button>
               </div>
-              <div class="modal-body">
-                <input type="hidden" id="addThresholdScheduleId" value="" />
-                <div class="form-group">
-                  <label for="addThresholdMetric">Metric</label>
-                  <select id="addThresholdMetric">
-                    <optgroup label="Overall">
-                      <option value="score">Score (0–100)</option>
-                    </optgroup>
-                    <optgroup label="Finding Counts">
-                      <option value="high">High findings</option>
-                      <option value="medium">Medium findings</option>
-                      <option value="low">Low findings</option>
-                      <option value="total">Total findings</option>
-                    </optgroup>
-                    <optgroup label="Compliance (%)">
-                      <option value="pci">PCI-DSS</option>
-                      <option value="cis">CIS</option>
-                      <option value="nist">NIST</option>
-                      <option value="hipaa">HIPAA</option>
-                      <option value="soc2">SOC2</option>
-                      <option value="stig">STIG</option>
-                    </optgroup>
-                  </select>
+              <input type="hidden" id="addThresholdScheduleId" value="" />
+              <div class="form">
+                <div class="field">
+                  <div class="label">Metric</div>
+                  <div class="ctrl">
+                    <select class="select" id="addThresholdMetric">
+                      <optgroup label="Overall">
+                        <option value="score">Score (0-100)</option>
+                      </optgroup>
+                      <optgroup label="Finding Counts">
+                        <option value="high">High findings</option>
+                        <option value="medium">Medium findings</option>
+                        <option value="low">Low findings</option>
+                        <option value="total">Total findings</option>
+                      </optgroup>
+                      <optgroup label="Compliance (%)">
+                        <option value="pci">PCI-DSS</option>
+                        <option value="cis">CIS</option>
+                        <option value="nist">NIST</option>
+                        <option value="hipaa">HIPAA</option>
+                        <option value="soc2">SOC2</option>
+                        <option value="stig">STIG</option>
+                      </optgroup>
+                    </select>
+                  </div>
                 </div>
-                <div class="form-group">
-                  <label for="addThresholdOperator">Condition</label>
-                  <select id="addThresholdOperator">
-                    <option value="lt">Below (&lt;)</option>
-                    <option value="gte">At or above (&ge;)</option>
-                  </select>
+                <div class="field split">
+                  <div class="label">Condition</div>
+                  <div class="ctrl">
+                    <select class="select" id="addThresholdOperator">
+                      <option value="lt">Below (&lt;)</option>
+                      <option value="gte">At or above (&ge;)</option>
+                    </select>
+                    <input class="input" type="number" id="addThresholdValue" min="0" max="10000" step="0.1" placeholder="e.g. 70" />
+                  </div>
                 </div>
-                <div class="form-group">
-                  <label for="addThresholdValue">Value</label>
-                  <input type="number" id="addThresholdValue" min="0" max="10000" step="0.1" placeholder="e.g. 70" />
-                </div>
-                <div style="display:flex;gap:0.5rem;margin-top:1rem">
-                  <button class="btn-primary" id="saveThresholdBtn">Save</button>
-                  <button class="btn-outline" id="cancelThresholdBtn">Cancel</button>
-                </div>
-                <span class="alert-inline hidden" id="addThresholdError" style="display:block;margin-top:0.5rem"></span>
+              </div>
+              <span class="alert-inline hidden" id="addThresholdError" style="display:block;margin-top:10px"></span>
+              <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:18px">
+                <button class="btn-outline" id="cancelThresholdBtn">Cancel</button>
+                <button class="btn-primary" id="saveThresholdBtn">Save</button>
               </div>
             </div>
           </div>
@@ -1832,44 +1850,12 @@
 
   </div><!-- /.shell -->
 
-  <!-- Tweaks panel -->
-  <div class="tweaks-panel" id="tweaksPanel">
-    <h4>
-      <span>Tweaks</span>
-      <span style="color:var(--ink-4);font-size:10px;font-family:'Geist Mono',monospace">live</span>
-    </h4>
-    <div class="tweaks-row">
-      <label>Theme</label>
-      <div class="seg">
-        <button id="twLight" aria-pressed="true" onclick="applyTheme('light')">Light</button>
-        <button id="twDark"  aria-pressed="false" onclick="applyTheme('dark')">Dark</button>
-      </div>
-    </div>
-    <div class="tweaks-row">
-      <label>Accent</label>
-      <div class="accent-swatches" id="tweaksAccentSwatches">
-        <div class="accent-swatch on" data-accent="acid"   style="background:oklch(0.86 0.19 128)" title="Acid"></div>
-        <div class="accent-swatch"   data-accent="blue"   style="background:oklch(0.72 0.17 245)" title="Blue"></div>
-        <div class="accent-swatch"   data-accent="violet" style="background:oklch(0.72 0.17 295)" title="Violet"></div>
-        <div class="accent-swatch"   data-accent="amber"  style="background:oklch(0.82 0.17 75)"  title="Amber"></div>
-        <div class="accent-swatch"   data-accent="rose"   style="background:oklch(0.74 0.17 15)"  title="Rose"></div>
-        <div class="accent-swatch"   data-accent="teal"   style="background:oklch(0.78 0.14 185)" title="Teal"></div>
-        <div class="accent-swatch"   data-accent="mono"   style="background:oklch(0.78 0.01 260)" title="Mono"></div>
-      </div>
-    </div>
-  </div>
-
   <script nonce="{{ g.csp_nonce }}">
   // ═══════════════════════════════════════════════════════════════ THEME ══
   const html = document.documentElement;
 
   function applyTheme(theme) {
     window._applyTheme(theme);
-    // sync tweaks buttons
-    const twL = document.getElementById('twLight');
-    const twD = document.getElementById('twDark');
-    if (twL) twL.setAttribute('aria-pressed', String(theme === 'light'));
-    if (twD) twD.setAttribute('aria-pressed', String(theme === 'dark'));
     // update theme toggle icon
     const icon = document.getElementById('themeIcon');
     if (icon) {
@@ -1885,15 +1871,10 @@
 
   function applyAccent(key) {
     window._applyAccent(key);
-    document.querySelectorAll('#accentSwatches .accent-swatch').forEach(el => {
+    document.querySelectorAll('.accent-swatch').forEach(el => {
+      el.classList.toggle('active', el.dataset.accent === key);
       el.classList.toggle('on', el.dataset.accent === key);
     });
-    // sync tweaks theme buttons state
-    const cur = html.getAttribute('data-theme') || 'light';
-    const twL = document.getElementById('twLight');
-    const twD = document.getElementById('twDark');
-    if (twL) twL.setAttribute('aria-pressed', String(cur === 'light'));
-    if (twD) twD.setAttribute('aria-pressed', String(cur === 'dark'));
   }
 
   // Init from current data-theme (already set in head)
@@ -1912,16 +1893,6 @@
       const cur = html.getAttribute('data-theme') || 'light';
       applyTheme(cur === 'dark' ? 'light' : 'dark');
     }
-  });
-
-  // Tweaks panel toggle
-  document.getElementById('tweaksBtn')?.addEventListener('click', () => {
-    document.getElementById('tweaksPanel').classList.toggle('on');
-  });
-
-  // Accent swatches
-  document.querySelectorAll('#accentSwatches .accent-swatch').forEach(el => {
-    el.addEventListener('click', () => applyAccent(el.dataset.accent));
   });
 
   // Restore saved accent
@@ -1944,14 +1915,8 @@
   document.getElementById('accentCycleBtn')?.addEventListener('click', function() {
     const cur = localStorage.getItem('cashel.accent') || 'acid';
     const next = ACCENT_ORDER[(ACCENT_ORDER.indexOf(cur) + 1) % ACCENT_ORDER.length];
-    window._applyAccent(next);
+    applyAccent(next);
     _updateAccentDot();
-  });
-  document.querySelectorAll('.accent-swatch').forEach(btn => {
-    btn.addEventListener('click', function() {
-      window._applyAccent(this.dataset.accent);
-      _updateAccentDot();
-    });
   });
   _updateAccentDot();
 
@@ -2814,6 +2779,13 @@
       document.querySelectorAll('input[name="auth_method"]').forEach(input => {
         input.closest(".tgl")?.classList.toggle("on", input.checked);
       });
+    });
+  });
+
+  document.querySelectorAll(".tgl input[type='checkbox']").forEach(input => {
+    input.closest(".tgl")?.classList.toggle("on", input.checked);
+    input.addEventListener("change", () => {
+      input.closest(".tgl")?.classList.toggle("on", input.checked);
     });
   });
 
@@ -3693,7 +3665,10 @@
     _set("setting-smtp-user",            "smtp_user",             "");
     _set("setting-smtp-from",            "smtp_from",             "");
     const smtpTls = document.getElementById("setting-smtp-tls");
-    if (smtpTls) smtpTls.checked = appSettings.smtp_tls !== false;
+    if (smtpTls) {
+      smtpTls.checked = appSettings.smtp_tls !== false;
+      smtpTls.closest(".tgl")?.classList.toggle("on", smtpTls.checked);
+    }
     _set("setting-ssh-host-key-policy",  "ssh_host_key_policy",   "warn");
     _set("setting-error-detail",         "error_detail",          "sanitized");
     _set("setting-webhook-allowlist",    "webhook_allowlist",      "");
@@ -4063,7 +4038,10 @@
     document.getElementById("whName").value = "";
     document.getElementById("whUrl").value = "";
     document.getElementById("whSecret").value = "";
-    document.querySelectorAll(".wh-event-cb").forEach(c => { c.checked = c.value === "audit.complete"; });
+    document.querySelectorAll(".wh-event-cb").forEach(c => {
+      c.checked = c.value === "audit.complete";
+      c.closest(".tgl")?.classList.toggle("on", c.checked);
+    });
     loadWebhooks();
   });
 
@@ -4436,9 +4414,9 @@
 
   <!-- ═══════════ Remediation Plan Modal ═══════════ -->
   <div class="modal-overlay hidden" id="remediationModal" role="dialog" aria-modal="true" aria-label="Remediation Plan">
-    <div class="modal-box remediation-modal-box">
-      <div class="modal-header">
-        <h3 class="modal-title">Remediation Plan</h3>
+    <div class="modal remediation-modal" style="max-width:860px">
+      <div style="display:flex;align-items:center;justify-content:space-between;gap:16px;margin-bottom:18px">
+        <h3>Remediation Plan</h3>
         <div style="display:flex;gap:0.5rem;align-items:center;">
           {% if not demo_mode %}
           <button class="btn-outline btn-sm" id="remPlanOpenPdf" title="Open as PDF in new tab">&#x2197; Open PDF</button>
@@ -4448,7 +4426,7 @@
           <button class="modal-close" id="remediationModalClose" aria-label="Close">&times;</button>
         </div>
       </div>
-      <div class="modal-body" id="remediationModalBody">
+      <div id="remediationModalBody">
         <div class="rem-loading">Generating plan&hellip;</div>
       </div>
     </div>
