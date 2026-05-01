@@ -521,9 +521,14 @@
         </div>
       </header>
       {% if demo_mode %}
-      <div class="card demo-picker-card">
-        <h2 class="card-title">Sample Comparisons</h2>
-        <p class="card-subtitle">Select a pre-loaded before/after pair to see a real config diff &mdash; no upload needed.</p>
+      <div class="section-head">
+        <div>
+          <div class="idx">01 &mdash; Samples</div>
+          <h2>Sample comparisons</h2>
+          <div class="desc">Select a pre-loaded before/after pair to see a real config diff &mdash; no upload needed.</div>
+        </div>
+      </div>
+      <div class="demo-picker-card">
         <div class="demo-config-grid" id="demoCompareGrid">
           {% for pair in demo_comparisons %}
           <button type="button" class="demo-config-card"
@@ -538,52 +543,77 @@
       </div>
       {% endif %}
 
-      <div class="card" id="diffUploadCard">
-        <h2 class="card-title">Compare Configs</h2>
-        <p class="card-desc">Upload two firewall configs of the same vendor to see added, removed, and unchanged rules.</p>
+      <div id="diffUploadCard">
+        <div class="section-head">
+          <div>
+            <div class="idx">{% if demo_mode %}02{% else %}01{% endif %} &mdash; Diff inputs</div>
+            <h2>Compare configs</h2>
+            <div class="desc">Upload two firewall configs of the same vendor to see added, removed, and unchanged rules.</div>
+          </div>
+        </div>
         <form id="diffForm" enctype="multipart/form-data">
-          <div class="form-grid">
-            <div class="form-group">
-              <label for="config_a">Baseline Config <span class="optional">(older)</span></label>
-              <div class="file-input-wrapper">
-                <input type="file" id="config_a" name="config_a" required />
-                <span class="file-label" id="fileLabelA">Choose a file&hellip;</span>
+          <div class="form">
+            <div class="field split">
+              <div>
+                <div class="label">Config files</div>
+                <div class="help">Choose the older baseline and the current candidate for a structural rule diff.</div>
+              </div>
+              <div class="ctrl">
+                <label for="config_a" class="file-field empty" id="diffFileFieldA">
+                  <div>
+                    <div class="fname" id="fileLabelA">Baseline config</div>
+                    <div class="fmeta" id="fileMetaA">Older file</div>
+                  </div>
+                  <span class="browse">Browse</span>
+                  <input type="file" id="config_a" name="config_a" required hidden />
+                </label>
+                <label for="config_b" class="file-field empty" id="diffFileFieldB">
+                  <div>
+                    <div class="fname" id="fileLabelB">New config</div>
+                    <div class="fmeta" id="fileMetaB">Current file</div>
+                  </div>
+                  <span class="browse">Browse</span>
+                  <input type="file" id="config_b" name="config_b" required hidden />
+                </label>
               </div>
             </div>
-            <div class="form-group">
-              <label for="config_b">New Config <span class="optional">(current)</span></label>
-              <div class="file-input-wrapper">
-                <input type="file" id="config_b" name="config_b" required />
-                <span class="file-label" id="fileLabelB">Choose a file&hellip;</span>
+            <div class="field">
+              <div>
+                <div class="label">Vendor</div>
+                <div class="help">Auto-detect is safest when both files are from the same platform.</div>
               </div>
-            </div>
-            <div class="form-group">
-              <label for="diffVendor">Vendor</label>
-              <select id="diffVendor" name="vendor">
-                <option value="auto" selected>Auto-detect (recommended)</option>
-                <option value="aws">AWS Security Group</option>
-                <option value="azure">Azure NSG</option>
-                <option value="cisco">Cisco</option>
-                <option value="fortinet">Fortinet</option>
-                <option value="gcp">GCP VPC Firewall</option>
-                <option value="iptables">iptables (Linux)</option>
-                <option value="juniper">Juniper SRX</option>
-                <option value="nftables">nftables (Linux)</option>
-                <option value="paloalto">Palo Alto Networks</option>
-                <option value="pfsense">pfSense</option>
-              </select>
+              <div class="ctrl">
+                <select class="select" id="diffVendor" name="vendor">
+                  <option value="auto" selected>Auto-detect (recommended)</option>
+                  <option value="aws">AWS Security Group</option>
+                  <option value="azure">Azure NSG</option>
+                  <option value="cisco">Cisco</option>
+                  <option value="fortinet">Fortinet</option>
+                  <option value="gcp">GCP VPC Firewall</option>
+                  <option value="iptables">iptables (Linux)</option>
+                  <option value="juniper">Juniper SRX</option>
+                  <option value="nftables">nftables (Linux)</option>
+                  <option value="paloalto">Palo Alto Networks</option>
+                  <option value="pfsense">pfSense</option>
+                </select>
+              </div>
             </div>
           </div>
-          <button type="submit" class="btn-primary" id="diffBtn">
-            <span id="diffText">Compare</span>
-            <span id="diffSpinner" class="spinner hidden"></span>
-          </button>
+          <div style="display:flex;justify-content:flex-end;padding-top:28px">
+            <button type="submit" class="btn-primary" id="diffBtn">
+              <span id="diffText">Compare</span>
+              <span id="diffSpinner" class="spinner hidden"></span>
+            </button>
+          </div>
         </form>
       </div><!-- /#diffUploadCard -->
 
-      <div class="card hidden" id="diffResults">
-        <div class="results-header">
-          <h2 class="card-title" style="margin-bottom:0">Diff Results</h2>
+      <div class="hidden" id="diffResults">
+        <div class="section-head">
+          <div>
+            <div class="idx">{% if demo_mode %}03{% else %}02{% endif %} &mdash; Results</div>
+            <h2>Diff results</h2>
+          </div>
           <span class="detected-vendor hidden" id="diffVendorTag"></span>
         </div>
         <div id="diffSummary"></div>
@@ -601,108 +631,148 @@
           <h1>Pull config<br/><em>in real time.</em></h1>
         </div>
       </header>
-      <div class="card">
-        <h2 class="card-title">Live SSH Connection</h2>
-        <p class="card-desc">Connect directly to a device to pull its running configuration and audit it in real time.</p>
+      <div>
+        <div class="section-head">
+          <div>
+            <div class="idx">01 &mdash; Connection</div>
+            <h2>Live SSH connection</h2>
+            <div class="desc">Connect directly to a device to pull its running configuration and audit it in real time.</div>
+          </div>
+        </div>
         {% if demo_mode %}
-        <div class="alert alert-info" style="display:flex;align-items:center;gap:0.6rem">
+        <div class="banner" style="margin-bottom:24px">
           <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" style="width:15px;height:15px;flex-shrink:0" aria-hidden="true"><circle cx="8" cy="8" r="6.5"/><line x1="8" y1="5" x2="8" y2="8.5"/><circle cx="8" cy="11" r="0.6" fill="currentColor" stroke="none"/></svg>
           <span><strong>Demo session active</strong> &mdash; a sample Cisco ASA (ASA01-EDGE) is pre-connected. Click <em>Connect &amp; Audit</em> to run the audit and see live findings.</span>
         </div>
         {% else %}
-        <div class="alert alert-info">
-          Supported: <strong>Cisco</strong>, <strong>Fortinet</strong>, <strong>Palo Alto Networks</strong> (SSH).
-          Credentials are used only for the single connection and are never stored.
+        <div class="banner" style="margin-bottom:24px">
+          <span>Supported: <strong>Cisco</strong>, <strong>Fortinet</strong>, <strong>Palo Alto Networks</strong> (SSH). Credentials are used only for the single connection and are never stored.</span>
         </div>
         {% endif %}
         <form id="connectForm">
-          <div class="form-grid connect-grid">
-            <div class="form-group" style="grid-column:1/-1">
-              <label for="connDeviceTag">Device Tag</label>
-              <input type="text" id="connDeviceTag" name="tag" placeholder="e.g. ASA01, FortiGate-HQ&hellip;" autocomplete="off" maxlength="64" required
-                {% if demo_mode %}value="ASA01-EDGE" readonly{% endif %} />
+          <div class="form">
+            <div class="field">
+              <div>
+                <div class="label">Device tag</div>
+                <div class="help">Used to label the pulled config in results and history.</div>
+              </div>
+              <div class="ctrl">
+                <input class="input" type="text" id="connDeviceTag" name="tag" placeholder="e.g. ASA01, FortiGate-HQ&hellip;" autocomplete="off" maxlength="64" required
+                  {% if demo_mode %}value="ASA01-EDGE" readonly{% endif %} />
+              </div>
             </div>
-            <div class="form-group">
-              <label for="connVendor">Vendor</label>
-              <select id="connVendor" name="vendor" {% if demo_mode %}disabled{% endif %}>
-                <option value="cisco" {% if demo_mode %}selected{% endif %}>Cisco</option>
-                <option value="fortinet">Fortinet</option>
-                <option value="iptables">iptables (Linux)</option>
-                <option value="juniper">Juniper SRX</option>
-                <option value="nftables">nftables (Linux)</option>
-                <option value="paloalto">Palo Alto Networks</option>
-                <option value="pfsense">pfSense</option>
-              </select>
+            <div class="field split">
+              <div>
+                <div class="label">Vendor &amp; compliance</div>
+                <div class="help">Compliance checks are license-gated and run after the hygiene audit.</div>
+              </div>
+              <div class="ctrl">
+                <select class="select" id="connVendor" name="vendor" {% if demo_mode %}disabled{% endif %}>
+                  <option value="cisco" {% if demo_mode %}selected{% endif %}>Cisco</option>
+                  <option value="fortinet">Fortinet</option>
+                  <option value="iptables">iptables (Linux)</option>
+                  <option value="juniper">Juniper SRX</option>
+                  <option value="nftables">nftables (Linux)</option>
+                  <option value="paloalto">Palo Alto Networks</option>
+                  <option value="pfsense">pfSense</option>
+                </select>
+                <select class="select" id="connCompliance" name="compliance" {% if demo_mode %}disabled{% endif %}>
+                  <option value="">Compliance &mdash; None</option>
+                  <option value="cis">CIS Benchmark</option>
+                  <option value="stig">DISA STIG</option>
+                  <option value="hipaa">HIPAA Security Rule</option>
+                  <option value="nist">NIST SP 800-41</option>
+                  <option value="pci">PCI-DSS</option>
+                  <option value="soc2">SOC2</option>
+                </select>
+              </div>
             </div>
             <div class="field triple" style="grid-column:1/-1">
+              <div>
+                <div class="label">Endpoint</div>
+                <div class="help">Target host, SSH username, and port for this one-time pull.</div>
+              </div>
               <div class="ctrl">
-                <div class="form-group">
-                  <label for="connHost">Host / IP</label>
-                  <input type="text" id="connHost" name="host" placeholder="192.168.1.1" autocomplete="off"
+                <input class="input" type="text" id="connHost" name="host" placeholder="Host / IP"
                     {% if demo_mode %}value="203.0.113.50" readonly{% endif %} />
-                </div>
-                <div class="form-group">
-                  <label for="connUser">Username</label>
-                  <input type="text" id="connUser" name="username" placeholder="admin" autocomplete="off"
+                <input class="input" type="text" id="connUser" name="username" placeholder="Username" autocomplete="off"
                     {% if demo_mode %}value="auditor" readonly{% endif %} />
-                </div>
-                <div class="form-group">
-                  <label for="connPort">SSH Port</label>
-                  <input type="text" id="connPort" name="port" value="22" placeholder="22" autocomplete="off"
+                <input class="input" type="text" id="connPort" name="port" value="22" placeholder="SSH port" autocomplete="off"
                     {% if demo_mode %}readonly{% endif %} />
-                </div>
               </div>
             </div>
             {% if not demo_mode %}
-            <div class="form-group" style="grid-column:1/-1">
-              <label>Authentication Method</label>
-              <div style="display:flex;gap:1.5rem;margin-top:0.35rem">
-                <label style="display:flex;align-items:center;gap:0.4rem;cursor:pointer">
+            <div class="field">
+              <div>
+                <div class="label">Authentication method</div>
+                <div class="help">Use a password or PEM key for this connection only.</div>
+              </div>
+              <div class="ctrl">
+                <div class="toggles">
+                <label class="tgl on">
                   <input type="radio" name="auth_method" value="password" id="authMethodPassword" checked />
+                  <span class="mark"></span>
                   <span>Password</span>
                 </label>
-                <label style="display:flex;align-items:center;gap:0.4rem;cursor:pointer">
+                <label class="tgl">
                   <input type="radio" name="auth_method" value="pem_key" id="authMethodPem" />
+                  <span class="mark"></span>
                   <span>PEM Key File</span>
+                </label>
+                </div>
+              </div>
+            </div>
+            <div class="field" id="connPassGroup">
+              <div>
+                <div class="label">Password</div>
+                <div class="help">Never stored; sent only for this SSH session.</div>
+              </div>
+              <div class="ctrl">
+                <input class="input" type="password" id="connPass" name="password" placeholder="&bull;&bull;&bull;&bull;&bull;&bull;&bull;&bull;" autocomplete="current-password" />
+              </div>
+            </div>
+            <div class="field hidden" id="connPemGroup">
+              <div>
+                <div class="label">PEM key file</div>
+                <div class="help">Upload a `.pem` or `.key` file for key-based auth.</div>
+              </div>
+              <div class="ctrl">
+                <label for="connPemKey" class="file-field empty">
+                  <div>
+                    <div class="fname">No key selected</div>
+                    <div class="fmeta">PEM or KEY</div>
+                  </div>
+                  <span class="browse">Browse</span>
+                  <input type="file" id="connPemKey" name="pem_key" accept=".pem,.key" hidden />
                 </label>
               </div>
             </div>
-            <div class="form-group" id="connPassGroup">
-              <label for="connPass">Password</label>
-              <input type="password" id="connPass" name="password" placeholder="&bull;&bull;&bull;&bull;&bull;&bull;&bull;&bull;" autocomplete="current-password" />
-            </div>
-            <div class="form-group hidden" id="connPemGroup">
-              <label for="connPemKey">PEM Key File</label>
-              <input type="file" id="connPemKey" name="pem_key" accept=".pem,.key" />
-            </div>
-            <div class="form-group hidden" id="connPemPassGroup">
-              <label for="connPemPassphrase">Key Passphrase <span class="optional">(if encrypted)</span></label>
-              <input type="password" id="connPemPassphrase" name="pem_passphrase" autocomplete="new-password" />
+            <div class="field hidden" id="connPemPassGroup">
+              <div>
+                <div class="label">Key passphrase <span class="opt-tag">Optional</span></div>
+                <div class="help">Only needed for encrypted private keys.</div>
+              </div>
+              <div class="ctrl">
+                <input class="input" type="password" id="connPemPassphrase" name="pem_passphrase" autocomplete="new-password" />
+              </div>
             </div>
             {% endif %}
-            <div class="form-group">
-              <label for="connCompliance">Compliance <span class="optional">(licensed)</span></label>
-              <select id="connCompliance" name="compliance" {% if demo_mode %}disabled{% endif %}>
-                <option value="">None</option>
-                <option value="cis">CIS Benchmark</option>
-                <option value="stig">DISA STIG</option>
-                <option value="hipaa">HIPAA Security Rule</option>
-                <option value="nist">NIST SP 800-41</option>
-                <option value="pci">PCI-DSS</option>
-                <option value="soc2">SOC2</option>
-              </select>
-            </div>
           </div>
-          <button type="submit" class="btn-primary" id="connectBtn">
-            <span id="connectText">Connect &amp; Audit</span>
-            <span id="connectSpinner" class="spinner hidden"></span>
-          </button>
+          <div style="display:flex;justify-content:flex-end;padding-top:28px">
+            <button type="submit" class="btn-primary" id="connectBtn">
+              <span id="connectText">Connect &amp; Audit</span>
+              <span id="connectSpinner" class="spinner hidden"></span>
+            </button>
+          </div>
         </form>
       </div>
 
-      <div class="card hidden" id="connectResults">
-        <div class="results-header">
-          <h2 class="card-title" style="margin-bottom:0">Live Audit Results</h2>
+      <div class="hidden" id="connectResults">
+        <div class="section-head">
+          <div>
+            <div class="idx">02 &mdash; Results</div>
+            <h2>Live audit results</h2>
+          </div>
           <span class="detected-vendor hidden" id="connVendorTag"></span>
         </div>
         <div class="summary-grid" id="connSummaryGrid"></div>
@@ -740,68 +810,75 @@
 
       <!-- ── Audit History sub-tab ── -->
       <div id="sub-audits">
-      <div class="card">
-        <div class="results-header">
-          <h2 class="card-title" style="margin-bottom:0">Audit History</h2>
-          <button class="btn-secondary" id="refreshHistoryBtn" style="font-size:0.8rem;padding:0.3rem 0.75rem">&#8635; Refresh</button>
+      <div>
+        <div class="section-head">
+          <div>
+            <div class="idx">01 &mdash; Audit runs</div>
+            <h2>Audit history</h2>
+            <div class="desc">Saved audits. Select two entries and click Compare.</div>
+          </div>
+          <button class="btn-outline" id="refreshHistoryBtn">Refresh</button>
         </div>
-        <p class="card-desc">Saved audits. Select two entries and click Compare.</p>
         <!-- Filters -->
-        <div class="history-filters">
-          <div class="history-filter-group">
-            <label class="filter-label">Vendor</label>
-            <select id="historyVendorFilter">
-              <option value="">All vendors</option>
-              <option value="aws">AWS Security Group</option>
-              <option value="azure">Azure NSG</option>
-              <option value="cisco">Cisco</option>
-              <option value="fortinet">Fortinet</option>
-              <option value="gcp">GCP VPC Firewall</option>
-              <option value="iptables">iptables (Linux)</option>
-              <option value="juniper">Juniper SRX</option>
-              <option value="nftables">nftables (Linux)</option>
-              <option value="paloalto">Palo Alto Networks</option>
-              <option value="pfsense">pfSense</option>
-            </select>
-          </div>
-          <div class="history-filter-group">
-            <label class="filter-label">Sort by</label>
-            <select id="historySort">
-              <option value="newest">Newest first</option>
-              <option value="oldest">Oldest first</option>
-              <option value="most">Most issues</option>
-              <option value="least">Least issues</option>
-            </select>
-          </div>
-          <div class="history-filter-group">
-            <label class="filter-label">Search</label>
-            <input type="text" id="historySearch" placeholder="Filter by filename&hellip;" style="padding:0.3rem 0.6rem;font-size:0.85rem;" />
+        <div class="form">
+          <div class="field triple">
+            <div>
+              <div class="label">Filters</div>
+              <div class="help">Narrow the audit list by vendor, sort order, or filename.</div>
+            </div>
+            <div class="ctrl">
+              <select class="select" id="historyVendorFilter">
+                <option value="">All vendors</option>
+                <option value="aws">AWS Security Group</option>
+                <option value="azure">Azure NSG</option>
+                <option value="cisco">Cisco</option>
+                <option value="fortinet">Fortinet</option>
+                <option value="gcp">GCP VPC Firewall</option>
+                <option value="iptables">iptables (Linux)</option>
+                <option value="juniper">Juniper SRX</option>
+                <option value="nftables">nftables (Linux)</option>
+                <option value="paloalto">Palo Alto Networks</option>
+                <option value="pfsense">pfSense</option>
+              </select>
+              <select class="select" id="historySort">
+                <option value="newest">Newest first</option>
+                <option value="oldest">Oldest first</option>
+                <option value="most">Most issues</option>
+                <option value="least">Least issues</option>
+              </select>
+              <input class="input" type="text" id="historySearch" placeholder="Filter by filename&hellip;" />
+            </div>
           </div>
         </div>
-        <div id="historyList" class="history-list">
+        <div id="historyList" class="history-list" style="margin-top:24px">
           <p class="text-muted">Loading&hellip;</p>
         </div>
       </div>
 
       <!-- Trends chart -->
-      <div class="card" id="trendsCard">
-        <div class="results-header">
-          <h2 class="card-title" style="margin-bottom:0">Score Trends</h2>
-          <button class="btn-secondary" id="refreshTrendsBtn" style="font-size:0.8rem;padding:0.3rem 0.75rem">&#8635; Refresh</button>
-        </div>
-        <p class="card-desc">Security score over time per device. Score = 100 &minus; (HIGH &times; 10) &minus; (MEDIUM &times; 3), min 0.</p>
-        <div style="display:flex;gap:1rem;flex-wrap:wrap;margin-bottom:1rem;" id="trendsFilters">
-          <div class="history-filter-group">
-            <label class="filter-label">Vendor</label>
-            <select id="trendsVendorFilter">
-              <option value="">All vendors</option>
-            </select>
+      <div id="trendsCard">
+        <div class="section-head">
+          <div>
+            <div class="idx">02 &mdash; Trends</div>
+            <h2>Score trends</h2>
+            <div class="desc">Security score over time per device. Score = 100 &minus; (HIGH &times; 10) &minus; (MEDIUM &times; 3), min 0.</div>
           </div>
-          <div class="history-filter-group">
-            <label class="filter-label">Device Tag</label>
-            <select id="trendsDeviceFilter">
-              <option value="">All devices</option>
-            </select>
+          <button class="btn-outline" id="refreshTrendsBtn">Refresh</button>
+        </div>
+        <div class="form" id="trendsFilters">
+          <div class="field split">
+            <div>
+              <div class="label">Trend filters</div>
+              <div class="help">Compare scores across vendors or a single tagged device.</div>
+            </div>
+            <div class="ctrl">
+              <select class="select" id="trendsVendorFilter">
+                <option value="">All vendors</option>
+              </select>
+              <select class="select" id="trendsDeviceFilter">
+                <option value="">All devices</option>
+              </select>
+            </div>
           </div>
         </div>
         <div id="trendsEmpty" class="hidden"><p class="text-muted">No trend data yet. Save two or more audits for the same device to see trends.</p></div>
@@ -811,8 +888,13 @@
       </div>
 
       <!-- Comparison result -->
-      <div class="card hidden" id="compareResults">
-        <h2 class="card-title">Comparison</h2>
+      <div class="hidden" id="compareResults">
+        <div class="section-head">
+          <div>
+            <div class="idx">03 &mdash; Comparison</div>
+            <h2>Comparison</h2>
+          </div>
+        </div>
         <div id="compareContent"></div>
       </div>
       </div><!-- /sub-audits -->
@@ -820,15 +902,18 @@
       <!-- ── Activity Log sub-tab ── -->
       {% if not current_user or current_user.role == 'admin' %}
       <div id="sub-activity" class="hidden">
-      <div class="card">
-        <div class="results-header">
-          <h2 class="card-title" style="margin-bottom:0">Activity Log</h2>
+      <div>
+        <div class="section-head">
+          <div>
+            <div class="idx">01 &mdash; Activity</div>
+            <h2>Activity log</h2>
+            <div class="desc">All application activity — audits, SSH connections, and config diffs — including failures.</div>
+          </div>
           <div style="display:flex;gap:0.5rem;align-items:center;">
-            <button class="btn-secondary" id="refreshActivityBtn" style="font-size:0.8rem;padding:0.3rem 0.75rem">&#8635; Refresh</button>
-            <button class="btn-danger"    id="clearActivityBtn"   style="font-size:0.8rem;padding:0.3rem 0.75rem">&#128465; Clear All</button>
+            <button class="btn-outline" id="refreshActivityBtn">Refresh</button>
+            <button class="btn-danger" id="clearActivityBtn">Clear All</button>
           </div>
         </div>
-        <p class="card-desc">All application activity — audits, SSH connections, and config diffs — including failures.</p>
         <div id="activityList" class="history-list">
           <p class="text-muted">Loading&hellip;</p>
         </div>
@@ -841,17 +926,20 @@
       <!-- ── Security Log sub-tab ── -->
       {% if not current_user or current_user.role in ('admin', 'auditor') %}
       <div id="sub-seclog" class="hidden">
-      <div class="card">
-        <div class="results-header">
-          <h2 class="card-title" style="margin-bottom:0">Security Log</h2>
+      <div>
+        <div class="section-head">
+          <div>
+            <div class="idx">01 &mdash; Security</div>
+            <h2>Security log</h2>
+            <div class="desc">Authentication events — logins, failures, invalid API keys, and user/settings changes.</div>
+          </div>
           <div style="display:flex;gap:0.5rem;align-items:center;">
-            <button class="btn-secondary" id="refreshSecLogBtn" style="font-size:0.8rem;padding:0.3rem 0.75rem">&#8635; Refresh</button>
+            <button class="btn-outline" id="refreshSecLogBtn">Refresh</button>
             {% if not current_user or current_user.role == 'admin' %}
-            <button class="btn-danger" id="clearSecLogBtn" style="font-size:0.8rem;padding:0.3rem 0.75rem">&#128465; Clear All</button>
+            <button class="btn-danger" id="clearSecLogBtn">Clear All</button>
             {% endif %}
           </div>
         </div>
-        <p class="card-desc">Authentication events — logins, failures, invalid API keys, and user/settings changes.</p>
         <div id="secLogList" class="history-list">
           <p class="text-muted">Loading&hellip;</p>
         </div>
@@ -871,15 +959,18 @@
           <h1>Schedule<br/><em>everything.</em></h1>
         </div>
       </header>
-      <div class="card">
-        <div class="results-header">
-          <h2 class="card-title" style="margin-bottom:0">Scheduled Audits</h2>
-          <button class="btn-secondary" id="refreshSchedulesBtn" style="font-size:0.8rem;padding:0.3rem 0.75rem">&#8635; Refresh</button>
+      <div>
+        <div class="section-head">
+          <div>
+            <div class="idx">01 &mdash; Runs</div>
+            <h2>Scheduled audits</h2>
+            <div class="desc">Automatically run SSH audits on a recurring schedule. Results are saved to Audit History.</div>
+          </div>
+          <button class="btn-outline" id="refreshSchedulesBtn">Refresh</button>
         </div>
-        <p class="card-desc">Automatically run SSH audits on a recurring schedule. Results are saved to Audit History.</p>
         {% if demo_mode %}
-        <div class="alert alert-info" style="margin-top:0.75rem">
-          <strong>Read-only demo view</strong> &mdash; Sample schedules are shown below. Creating, editing, and deleting schedules is disabled in demo mode.
+        <div class="banner" style="margin-bottom:24px">
+          <span><strong>Read-only demo view</strong> &mdash; Sample schedules are shown below. Creating, editing, and deleting schedules is disabled in demo mode.</span>
         </div>
         {% endif %}
         <div id="schedulesList" class="schedules-list">
@@ -888,123 +979,146 @@
       </div>
 
       <!-- New / Edit Schedule Form — hidden in demo mode and for viewer role -->
-      <div class="card{% if demo_mode or (current_user and current_user.role == 'viewer') %} hidden{% endif %}" id="scheduleFormCard">
-        <h2 class="card-title" id="scheduleFormTitle">New Schedule</h2>
+      <div class="{% if demo_mode or (current_user and current_user.role == 'viewer') %}hidden{% endif %}" id="scheduleFormCard">
+        <div class="section-head">
+          <div>
+            <div class="idx">02 &mdash; Schedule editor</div>
+            <h2 id="scheduleFormTitle">New schedule</h2>
+            <div class="desc">Define the device, cadence, and notification targets for an automated SSH audit.</div>
+          </div>
+        </div>
         <form id="scheduleForm">
           <input type="hidden" id="scheduleId" value="" />
-          <div class="form-grid">
-            <div class="form-group">
-              <label for="schedName">Name</label>
-              <input type="text" id="schedName" name="name" placeholder="My ASA01 daily audit" maxlength="80" autocomplete="off" required />
-            </div>
-            <div class="form-group">
-              <label for="schedVendor">Vendor</label>
-              <select id="schedVendor" name="vendor">
-                <option value="cisco">Cisco</option>
-                <option value="fortinet">Fortinet</option>
-                <option value="iptables">iptables (Linux)</option>
-                <option value="juniper">Juniper SRX</option>
-                <option value="nftables">nftables (Linux)</option>
-                <option value="paloalto">Palo Alto Networks</option>
-                <option value="pfsense">pfSense</option>
-              </select>
-            </div>
-            <div class="form-group">
-              <label for="schedHost">Host / IP</label>
-              <input type="text" id="schedHost" name="host" placeholder="192.168.1.1" autocomplete="off" required />
-            </div>
-            <div class="form-group">
-              <label for="schedPort">SSH Port</label>
-              <input type="text" id="schedPort" name="port" value="22" placeholder="22" autocomplete="off" />
-            </div>
-            <div class="form-group">
-              <label for="schedUser">Username</label>
-              <input type="text" id="schedUser" name="username" placeholder="admin" autocomplete="off" required />
-            </div>
-            <div class="form-group">
-              <label for="schedPass">Password</label>
-              <input type="password" id="schedPass" name="password" placeholder="leave blank to keep existing" autocomplete="new-password" />
-            </div>
-            <div class="form-group">
-              <label for="schedTag">Device Tag</label>
-              <input type="text" id="schedTag" name="tag" placeholder="ASA01" maxlength="64" autocomplete="off" />
-            </div>
-            <div class="form-group">
-              <label for="schedCompliance">Compliance <span class="optional">(licensed)</span></label>
-              <select id="schedCompliance" name="compliance">
-                <option value="">None</option>
-                <option value="cis">CIS Benchmark</option>
-                <option value="stig">DISA STIG</option>
-                <option value="hipaa">HIPAA Security Rule</option>
-                <option value="nist">NIST SP 800-41</option>
-                <option value="pci">PCI-DSS</option>
-                <option value="soc2">SOC2</option>
-              </select>
-            </div>
-            <div class="form-group">
-              <label for="schedFrequency">Frequency</label>
-              <select id="schedFrequency" name="frequency">
-                <option value="hourly">Hourly</option>
-                <option value="daily" selected>Daily</option>
-                <option value="weekly">Weekly</option>
-              </select>
-            </div>
-            <div class="form-group" id="schedHourGroup">
-              <label for="schedHour">Hour (UTC, 0&ndash;23)</label>
-              <input type="number" id="schedHour" name="hour" value="2" min="0" max="23" />
-            </div>
-            <div class="form-group">
-              <label for="schedMinute">Minute (0&ndash;59)</label>
-              <input type="number" id="schedMinute" name="minute" value="0" min="0" max="59" />
-            </div>
-            <div class="form-group" id="schedDowGroup" style="display:none">
-              <label for="schedDow">Day of Week</label>
-              <select id="schedDow" name="day_of_week">
-                <option value="mon" selected>Monday</option>
-                <option value="tue">Tuesday</option>
-                <option value="wed">Wednesday</option>
-                <option value="thu">Thursday</option>
-                <option value="fri">Friday</option>
-                <option value="sat">Saturday</option>
-                <option value="sun">Sunday</option>
-              </select>
-            </div>
-            <div class="form-group form-group-check">
-              <label class="checkbox-label">
-                <input type="checkbox" id="schedEnabled" name="enabled" checked />
-                <span>Enabled</span>
-              </label>
-            </div>
-            <!-- Notifications -->
-            <div class="form-group" style="grid-column:1/-1">
-              <label>Notifications</label>
-              <div style="display:flex;gap:1.5rem;flex-wrap:wrap;margin-top:0.35rem">
-                <label class="checkbox-label">
-                  <input type="checkbox" id="schedNotifyFinding" />
-                  <span>Alert on HIGH findings</span>
-                </label>
-                <label class="checkbox-label">
-                  <input type="checkbox" id="schedNotifyError" />
-                  <span>Alert on audit errors</span>
-                </label>
+          <div class="form">
+            <div class="field split">
+              <div>
+                <div class="label">Name &amp; platform</div>
+                <div class="help">Give the schedule a recognizable name and choose the device parser.</div>
+              </div>
+              <div class="ctrl">
+                <input class="input" type="text" id="schedName" name="name" placeholder="My ASA01 daily audit" maxlength="80" autocomplete="off" required />
+                <select class="select" id="schedVendor" name="vendor">
+                  <option value="cisco">Cisco</option>
+                  <option value="fortinet">Fortinet</option>
+                  <option value="iptables">iptables (Linux)</option>
+                  <option value="juniper">Juniper SRX</option>
+                  <option value="nftables">nftables (Linux)</option>
+                  <option value="paloalto">Palo Alto Networks</option>
+                  <option value="pfsense">pfSense</option>
+                </select>
               </div>
             </div>
-            <div class="form-group" style="grid-column:1/-1">
-              <label for="schedSlackWebhook">Slack Webhook URL <span class="optional">(optional)</span></label>
-              <input type="url" id="schedSlackWebhook" placeholder="https://hooks.slack.com/services/…" autocomplete="off" maxlength="512" />
+            <div class="field triple">
+              <div>
+                <div class="label">Endpoint</div>
+                <div class="help">SSH target and credentials for the scheduled pull.</div>
+              </div>
+              <div class="ctrl">
+                <input class="input" type="text" id="schedHost" name="host" placeholder="Host / IP" autocomplete="off" required />
+                <input class="input" type="text" id="schedPort" name="port" value="22" placeholder="SSH port" autocomplete="off" />
+                <input class="input" type="text" id="schedUser" name="username" placeholder="Username" autocomplete="off" required />
+              </div>
             </div>
-            <div class="form-group" style="grid-column:1/-1">
-              <label for="schedTeamsWebhook">Microsoft Teams Webhook URL <span class="optional">(optional)</span></label>
-              <input type="url" id="schedTeamsWebhook" placeholder="https://[tenant].webhook.office.com/webhookb2/…" autocomplete="off" maxlength="512" />
+            <div class="field split">
+              <div>
+                <div class="label">Audit defaults</div>
+                <div class="help">Device label and optional compliance framework for every run.</div>
+              </div>
+              <div class="ctrl">
+                <input class="input" type="text" id="schedTag" name="tag" placeholder="Device tag, e.g. ASA01" maxlength="64" autocomplete="off" />
+                <select class="select" id="schedCompliance" name="compliance">
+                  <option value="">Compliance &mdash; None</option>
+                  <option value="cis">CIS Benchmark</option>
+                  <option value="stig">DISA STIG</option>
+                  <option value="hipaa">HIPAA Security Rule</option>
+                  <option value="nist">NIST SP 800-41</option>
+                  <option value="pci">PCI-DSS</option>
+                  <option value="soc2">SOC2</option>
+                </select>
+              </div>
             </div>
-            <div class="form-group" style="grid-column:1/-1">
-              <label for="schedNotifyEmail">Alert Email <span class="optional">(optional)</span></label>
-              <input type="email" id="schedNotifyEmail" placeholder="ops@example.com" autocomplete="off" maxlength="254" />
+            <div class="field">
+              <div>
+                <div class="label">Password</div>
+                <div class="help">Leave blank when editing to keep the existing saved secret.</div>
+              </div>
+              <div class="ctrl">
+                <input class="input" type="password" id="schedPass" name="password" placeholder="leave blank to keep existing" autocomplete="new-password" />
+              </div>
+            </div>
+            <div class="field triple">
+              <div>
+                <div class="label">Cadence</div>
+                <div class="help">Choose how often the audit runs. Times are stored in UTC.</div>
+              </div>
+              <div class="ctrl">
+                <select class="select" id="schedFrequency" name="frequency">
+                  <option value="hourly">Hourly</option>
+                  <option value="daily" selected>Daily</option>
+                  <option value="weekly">Weekly</option>
+                </select>
+                <input class="input" type="number" id="schedHour" name="hour" value="2" min="0" max="23" placeholder="Hour" />
+                <input class="input" type="number" id="schedMinute" name="minute" value="0" min="0" max="59" placeholder="Minute" />
+              </div>
+            </div>
+            <div class="field" id="schedDowGroup" style="display:none">
+              <div>
+                <div class="label">Day of week</div>
+                <div class="help">Only used for weekly schedules.</div>
+              </div>
+              <div class="ctrl">
+                <select class="select" id="schedDow" name="day_of_week">
+                  <option value="mon" selected>Monday</option>
+                  <option value="tue">Tuesday</option>
+                  <option value="wed">Wednesday</option>
+                  <option value="thu">Thursday</option>
+                  <option value="fri">Friday</option>
+                  <option value="sat">Saturday</option>
+                  <option value="sun">Sunday</option>
+                </select>
+              </div>
+            </div>
+            <!-- Notifications -->
+            <div class="field">
+              <div>
+                <div class="label">Status &amp; notifications</div>
+                <div class="help">Enable the schedule and decide when alerts should fire.</div>
+              </div>
+              <div class="ctrl">
+                <div class="toggles">
+                <label class="tgl on" id="schedEnabledToggle">
+                  <input type="checkbox" id="schedEnabled" name="enabled" checked />
+                  <span class="mark"></span>
+                  Enabled
+                </label>
+                <label class="tgl" id="schedNotifyFindingToggle">
+                  <input type="checkbox" id="schedNotifyFinding" />
+                  <span class="mark"></span>
+                  Alert on HIGH findings
+                </label>
+                <label class="tgl" id="schedNotifyErrorToggle">
+                  <input type="checkbox" id="schedNotifyError" />
+                  <span class="mark"></span>
+                  Alert on audit errors
+                </label>
+                </div>
+              </div>
+            </div>
+            <div class="field triple">
+              <div>
+                <div class="label">Notification targets <span class="opt-tag">Optional</span></div>
+                <div class="help">Send alerts to Slack, Teams, or email when selected conditions trigger.</div>
+              </div>
+              <div class="ctrl">
+                <input class="input" type="url" id="schedSlackWebhook" placeholder="Slack webhook URL" autocomplete="off" maxlength="512" />
+                <input class="input" type="url" id="schedTeamsWebhook" placeholder="Teams webhook URL" autocomplete="off" maxlength="512" />
+                <input class="input" type="email" id="schedNotifyEmail" placeholder="ops@example.com" autocomplete="off" maxlength="254" />
+              </div>
             </div>
           </div>
-          <div style="display:flex;gap:0.75rem;align-items:center;flex-wrap:wrap">
+          <div style="display:flex;gap:0.75rem;align-items:center;flex-wrap:wrap;padding-top:28px">
             <button type="submit" class="btn-primary" id="schedSaveBtn">Save Schedule</button>
-            <button type="button" class="btn-secondary" id="schedCancelBtn">Cancel</button>
+            <button type="button" class="btn-outline" id="schedCancelBtn">Cancel</button>
             <span class="settings-saved-msg hidden" id="schedSavedMsg">&#10003; Saved</span>
             <span class="alert-inline hidden" id="schedErrorMsg"></span>
           </div>
@@ -1223,7 +1337,7 @@
               </div>
             </div>
             <div style="margin-top:1.25rem;display:flex;align-items:center;gap:0.75rem">
-              <button class="btn-secondary" id="testSmtpBtn">
+              <button class="btn-outline" id="testSmtpBtn">
                 <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" style="width:13px;height:13px;vertical-align:-1px;margin-right:4px" aria-hidden="true"><rect x="1" y="3.5" width="14" height="9" rx="1.5"/><path d="M1 5l7 4.5L15 5"/></svg>
                 Test SMTP
               </button>
@@ -1299,7 +1413,7 @@
                       <option value="admin">Admin</option>
                     </select>
                   </div>
-                  <button class="btn-secondary" id="btnAddUser" style="padding:0.45rem 0.9rem">Add User</button>
+                  <button class="btn-outline" id="btnAddUser" style="padding:0.45rem 0.9rem">Add User</button>
                 </div>
                 <div id="addUserError" style="margin-top:0.5rem;font-size:0.82rem;color:var(--high);display:none"></div>
               </div>
@@ -1316,19 +1430,19 @@
                 </span>
               </div>
               <div style="margin-top:0.75rem;display:flex;gap:0.75rem;flex-wrap:wrap">
-                <button class="btn-secondary" id="btnGenerateKey">Generate New Key</button>
-                <button class="btn-secondary" id="btnRevokeKey" style="{% if not current_user or not current_user.has_api_key %}display:none{% endif %}">Revoke Key</button>
+                <button class="btn-outline" id="btnGenerateKey">Generate New Key</button>
+                <button class="btn-outline" id="btnRevokeKey" style="{% if not current_user or not current_user.has_api_key %}display:none{% endif %}">Revoke Key</button>
               </div>
               <div id="authNewKeyBox" class="hidden" style="margin-top:1rem;background:var(--card-bg);border:1px solid var(--accent);border-radius:8px;padding:1rem">
                 <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:0.5rem">
                   <p style="font-size:0.82rem;color:var(--high);font-weight:600;margin:0">&#9888; Copy this key now — it will not be shown again. Auto-hides in <span id="authKeyCountdown">60</span>s.</p>
-                  <button class="btn-secondary" id="btnDismissKey" style="padding:0.2rem 0.6rem;font-size:0.78rem">Dismiss</button>
+                  <button class="btn-outline" id="btnDismissKey" style="padding:0.2rem 0.6rem;font-size:0.78rem">Dismiss</button>
                 </div>
                 <div style="display:flex;align-items:center;gap:0.5rem">
                   <input type="password" id="authNewKeyVal" readonly
                          style="flex:1;padding:0.5rem;background:var(--input-bg);border:1px solid var(--border);border-radius:4px;word-break:break-all;font-size:0.88rem;color:var(--text);font-family:monospace" />
-                  <button class="btn-secondary" id="btnRevealKey">Show</button>
-                  <button class="btn-secondary" id="btnCopyKey">Copy</button>
+                  <button class="btn-outline" id="btnRevealKey">Show</button>
+                  <button class="btn-outline" id="btnCopyKey">Copy</button>
                 </div>
               </div>
               <p class="section-desc" style="margin-top:0.75rem">Use this key in the <code>X-API-Key</code> header for CLI or CI/CD access:<br><code>curl -H "X-API-Key: csh_..." https://your-cashel/api/v1/audit</code></p>
@@ -1349,7 +1463,7 @@
                          style="padding:0.55rem 0.75rem;font-size:0.88rem" />
                 </div>
                 <div>
-                  <button class="btn-secondary" id="btnChangePassword">Update Password</button>
+                  <button class="btn-outline" id="btnChangePassword">Update Password</button>
                   <span id="chpwMsg" style="margin-left:0.75rem;font-size:0.82rem"></span>
                 </div>
               </div>
@@ -1484,14 +1598,14 @@
                   <span class="form-hint">Comma-separated. Uses the SMTP settings from the Email pane.</span>
                 </div>
               </div>
-              <button class="btn-secondary" id="saveAlertChannelsBtn" style="margin-top:0.75rem">Save Channels</button>
+              <button class="btn-outline" id="saveAlertChannelsBtn" style="margin-top:0.75rem">Save Channels</button>
               <span class="settings-saved-msg hidden" id="alertChannelsSavedMsg">&#10003; Saved</span>
             </div>
 
             <div class="settings-group" style="margin-top:1.5rem">
               <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:0.75rem">
                 <h3 class="settings-group-title" style="margin:0">Global Thresholds</h3>
-                <button class="btn-secondary" id="addGlobalThresholdBtn">+ Add Threshold</button>
+                <button class="btn-outline" id="addGlobalThresholdBtn">+ Add Threshold</button>
               </div>
               <p class="settings-row-desc">Applied to all audits. Per-schedule overrides (below) take precedence on a per-metric basis.</p>
               <div id="globalThresholdsTable">
@@ -1512,7 +1626,7 @@
               </div>
               <div id="scheduleThresholdsTable" style="display:none">
                 <div style="display:flex;justify-content:flex-end;margin-bottom:0.5rem">
-                  <button class="btn-secondary" id="addScheduleThresholdBtn">+ Add Override</button>
+                  <button class="btn-outline" id="addScheduleThresholdBtn">+ Add Override</button>
                 </div>
                 <div id="scheduleThresholdsList">
                   <p class="muted" id="noScheduleThresholds">No overrides for this schedule.</p>
@@ -1599,7 +1713,7 @@
             <div class="settings-group">
               <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:0.75rem">
                 <h3 class="settings-group-title" style="margin:0">Configured Webhooks</h3>
-                <button class="btn-secondary" id="addWebhookBtn">+ Add Webhook</button>
+                <button class="btn-outline" id="addWebhookBtn">+ Add Webhook</button>
               </div>
               <div id="webhooksTable">
                 <p class="muted" id="noWebhooksMsg">No webhooks configured.</p>
@@ -1638,7 +1752,7 @@
                 <p class="muted" id="whError" style="color:var(--color-danger);display:none"></p>
               </div>
               <div class="modal-footer" style="display:flex;gap:0.5rem;justify-content:flex-end;padding:1rem 1.25rem 1.25rem">
-                <button class="btn-secondary" id="addWebhookModalCancel">Cancel</button>
+                <button class="btn-outline" id="addWebhookModalCancel">Cancel</button>
                 <button class="btn-primary" id="saveWebhookBtn">Save</button>
               </div>
             </div>
@@ -1688,7 +1802,7 @@
                 </div>
                 <div style="display:flex;gap:0.5rem;margin-top:1rem">
                   <button class="btn-primary" id="saveThresholdBtn">Save</button>
-                  <button class="btn-secondary" id="cancelThresholdBtn">Cancel</button>
+                  <button class="btn-outline" id="cancelThresholdBtn">Cancel</button>
                 </div>
                 <span class="alert-inline hidden" id="addThresholdError" style="display:block;margin-top:0.5rem"></span>
               </div>
@@ -2618,10 +2732,18 @@
 
   // ══════════════════════════════════════════════════ COMPARE CONFIGS ══
   document.getElementById("config_a")?.addEventListener("change", function () {
-    document.getElementById("fileLabelA").textContent = this.files.length ? this.files[0].name : "Choose a file\u2026";
+    const hasFile = this.files.length > 0;
+    document.getElementById("fileLabelA").textContent = hasFile ? this.files[0].name : "Baseline config";
+    document.getElementById("fileMetaA").textContent = hasFile ? `${(this.files[0].size / 1024).toFixed(1)} KB · ready` : "Older file";
+    document.getElementById("diffFileFieldA").classList.toggle("empty", !hasFile);
+    document.getElementById("diffFileFieldA").classList.toggle("has-file", hasFile);
   });
   document.getElementById("config_b")?.addEventListener("change", function () {
-    document.getElementById("fileLabelB").textContent = this.files.length ? this.files[0].name : "Choose a file\u2026";
+    const hasFile = this.files.length > 0;
+    document.getElementById("fileLabelB").textContent = hasFile ? this.files[0].name : "New config";
+    document.getElementById("fileMetaB").textContent = hasFile ? `${(this.files[0].size / 1024).toFixed(1)} KB · ready` : "Current file";
+    document.getElementById("diffFileFieldB").classList.toggle("empty", !hasFile);
+    document.getElementById("diffFileFieldB").classList.toggle("has-file", hasFile);
   });
 
   document.getElementById("diffForm")?.addEventListener("submit", async function (e) {
@@ -2689,7 +2811,21 @@
       document.getElementById("connPassGroup").classList.toggle("hidden", isPem);
       document.getElementById("connPemGroup").classList.toggle("hidden", !isPem);
       document.getElementById("connPemPassGroup").classList.toggle("hidden", !isPem);
+      document.querySelectorAll('input[name="auth_method"]').forEach(input => {
+        input.closest(".tgl")?.classList.toggle("on", input.checked);
+      });
     });
+  });
+
+  document.getElementById("connPemKey")?.addEventListener("change", function () {
+    const field = this.closest(".file-field");
+    const name = field?.querySelector(".fname");
+    const meta = field?.querySelector(".fmeta");
+    const hasFile = this.files.length > 0;
+    if (name) name.textContent = hasFile ? this.files[0].name : "No key selected";
+    if (meta) meta.textContent = hasFile ? `${(this.files[0].size / 1024).toFixed(1)} KB · ready` : "PEM or KEY";
+    field?.classList.toggle("empty", !hasFile);
+    field?.classList.toggle("has-file", hasFile);
   });
 
   document.getElementById("connectForm")?.addEventListener("submit", async function (e) {
@@ -2818,12 +2954,12 @@
           <span class="sev-chip total" title="Total">${tot}</span>
         </div>
         <div style="display:flex;gap:0.4rem;align-items:center;flex-wrap:wrap;">
-          <button class="btn-secondary btn-sm" data-rem-archive="${escHtml(e.id)}" title="View Remediation Plan">&#9881; Plan</button>
-          <a class="btn-secondary btn-sm" href="/archive/${escHtml(e.id)}/export?fmt=json"  download title="Download JSON">JSON</a>
-          <a class="btn-secondary btn-sm" href="/archive/${escHtml(e.id)}/export?fmt=csv"   download title="Download CSV">CSV</a>
-          <a class="btn-secondary btn-sm" href="/archive/${escHtml(e.id)}/export?fmt=sarif" download title="Download SARIF">SARIF</a>
+          <button class="btn-outline btn-sm" data-rem-archive="${escHtml(e.id)}" title="View Remediation Plan">&#9881; Plan</button>
+          <a class="btn-outline btn-sm" href="/archive/${escHtml(e.id)}/export?fmt=json"  download title="Download JSON">JSON</a>
+          <a class="btn-outline btn-sm" href="/archive/${escHtml(e.id)}/export?fmt=csv"   download title="Download CSV">CSV</a>
+          <a class="btn-outline btn-sm" href="/archive/${escHtml(e.id)}/export?fmt=sarif" download title="Download SARIF">SARIF</a>
           ${(userRole === 'admin' || userRole === 'auditor')
-            ? `<button class="btn-secondary btn-sm" data-evidence-bundle="${escHtml(e.id)}" title="Download Evidence Bundle (ZIP)">&#128196; Bundle</button>`
+            ? `<button class="btn-outline btn-sm" data-evidence-bundle="${escHtml(e.id)}" title="Download Evidence Bundle (ZIP)">&#128196; Bundle</button>`
             : ''
           }
           ${userRole === 'admin'
@@ -3305,7 +3441,7 @@
           </div>
         </details>
         ${(r.enriched_findings||r.findings||[]).length > 0
-          ? `<button class="btn-secondary btn-sm bulk-rem-btn" data-rem-idx="${i}">View Remediation Plan</button>`
+          ? `<button class="btn-outline btn-sm bulk-rem-btn" data-rem-idx="${i}">View Remediation Plan</button>`
           : ''}
       </div>`;
     }).join("");
@@ -3380,8 +3516,8 @@
         <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;justify-content:flex-end">
           <span class="${statusClass}">${statusLabel}</span>
           ${(!DEMO_MODE && canManageSchedules) ? `
-          <button class="btn-secondary btn-sm" data-sched-run="${escHtml(s.id)}" title="Run now">&#9654; Run Now</button>
-          <button class="btn-secondary btn-sm" data-sched-edit="${escHtml(s.id)}" title="Edit">&#9998; Edit</button>
+          <button class="btn-outline btn-sm" data-sched-run="${escHtml(s.id)}" title="Run now">&#9654; Run Now</button>
+          <button class="btn-outline btn-sm" data-sched-edit="${escHtml(s.id)}" title="Edit">&#9998; Edit</button>
           <button class="btn-danger btn-sm"    data-sched-del="${escHtml(s.id)}"  title="Delete">&#128465;</button>
           ` : ""}
         </div>
@@ -3412,17 +3548,29 @@
     document.getElementById("schedSlackWebhook").value      = s.notify_slack_webhook || "";
     document.getElementById("schedTeamsWebhook").value      = s.notify_teams_webhook || "";
     document.getElementById("schedNotifyEmail").value       = s.notify_email || "";
+    syncScheduleTogglePills();
     toggleScheduleFreqFields(s.frequency || "daily");
     document.getElementById("scheduleFormCard").scrollIntoView({ behavior: "smooth", block: "start" });
   }
 
   function toggleScheduleFreqFields(freq) {
-    document.getElementById("schedHourGroup").style.display = freq === "hourly" ? "none" : "";
-    document.getElementById("schedDowGroup").style.display  = freq === "weekly" ? ""     : "none";
+    document.getElementById("schedHour").style.display = freq === "hourly" ? "none" : "";
+    document.getElementById("schedDowGroup").style.display  = freq === "weekly" ? "" : "none";
+  }
+
+  function syncScheduleTogglePills() {
+    ["schedEnabled", "schedNotifyFinding", "schedNotifyError"].forEach(id => {
+      const input = document.getElementById(id);
+      input?.closest(".tgl")?.classList.toggle("on", !!input.checked);
+    });
   }
 
   document.getElementById("schedFrequency")?.addEventListener("change", function () {
     toggleScheduleFreqFields(this.value);
+  });
+
+  ["schedEnabled", "schedNotifyFinding", "schedNotifyError"].forEach(id => {
+    document.getElementById(id)?.addEventListener("change", syncScheduleTogglePills);
   });
 
   document.getElementById("schedCancelBtn")?.addEventListener("click", function () {
@@ -3431,6 +3579,7 @@
     document.getElementById("scheduleFormTitle").textContent = "New Schedule";
     document.getElementById("schedSavedMsg").classList.add("hidden");
     document.getElementById("schedErrorMsg").classList.add("hidden");
+    syncScheduleTogglePills();
     toggleScheduleFreqFields("daily");
   });
 
@@ -3480,6 +3629,7 @@
       if (!schedId) {
         this.reset();
         document.getElementById("scheduleId").value = "";
+        syncScheduleTogglePills();
         toggleScheduleFreqFields("daily");
       }
       await loadSchedules();
@@ -3862,7 +4012,7 @@
               <td>${w.secret_set ? "&#10003;" : "—"}</td>
               <td>${w.enabled ? "Yes" : "No"}</td>
               <td style="display:flex;gap:0.4rem">
-                <button class="btn-secondary btn-xs wh-test-btn" data-id="${w.id}">Test</button>
+                <button class="btn-outline btn-xs wh-test-btn" data-id="${w.id}">Test</button>
                 <button class="btn-danger btn-xs wh-delete-btn" data-id="${w.id}">Delete</button>
               </td>
             </tr>`).join("")}
@@ -4104,7 +4254,7 @@
           <td style="padding:0.45rem 0.6rem;font-size:0.82rem">${u.has_api_key ? "&#10003; set" : "—"}</td>
           <td style="padding:0.45rem 0.6rem;font-size:0.82rem;color:var(--text-muted)">${created}</td>
           <td style="padding:0.45rem 0.6rem">
-            <button class="btn-secondary btn-delete-user" data-id="${u.id}" data-name="${u.username}"
+            <button class="btn-outline btn-delete-user" data-id="${u.id}" data-name="${u.username}"
                     style="padding:0.2rem 0.55rem;font-size:0.78rem"
                     ${isSelf ? "disabled title='Cannot delete your own account'" : ""}>Delete</button>
           </td>`;
@@ -4291,9 +4441,9 @@
         <h3 class="modal-title">Remediation Plan</h3>
         <div style="display:flex;gap:0.5rem;align-items:center;">
           {% if not demo_mode %}
-          <button class="btn-secondary btn-sm" id="remPlanOpenPdf" title="Open as PDF in new tab">&#x2197; Open PDF</button>
-          <button class="btn-secondary btn-sm" id="remPlanDownloadPdf" title="Download PDF">&#8681; PDF</button>
-          <button class="btn-secondary btn-sm" id="remPlanDownloadMd" title="Download Markdown">MD</button>
+          <button class="btn-outline btn-sm" id="remPlanOpenPdf" title="Open as PDF in new tab">&#x2197; Open PDF</button>
+          <button class="btn-outline btn-sm" id="remPlanDownloadPdf" title="Download PDF">&#8681; PDF</button>
+          <button class="btn-outline btn-sm" id="remPlanDownloadMd" title="Download Markdown">MD</button>
           {% endif %}
           <button class="modal-close" id="remediationModalClose" aria-label="Close">&times;</button>
         </div>

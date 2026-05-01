@@ -168,6 +168,8 @@ button { cursor: pointer; border: 0; background: transparent; }
 .btn-ghost:hover { color: var(--ink); border-color: var(--line); }
 .btn-outline { padding: 10px 14px; border-radius: 999px; color: var(--ink-2); font-size: 13px; border: 1px solid var(--line); display: inline-flex; align-items: center; gap: 8px; }
 .btn-outline:hover { color: var(--ink); border-color: var(--line-2); }
+.btn-outline.btn-sm { padding: 6px 10px; font-size: 12px; }
+.btn-outline.btn-xs { padding: 4px 8px; font-size: 11px; }
 .btn-danger { padding: 8px 14px; border-radius: 999px; color: var(--crit); font-size: 12px; border: 1px solid color-mix(in oklab, var(--crit) 40%, transparent); display: inline-flex; align-items: center; gap: 6px; }
 .btn-danger:hover { background: color-mix(in oklab, var(--crit) 10%, transparent); }
 .btn-icon { width: 32px; height: 32px; border-radius: 50%; color: var(--ink-3); display: inline-grid; place-items: center; transition: background .15s, color .15s; }
