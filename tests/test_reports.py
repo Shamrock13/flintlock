@@ -280,12 +280,15 @@ class TestDemoSampleReport(unittest.TestCase):
 
 
 class TestModalMarkup(unittest.TestCase):
-    def test_webhook_and_remediation_modals_use_scoped_layouts(self):
+    def _index_template(self):
         template_path = os.path.join(
             os.path.dirname(__file__), "..", "src", "cashel", "templates", "index.html"
         )
         with open(template_path, encoding="utf-8") as fh:
-            body = fh.read()
+            return fh.read()
+
+    def test_webhook_and_remediation_modals_use_scoped_layouts(self):
+        body = self._index_template()
 
         self.assertIn("modal webhook-modal", body)
         self.assertIn("event-picker", body)
@@ -293,3 +296,58 @@ class TestModalMarkup(unittest.TestCase):
         self.assertIn("rem-summary-bar", body)
         self.assertNotIn('class="modal remediation-modal" style=', body)
         self.assertNotIn('class="modal" style="max-width:520px"', body)
+
+    def test_audit_result_actions_are_glyph_free_and_grouped(self):
+        body = self._index_template()
+
+        self.assertIn(">View Report<", body)
+        self.assertIn(">View remediation plan<", body)
+        self.assertIn(">Download<", body)
+        self.assertIn("downloadMenuPanel", body)
+        action_area = body[
+            body.index('<div class="actions-row">') : body.index(
+                '<div class="archive-row hidden" id="archiveRow">'
+            )
+        ]
+        for glyph in ("&#8681;", "&#128196;", "&#10003;"):
+            self.assertNotIn(glyph, action_area)
+
+    def test_bulk_mode_has_own_section_without_single_header_overlap(self):
+        body = self._index_template()
+        single_start = body.index('<div id="audit-mode-single">')
+        bulk_start = body.index('<div id="audit-mode-bulk"')
+
+        self.assertGreater(body.index("01 &mdash; New audit"), single_start)
+        self.assertLess(body.index("01 &mdash; New audit"), bulk_start)
+        self.assertGreater(body.index("01 &mdash; Bulk audit"), bulk_start)
+
+    def test_live_ssh_sections_are_in_requested_order(self):
+        body = self._index_template()
+        connect = body[
+            body.index('<form id="connectForm">') : body.index(
+                '<button type="submit" class="btn-primary" id="connectBtn">'
+            )
+        ]
+        labels = [
+            '<div class="label">Device tag</div>',
+            '<div class="label">Connection</div>',
+            '<div class="label">Scope</div>',
+            '<div class="label">Authentication</div>',
+            '<div class="label">Credentials</div>',
+        ]
+        positions = [connect.index(label) for label in labels]
+        self.assertEqual(positions, sorted(positions))
+        self.assertNotIn('<div class="label">Endpoint</div>', connect)
+
+    def test_uptime_formatter_thresholds_are_encoded(self):
+        body = self._index_template()
+
+        self.assertIn('if (days > 0) return `${days}d ${hours}h`;', body)
+        self.assertIn('if (hours > 0) return `${hours}h ${minutes}m`;', body)
+        self.assertIn('if (minutes > 0) return `${minutes}m ${seconds}s`;', body)
+        self.assertIn('return `${seconds}s`;', body)
+
+    def test_tab_lists_do_not_render_transient_loading_text(self):
+        body = self._index_template()
+        self.assertNotIn('id="schedulesList" class="schedules-list">\n          <p class="text-muted">Loading', body)
+        self.assertNotIn('id="historyList" class="history-list" style="margin-top:24px">\n          <p class="text-muted">Loading', body)

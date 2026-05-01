@@ -164,17 +164,15 @@
 
           {% if not current_user or current_user.role in ('admin', 'auditor') %}
 
-          <!-- section header -->
-          <div class="section-head">
-            <div>
-              <div class="idx">01 &mdash; New audit</div>
-              <h2>Configure</h2>
-              <div class="desc">Drop a config, pick a compliance lens, and review the results. Nothing leaves this machine.</div>
-            </div>
-          </div>
-
           <!-- ── Single File mode ── -->
           <div id="audit-mode-single">
+            <div class="section-head">
+              <div>
+                <div class="idx">01 &mdash; New audit</div>
+                <h2>Configure</h2>
+                <div class="desc">Drop a config, pick a compliance lens, and review the results. Nothing leaves this machine.</div>
+              </div>
+            </div>
 
             {% if demo_mode %}
             <div style="margin-bottom:2rem">
@@ -316,20 +314,25 @@
               <div id="findingsList"></div>
               <div id="findingsPagination" class="findings-pagination hidden"></div>
               <div class="actions-row">
-                <div class="pdf-row hidden" id="pdfRow">
-                  <a id="pdfLink" class="btn-outline" href="#" download>&#8681; PDF</a>
-                  <a id="pdfViewLink" class="btn-outline" href="#" target="_blank" rel="noopener">&#128196; View PDF</a>
+                <div class="report-row hidden" id="pdfRow">
+                  <a id="pdfViewLink" class="btn-primary" href="#" target="_blank" rel="noopener">View Report</a>
+                  <a id="pdfLink" class="hidden" href="#" download>Report PDF</a>
                 </div>
                 <div class="remediation-row hidden" id="remediationRow">
                   <button id="remediationPlanBtn" class="btn-primary">View remediation plan</button>
                 </div>
-                <div class="export-row hidden" id="exportRow">
-                  <button id="exportJsonBtn" class="btn-outline">&#8681; JSON</button>
-                  <button id="exportCsvBtn"  class="btn-outline">&#8681; CSV</button>
-                  <button id="exportSarifBtn" class="btn-outline">&#8681; SARIF</button>
+                <div class="download-menu hidden" id="exportRow">
+                  <button id="downloadMenuBtn" class="btn-outline" type="button" aria-haspopup="true" aria-expanded="false">Download</button>
+                  <div class="download-menu-panel hidden" id="downloadMenuPanel" role="menu">
+                    <button id="exportJsonBtn" type="button" role="menuitem">JSON</button>
+                    <button id="exportCsvBtn" type="button" role="menuitem">CSV</button>
+                    <button id="exportSarifBtn" type="button" role="menuitem">SARIF</button>
+                    <a id="downloadReportPdf" class="hidden" href="#" download role="menuitem">Report PDF</a>
+                    <button id="downloadRemediationPdf" class="hidden" type="button" role="menuitem">Remediation PDF</button>
+                  </div>
                 </div>
                 <div class="archive-row hidden" id="archiveRow">
-                  <span class="archive-saved-msg">&#10003; Saved to Audit History &mdash;
+                  <span class="archive-saved-msg">Saved to Audit History &mdash;
                     <button class="link-btn" id="viewHistoryBtn">View History</button>
                   </span>
                 </div>
@@ -426,10 +429,10 @@
                   </div>
                 </div>
               </div>
-              <div style="display:flex;justify-content:flex-end;padding-top:28px">
+              <div style="display:flex;justify-content:space-between;align-items:center;gap:16px;padding-top:28px">
                 <div class="meta">Upload multiple configs to audit in batch</div>
                 <button type="submit" class="btn-primary lg" id="bulkBtn">
-                  <span id="bulkText">Run Bulk Audit</span>
+                  <span id="bulkText">Run bulk audit</span>
                   <span id="bulkSpinner" class="spinner hidden" style="border-color:rgba(0,0,0,0.2);border-top-color:var(--acc-ink)"></span>
                   <span class="btn-arr" aria-hidden="true">
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14"><path d="M5 12h14"/><path d="M13 6l6 6-6 6"/></svg>
@@ -659,10 +662,10 @@
                   {% if demo_mode %}value="ASA01-EDGE" readonly{% endif %} />
               </div>
             </div>
-            <div class="field split">
+            <div class="field triple">
               <div>
-                <div class="label">Vendor &amp; compliance</div>
-                <div class="help">Compliance checks are license-gated and run after the hygiene audit.</div>
+                <div class="label">Connection</div>
+                <div class="help">Vendor, host or IP, and SSH port.</div>
               </div>
               <div class="ctrl">
                 <select class="select" id="connVendor" name="vendor" {% if demo_mode %}disabled{% endif %}>
@@ -674,6 +677,18 @@
                   <option value="paloalto">Palo Alto Networks</option>
                   <option value="pfsense">pfSense</option>
                 </select>
+                <input class="input" type="text" id="connHost" name="host" placeholder="Host / IP"
+                    {% if demo_mode %}value="203.0.113.50" readonly{% endif %} />
+                <input class="input" type="text" id="connPort" name="port" value="22" placeholder="SSH port" autocomplete="off"
+                    {% if demo_mode %}readonly{% endif %} />
+              </div>
+            </div>
+            <div class="field">
+              <div>
+                <div class="label">Scope</div>
+                <div class="help">Compliance checks are license-gated and run after the hygiene audit.</div>
+              </div>
+              <div class="ctrl">
                 <select class="select" id="connCompliance" name="compliance" {% if demo_mode %}disabled{% endif %}>
                   <option value="">Compliance &mdash; None</option>
                   <option value="cis">CIS Benchmark</option>
@@ -685,24 +700,10 @@
                 </select>
               </div>
             </div>
-            <div class="field triple" style="grid-column:1/-1">
-              <div>
-                <div class="label">Endpoint</div>
-                <div class="help">Target host, SSH username, and port for this one-time pull.</div>
-              </div>
-              <div class="ctrl">
-                <input class="input" type="text" id="connHost" name="host" placeholder="Host / IP"
-                    {% if demo_mode %}value="203.0.113.50" readonly{% endif %} />
-                <input class="input" type="text" id="connUser" name="username" placeholder="Username" autocomplete="off"
-                    {% if demo_mode %}value="auditor" readonly{% endif %} />
-                <input class="input" type="text" id="connPort" name="port" value="22" placeholder="SSH port" autocomplete="off"
-                    {% if demo_mode %}readonly{% endif %} />
-              </div>
-            </div>
             {% if not demo_mode %}
             <div class="field">
               <div>
-                <div class="label">Authentication method</div>
+                <div class="label">Authentication</div>
                 <div class="help">Use a password or PEM key for this connection only.</div>
               </div>
               <div class="ctrl">
@@ -720,22 +721,15 @@
                 </div>
               </div>
             </div>
-            <div class="field" id="connPassGroup">
+            <div class="field triple" id="connCredentialsField">
               <div>
-                <div class="label">Password</div>
+                <div class="label">Credentials</div>
                 <div class="help">Never stored; sent only for this SSH session.</div>
               </div>
               <div class="ctrl">
-                <input class="input" type="password" id="connPass" name="password" placeholder="&bull;&bull;&bull;&bull;&bull;&bull;&bull;&bull;" autocomplete="current-password" />
-              </div>
-            </div>
-            <div class="field hidden" id="connPemGroup">
-              <div>
-                <div class="label">PEM key file</div>
-                <div class="help">Upload a `.pem` or `.key` file for key-based auth.</div>
-              </div>
-              <div class="ctrl">
-                <label for="connPemKey" class="file-field empty">
+                <input class="input" type="text" id="connUser" name="username" placeholder="Username" autocomplete="off" />
+                <input class="input" type="password" id="connPass" name="password" placeholder="Password" autocomplete="current-password" />
+                <label for="connPemKey" class="file-field empty hidden" id="connPemGroup">
                   <div>
                     <div class="fname">No key selected</div>
                     <div class="fmeta">PEM or KEY</div>
@@ -743,17 +737,11 @@
                   <span class="browse">Browse</span>
                   <input type="file" id="connPemKey" name="pem_key" accept=".pem,.key" hidden />
                 </label>
+                <input class="input hidden" type="password" id="connPemPassGroup" name="pem_passphrase" placeholder="Key passphrase (optional)" autocomplete="new-password" />
               </div>
             </div>
-            <div class="field hidden" id="connPemPassGroup">
-              <div>
-                <div class="label">Key passphrase <span class="opt-tag">Optional</span></div>
-                <div class="help">Only needed for encrypted private keys.</div>
-              </div>
-              <div class="ctrl">
-                <input class="input" type="password" id="connPemPassphrase" name="pem_passphrase" autocomplete="new-password" />
-              </div>
-            </div>
+            {% else %}
+            <input type="hidden" id="connUser" name="username" value="auditor" />
             {% endif %}
           </div>
           <div style="display:flex;justify-content:flex-end;padding-top:28px">
@@ -848,7 +836,6 @@
           </div>
         </div>
         <div id="historyList" class="history-list" style="margin-top:24px">
-          <p class="text-muted">Loading&hellip;</p>
         </div>
       </div>
 
@@ -912,7 +899,6 @@
           </div>
         </div>
         <div id="activityList" class="history-list">
-          <p class="text-muted">Loading&hellip;</p>
         </div>
       </div>
       </div><!-- /sub-activity -->
@@ -938,7 +924,6 @@
           </div>
         </div>
         <div id="secLogList" class="history-list">
-          <p class="text-muted">Loading&hellip;</p>
         </div>
       </div>
       </div><!-- /sub-seclog -->
@@ -971,7 +956,6 @@
         </div>
         {% endif %}
         <div id="schedulesList" class="schedules-list">
-          <p class="text-muted">Loading&hellip;</p>
         </div>
       </div>
 
@@ -1921,8 +1905,8 @@
       const hours = Math.floor((totalSeconds % 86400) / 3600);
       const minutes = Math.floor((totalSeconds % 3600) / 60);
       const seconds = totalSeconds % 60;
-      if (days > 0) return `${days}d ${hours}h ${minutes}m`;
-      if (hours > 0) return `${hours}h ${minutes}m ${seconds}s`;
+      if (days > 0) return `${days}d ${hours}h`;
+      if (hours > 0) return `${hours}h ${minutes}m`;
       if (minutes > 0) return `${minutes}m ${seconds}s`;
       return `${seconds}s`;
     }
@@ -2650,8 +2634,13 @@
     if (data.report) {
       document.getElementById("pdfLink").href     = "/reports/" + data.report;
       document.getElementById("pdfViewLink").href = "/reports/" + data.report + "/view";
+      document.getElementById("downloadReportPdf").href = "/reports/" + data.report;
+      document.getElementById("downloadReportPdf").classList.remove("hidden");
       pdfRow.classList.remove("hidden");
-    } else { pdfRow.classList.add("hidden"); }
+    } else {
+      pdfRow.classList.add("hidden");
+      document.getElementById("downloadReportPdf").classList.add("hidden");
+    }
 
     if (data.archive_id) { document.getElementById("archiveRow").classList.remove("hidden"); }
     else { document.getElementById("archiveRow").classList.add("hidden"); }
@@ -2662,8 +2651,13 @@
     /* Show remediation plan button when there are findings */
     const remRow = document.getElementById("remediationRow");
     const hasFindings = (data.enriched_findings || data.findings || []).length > 0;
-    if (hasFindings) { remRow.classList.remove("hidden"); }
-    else { remRow.classList.add("hidden"); }
+    if (hasFindings) {
+      remRow.classList.remove("hidden");
+      document.getElementById("downloadRemediationPdf").classList.remove("hidden");
+    } else {
+      remRow.classList.add("hidden");
+      document.getElementById("downloadRemediationPdf").classList.add("hidden");
+    }
   }
 
   document.getElementById("viewHistoryBtn")?.addEventListener("click", () => switchTab("history"));
@@ -2752,6 +2746,54 @@
   document.getElementById("exportCsvBtn")?.addEventListener("click",   exportCSV);
   document.getElementById("exportSarifBtn")?.addEventListener("click", exportSARIF);
 
+  function closeDownloadMenu() {
+    document.getElementById("downloadMenuPanel")?.classList.add("hidden");
+    document.getElementById("downloadMenuBtn")?.setAttribute("aria-expanded", "false");
+  }
+  document.getElementById("downloadMenuBtn")?.addEventListener("click", e => {
+    e.stopPropagation();
+    const panel = document.getElementById("downloadMenuPanel");
+    const open = panel.classList.toggle("hidden") === false;
+    document.getElementById("downloadMenuBtn").setAttribute("aria-expanded", String(open));
+  });
+  document.addEventListener("click", e => {
+    if (!e.target.closest?.(".download-menu")) closeDownloadMenu();
+  });
+  document.addEventListener("keydown", e => {
+    if (e.key === "Escape") closeDownloadMenu();
+  });
+  document.querySelectorAll("#downloadMenuPanel button, #downloadMenuPanel a").forEach(item => {
+    item.addEventListener("click", closeDownloadMenu);
+  });
+
+  document.getElementById("downloadRemediationPdf")?.addEventListener("click", async () => {
+    if (!lastAuditData) return;
+    try {
+      const csrfToken = document.querySelector('meta[name="csrf-token"]')?.content
+                     || document.querySelector('input[name="csrf_token"]')?.value || '';
+      const payload = {
+        findings: lastAuditData.enriched_findings || lastAuditData.findings || [],
+        vendor: lastAuditData.detected_vendor || lastAuditData.vendor || "",
+        filename: lastAuditData.filename || "",
+        compliance: lastAuditData.compliance || null,
+        summary: lastAuditData.summary || {},
+      };
+      const res = await fetch("/remediation-plan?fmt=pdf", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "X-CSRFToken": csrfToken },
+        body: JSON.stringify(payload),
+      });
+      if (!res.ok) throw new Error("Download failed");
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url; a.download = _exportBasename() + "_remediation.pdf"; a.click();
+      URL.revokeObjectURL(url);
+    } catch (err) {
+      alert("Remediation PDF download failed: " + err.message);
+    }
+  });
+
   // ══════════════════════════════════════════════════ COMPARE CONFIGS ══
   document.getElementById("config_a")?.addEventListener("change", function () {
     const hasFile = this.files.length > 0;
@@ -2830,7 +2872,7 @@
   document.querySelectorAll('input[name="auth_method"]').forEach(r => {
     r.addEventListener("change", () => {
       const isPem = document.getElementById("authMethodPem").checked;
-      document.getElementById("connPassGroup").classList.toggle("hidden", isPem);
+      document.getElementById("connPass").classList.toggle("hidden", isPem);
       document.getElementById("connPemGroup").classList.toggle("hidden", !isPem);
       document.getElementById("connPemPassGroup").classList.toggle("hidden", !isPem);
       document.querySelectorAll('input[name="auth_method"]').forEach(input => {
@@ -2917,7 +2959,6 @@
   let compareSelections = [];
 
   async function loadHistory() {
-    document.getElementById("historyList").innerHTML = `<p class="text-muted">Loading&hellip;</p>`;
     try {
       const res  = await fetch("/archive");
       historyData = await res.json();
@@ -3203,7 +3244,6 @@
   async function loadActivity() {
     const activityList = document.getElementById("activityList");
     if (!activityList) return;
-    activityList.innerHTML = `<p class="text-muted">Loading&hellip;</p>`;
     try {
       const res    = await fetch("/activity");
       const events = await res.json();
@@ -3275,7 +3315,6 @@
   async function loadSecLog() {
     const el = document.getElementById("secLogList");
     if (!el) return;
-    el.innerHTML = `<p class="text-muted">Loading&hellip;</p>`;
     try {
       const res    = await fetch("/auth-events");
       const events = await res.json();
@@ -3389,7 +3428,7 @@
     document.getElementById(textId).textContent = loading ? label : label.replace(/\u2026$/, "").trim();
     document.getElementById(spinnerId).classList.toggle("hidden", !loading);
     if (!loading) {
-      const origLabels = { submitBtn:"Run Audit", bulkBtn:"Run Bulk Audit", diffBtn:"Compare", connectBtn:"Connect & Audit" };
+      const origLabels = { submitBtn:"Run Audit", bulkBtn:"Run bulk audit", diffBtn:"Compare", connectBtn:"Connect & Audit" };
       document.getElementById(textId).textContent = origLabels[btnId] || label;
     }
   }
@@ -3424,7 +3463,7 @@
       document.getElementById("bulkResultsList").innerHTML =
         `<div class="alert alert-error">Unexpected error: ${escHtml(err.message)}</div>`;
     } finally {
-      setLoading("bulkBtn", "bulkText", "bulkSpinner", "Run Bulk Audit", false);
+      setLoading("bulkBtn", "bulkText", "bulkSpinner", "Run bulk audit", false);
     }
   });
 
@@ -3498,7 +3537,6 @@
   let schedulesData = [];
 
   async function loadSchedules() {
-    document.getElementById("schedulesList").innerHTML = `<p class="text-muted">Loading\u2026</p>`;
     try {
       const res = await fetch("/schedules");
       schedulesData = await res.json();
