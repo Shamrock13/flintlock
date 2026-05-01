@@ -92,9 +92,12 @@
       <button class="accent-cycle-btn" id="accentCycleBtn" aria-label="Change accent color" title="Cycle accent color">
         <span class="dot" id="accentDot"></span>
       </button>
-      <span class="license-chip" id="licenseChip" onclick="gotoLicensing()">
+      <span class="license-chip{% if not licensed %} unlicensed{% endif %}" id="licenseChip" role="button" tabindex="0" onclick="gotoLicensing()" title="{% if licensed %}Open Licensing settings{% else %}Compliance checks disabled — click to activate a license{% endif %}">
         <span class="dot" id="licDot"></span>
-        <span id="licenseText">{% if license_active %}Licensed{% else %}Unlicensed{% endif %}</span>
+        <span id="licenseText">{% if licensed %}Licensed{% else %}Unlicensed{% endif %}</span>
+        {% if not licensed %}
+        <svg class="arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
+        {% endif %}
       </span>
       <span class="user">
         <span>{{ current_user.username if current_user and current_user.is_authenticated else 'admin' }}</span>
@@ -1536,7 +1539,8 @@
                 <div class="lic-meta" id="licMetaBlock"{% if not licensed %} style="display:none"{% endif %}>
                   <div class="lic-meta-row"><span class="lab">Plan</span><span class="val">Cashel Pro</span></div>
                   <div class="lic-meta-row"><span class="lab">Seats</span><span class="val">5 engines</span></div>
-                  <div class="lic-meta-row"><span class="lab">Key</span><span class="val mono">{{ license_info[:12] }}&hellip;</span></div>
+                  <div class="lic-meta-row"><span class="lab">Renews</span><span class="val">Mar 14, 2027</span></div>
+                  <div class="lic-meta-row"><span class="lab">Key</span><span class="val mono" id="licMetaKey">{{ license_info if licensed else 'CSL-••••••••-••••••••-••••••••-••••••••-••••••••' }}</span></div>
                 </div>
               </div>
             </div>
@@ -1549,10 +1553,10 @@
                   <div class="help">Paste the key from your purchase email. Activation is local — no telemetry.</div>
                 </div>
                 <div class="ctrl">
-                  <input class="input mono" id="licenseKeyInput" placeholder="CSL-XXXXXXXX-XXXXXXXX-XXXXXXXX-XXXXXXXX" autocomplete="off" style="font-family:'Geist Mono',monospace;font-size:12px;letter-spacing:0.02em" />
-                  <button type="button" class="btn-run" id="activateLicenseBtn" style="white-space:nowrap;align-self:flex-end">
+                  <input class="input mono" id="licenseKeyInput" placeholder="CSL-XXXXXXXX-XXXXXXXX-XXXXXXXX-XXXXXXXX" autocomplete="off" />
+                  <button type="button" class="btn-primary" id="activateLicenseBtn" style="white-space:nowrap;align-self:flex-end">
                     Activate
-                    <span class="btn-arr" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14"><path d="M5 12h14M13 6l6 6-6 6"/></svg></span>
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
                   </button>
                 </div>
               </div>
@@ -1563,8 +1567,8 @@
                 </div>
                 <div class="ctrl">
                   <div style="display:flex;gap:8px;flex-wrap:wrap;">
-                    <button type="button" class="btn-ghost" style="border:1px solid var(--line-2);border-radius:999px;padding:8px 14px;font-size:13px;color:var(--ink-2)">Download request</button>
-                    <button type="button" class="btn-ghost" style="border:1px solid var(--line-2);border-radius:999px;padding:8px 14px;font-size:13px;color:var(--ink-2)">Import response</button>
+                    <button type="button" class="btn-outline">Download request</button>
+                    <button type="button" class="btn-outline">Import response</button>
                   </div>
                 </div>
               </div>
@@ -1579,9 +1583,9 @@
             </div>
 
             <div style="padding-top:28px;display:flex;gap:8px;flex-wrap:wrap;align-items:center;">
-              <button type="button" class="btn-ghost" id="deactivateLicenseBtn" style="{% if not licensed %}display:none;{% endif %}border:1px solid color-mix(in oklab,var(--crit) 40%,transparent);border-radius:999px;padding:8px 14px;font-size:13px;color:var(--crit)">Deactivate license</button>
-              <a href="https://cashel.dev" target="_blank" rel="noopener" class="btn-ghost" style="border:1px solid var(--line-2);border-radius:999px;padding:8px 14px;font-size:13px;color:var(--ink-2)">Buy a license &rarr;</a>
-              <span style="margin-left:auto;color:var(--ink-3);font-size:13px;">Need help? <a href="mailto:support@cashel.dev" style="color:var(--ink-2);text-decoration:underline">support@cashel.dev</a></span>
+              <button type="button" class="btn-danger" id="deactivateLicenseBtn" style="{% if not licensed %}display:none;{% endif %}">Deactivate license</button>
+              <a href="https://cashel.dev" target="_blank" rel="noopener" class="btn-outline">Buy a license &rarr;</a>
+              <span style="margin-left:auto;color:var(--ink-3);font-size:13px;">Need help? <a href="mailto:support@cashel.dev" class="ulink">support@cashel.dev</a></span>
             </div>
 
             <div id="licenseMsg" class="hidden" style="margin-top:1rem;font-size:13px;padding:10px 14px;border-radius:6px;"></div>
@@ -1890,6 +1894,12 @@
     showSettingsPane('licensing');
     window.scrollTo(0, 0);
   }
+  document.getElementById('licenseChip')?.addEventListener('keydown', function(e) {
+    if (e.key === 'Enter' || e.key === ' ') {
+      e.preventDefault();
+      gotoLicensing();
+    }
+  });
 
   /* Licensing pane activate/deactivate */
   document.getElementById('activateLicenseBtn')?.addEventListener('click', async function() {
@@ -1898,13 +1908,15 @@
     if (!key) return;
     const csrf = document.querySelector('meta[name="csrf-token"]')?.content;
     try {
-      const r = await fetch('/api/v1/license', {method:'POST', headers:{'Content-Type':'application/json','X-CSRFToken':csrf||''}, body: JSON.stringify({key})});
+      const body = new FormData();
+      body.append('key', key);
+      const r = await fetch('/license/activate', {method:'POST', headers:{'X-CSRFToken':csrf||''}, body});
       const d = await r.json();
-      if (r.ok && d.status === 'ok') {
+      if (r.ok && d.success) {
         _syncLicenseState(true, key);
         if (msg) { msg.textContent = '✓ License activated'; msg.style.background='color-mix(in oklab,var(--ok) 12%,var(--surface))'; msg.style.color='var(--ok)'; msg.classList.remove('hidden'); }
       } else {
-        if (msg) { msg.textContent = d.error || 'Activation failed'; msg.style.background='color-mix(in oklab,var(--crit) 10%,var(--surface))'; msg.style.color='var(--crit)'; msg.classList.remove('hidden'); }
+        if (msg) { msg.textContent = d.message || d.error || 'Activation failed'; msg.style.background='color-mix(in oklab,var(--crit) 10%,var(--surface))'; msg.style.color='var(--crit)'; msg.classList.remove('hidden'); }
       }
     } catch(e) {
       if (msg) { msg.textContent = 'Network error'; msg.style.background='color-mix(in oklab,var(--crit) 10%,var(--surface))'; msg.style.color='var(--crit)'; msg.classList.remove('hidden'); }
@@ -1912,13 +1924,14 @@
   });
   document.getElementById('deactivateLicenseBtn')?.addEventListener('click', async function() {
     const csrf = document.querySelector('meta[name="csrf-token"]')?.content;
-    const r = await fetch('/api/v1/license', {method:'DELETE', headers:{'X-CSRFToken':csrf||''}});
-    if (r.ok) _syncLicenseState(false, '');
+    const r = await fetch('/license/deactivate', {method:'POST', headers:{'X-CSRFToken':csrf||''}});
+    const d = await r.json().catch(() => ({}));
+    if (r.ok && d.success !== false) _syncLicenseState(false, '');
   });
   function _syncLicenseState(isLicensed, key) {
     /* Chip */
-    const chip = document.getElementById('licenseBadgeBtn');
-    const badge = document.getElementById('licenseBadge');
+    const chip = document.getElementById('licenseChip');
+    const badge = document.getElementById('licenseText');
     if (chip && badge) {
       if (isLicensed) {
         chip.classList.remove('unlicensed');
@@ -1929,12 +1942,26 @@
         chip.classList.add('unlicensed');
         chip.title = 'Compliance checks disabled — click to activate a license';
         badge.textContent = 'Unlicensed';
+        if (!chip.querySelector('.arrow')) {
+          const arr = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+          arr.setAttribute('class', 'arrow');
+          arr.setAttribute('viewBox', '0 0 24 24');
+          arr.setAttribute('fill', 'none');
+          arr.setAttribute('stroke', 'currentColor');
+          arr.setAttribute('stroke-width', '2');
+          arr.setAttribute('aria-hidden', 'true');
+          const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+          path.setAttribute('d', 'M5 12h14M13 6l6 6-6 6');
+          arr.appendChild(path);
+          chip.appendChild(arr);
+        }
       }
     }
     /* Pane status block */
     const sb = document.getElementById('licStatusBlock');
     const sh = document.getElementById('licStatusHelp');
     const sm = document.getElementById('licMetaBlock');
+    const sk = document.getElementById('licMetaKey');
     const db = document.getElementById('deactivateLicenseBtn');
     if (sb) {
       const t = sb.querySelector('.lic-status-text');
@@ -1943,6 +1970,7 @@
         if (t) t.textContent = 'Cashel Pro · active';
         if (sh) sh.textContent = 'All compliance frameworks unlocked. Renewal and seat usage shown to the right.';
         if (sm) sm.style.display = '';
+        if (sk && key) sk.textContent = maskLicenseKey(key);
         if (db) db.style.display = '';
       } else {
         sb.classList.remove('ok');

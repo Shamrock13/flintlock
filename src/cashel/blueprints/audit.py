@@ -417,7 +417,7 @@ def run_audit():
                     "Compliance checks require a valid license. "
                     'Purchase one at <a href="https://shamrock13.gumroad.com/l/cashel" '
                     'target="_blank" rel="noopener">shamrock13.gumroad.com/l/cashel</a>. '
-                    "Once purchased, enter your key using the Licensed/Unlicensed badge in the top-right corner."
+                    "Once purchased, enter your key in Settings → Licensing."
                 )
             else:
                 raw = run_compliance_checks(vendor, compliance, parse, extra_data)
