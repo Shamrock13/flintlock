@@ -146,19 +146,18 @@
     <!-- ══════════════════════════════════════════════ AUDIT ══ -->
     <section class="tab-panel" id="tab-audit">
 
-      <!-- Page head -->
-      <section class="hero">
+      <header class="page-head">
         <div>
-          <div class="hero-eyebrow">Audit runner</div>
+          <div class="eyebrow">Audit runner</div>
           <h1>Review a firewall<br/><em>in one pass.</em></h1>
         </div>
-        <div style="display:flex;align-items:flex-end;padding-bottom:8px">
+        <div class="actions">
           <div class="seg" role="group" aria-label="Audit mode" id="auditModeSegmented">
             <button aria-pressed="true" data-mode="single">Single file</button>
             <button aria-pressed="false" data-mode="bulk">Bulk</button>
           </div>
         </div>
-      </section>
+      </header>
 
       <!-- Workspace: main form + sidebar (Single mode only) -->
       <div class="audit-work" id="auditWorkSingle">
@@ -283,14 +282,15 @@
 
               </div><!-- /form -->
 
-              <div class="form-actions">
+              <div style="display:flex;justify-content:space-between;align-items:center;gap:16px;padding-top:28px">
                 <div class="meta" id="auditFormMeta">Ready</div>
                 <div style="display:flex;gap:4px;align-items:center">
-                  <button type="submit" class="btn-run" id="submitBtn">
+                  <button type="button" class="btn-ghost">Save as preset</button>
+                  <button type="submit" class="btn-primary lg" id="submitBtn">
                     <span id="submitText">Run audit</span>
                     <span id="submitSpinner" class="spinner hidden" style="border-color:rgba(0,0,0,0.2);border-top-color:var(--acc-ink)"></span>
                     <span class="btn-arr" id="submitArr" aria-hidden="true">
-                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 12h14"/><path d="M13 6l6 6-6 6"/></svg>
+                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14"><path d="M5 12h14"/><path d="M13 6l6 6-6 6"/></svg>
                     </span>
                   </button>
                 </div>
@@ -308,9 +308,9 @@
                 </div>
                 <div style="display:flex;align-items:center;gap:0.75rem;flex-shrink:0">
                   <span class="detected-vendor hidden" id="detectedVendorTag"></span>
-                  <div class="view-toggle" id="findingsViewToggle" title="Toggle compact view">
-                    <button class="view-btn view-btn-active" id="viewDetailed">Detailed</button>
-                    <button class="view-btn" id="viewCompact">Compact</button>
+                  <div class="seg" id="findingsViewToggle" title="Toggle compact view">
+                    <button aria-pressed="true" id="viewDetailed">Detailed</button>
+                    <button aria-pressed="false" id="viewCompact">Compact</button>
                   </div>
                 </div>
               </div>
@@ -324,7 +324,7 @@
                   <a id="pdfViewLink" class="btn-outline" href="#" target="_blank" rel="noopener">&#128196; View PDF</a>
                 </div>
                 <div class="remediation-row hidden" id="remediationRow">
-                  <button id="remediationPlanBtn" class="btn-primary btn-remediation">&#9881; View Remediation Plan</button>
+                  <button id="remediationPlanBtn" class="btn-primary">View remediation plan</button>
                 </div>
                 <div class="export-row hidden" id="exportRow">
                   <button id="exportJsonBtn" class="btn-outline">&#8681; JSON</button>
@@ -355,18 +355,18 @@
                 </div>
                 {% endfor %}
               </div>
-              <button type="button" class="btn-run" id="demoBulkBtn" style="margin-top:1.25rem">
+              <button type="button" class="btn-primary lg" id="demoBulkBtn" style="margin-top:1.25rem">
                 <span id="demoBulkText">Run Sample Bulk Audit</span>
                 <span id="demoBulkSpinner" class="spinner hidden" style="border-color:rgba(0,0,0,0.2);border-top-color:var(--acc-ink)"></span>
               </button>
             </div>
             {% endif %}
 
-            <div class="section-head" style="margin-bottom:1.5rem">
+            <div class="section-head">
               <div>
                 <div class="idx">01 &mdash; Bulk audit</div>
-                <h2>Configure</h2>
-                <div class="desc">Upload multiple firewall configs at once. Each file is audited independently.</div>
+                <h2>Audit many at once</h2>
+                <div class="desc">Upload multiple firewall configs. Each is audited independently; results stream in side-by-side.</div>
               </div>
             </div>
 
@@ -429,13 +429,13 @@
                   </div>
                 </div>
               </div>
-              <div class="form-actions">
+              <div style="display:flex;justify-content:flex-end;padding-top:28px">
                 <div class="meta">Upload multiple configs to audit in batch</div>
-                <button type="submit" class="btn-run" id="bulkBtn">
+                <button type="submit" class="btn-primary lg" id="bulkBtn">
                   <span id="bulkText">Run Bulk Audit</span>
                   <span id="bulkSpinner" class="spinner hidden" style="border-color:rgba(0,0,0,0.2);border-top-color:var(--acc-ink)"></span>
                   <span class="btn-arr" aria-hidden="true">
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 12h14"/><path d="M13 6l6 6-6 6"/></svg>
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14"><path d="M5 12h14"/><path d="M13 6l6 6-6 6"/></svg>
                   </span>
                 </button>
               </div>
@@ -1142,44 +1142,44 @@
         <nav class="settings-nav" role="navigation" aria-label="Settings sections">
           <div class="group">Configuration</div>
 
-          <a class="active" data-pane="general" onclick="showSettingsPane('general'); return false;" href="#">
+          <a class="active" data-pane="general" href="#">
             <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" aria-hidden="true"><line x1="2" y1="5" x2="14" y2="5"/><line x1="2" y1="9" x2="14" y2="9"/><line x1="2" y1="13" x2="14" y2="13"/><circle cx="6" cy="5" r="1.75"/><circle cx="10" cy="9" r="1.75"/><circle cx="6" cy="13" r="1.75"/></svg>
             General
           </a>
 
-          <a data-pane="email" onclick="showSettingsPane('email'); return false;" href="#">
+          <a data-pane="email" href="#">
             <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="1" y="3.5" width="14" height="9" rx="1.5"/><path d="M1 5l7 4.5L15 5"/></svg>
             Email (SMTP)
           </a>
 
           {% if not demo_mode %}
-          <a data-pane="auth" onclick="showSettingsPane('auth'); return false;" href="#">
+          <a data-pane="auth" href="#">
             <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="7" width="10" height="8" rx="1.5"/><path d="M5 7V5a3 3 0 0 1 6 0v2"/><circle cx="8" cy="11" r="1" fill="currentColor" stroke="none"/></svg>
             Authentication
           </a>
           {% endif %}
 
-          <a data-pane="security" onclick="showSettingsPane('security'); return false;" href="#">
+          <a data-pane="security" href="#">
             <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8 1.5L2 4v4.5c0 3.5 2.5 6.7 6 7.5 3.5-.8 6-4 6-7.5V4L8 1.5z"/><path d="M5.5 8l2 2 3-3"/></svg>
             Security
           </a>
 
-          <a data-pane="syslog" onclick="showSettingsPane('syslog'); return false;" href="#">
+          <a data-pane="syslog" href="#">
             <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="1" y="1.5" width="14" height="5" rx="1.5"/><rect x="1" y="9.5" width="14" height="5" rx="1.5"/><circle cx="4" cy="4" r="0.8" fill="currentColor" stroke="none"/><circle cx="4" cy="12" r="0.8" fill="currentColor" stroke="none"/><line x1="7" y1="4" x2="12" y2="4"/><line x1="7" y1="12" x2="12" y2="12"/></svg>
             Syslog
           </a>
 
-          <a data-pane="alerts" onclick="showSettingsPane('alerts'); return false;" href="#">
+          <a data-pane="alerts" href="#">
             <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8 1.5a4.5 4.5 0 0 1 4.5 4.5c0 2 .8 3.2 1.5 4H2c.7-.8 1.5-2 1.5-4A4.5 4.5 0 0 1 8 1.5z"/><path d="M6.5 14a1.5 1.5 0 0 0 3 0"/></svg>
             Alert Thresholds
           </a>
 
-          <a data-pane="licensing" onclick="showSettingsPane('licensing'); return false;" href="#">
+          <a data-pane="licensing" href="#">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 12l2 2 4-4"/><circle cx="12" cy="12" r="9"/></svg>
             Licensing
           </a>
 
-          <a data-pane="webhooks" onclick="showSettingsPane('webhooks'); return false;" href="#">
+          <a data-pane="webhooks" href="#">
             <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2 8a6 6 0 1 1 12 0"/><path d="M5 8a3 3 0 1 1 6 0"/><circle cx="8" cy="8" r="1" fill="currentColor" stroke="none"/><line x1="8" y1="9" x2="8" y2="14.5"/><line x1="5.5" y1="14.5" x2="10.5" y2="14.5"/></svg>
             Webhooks
           </a>
@@ -2414,8 +2414,8 @@
   })();
   window.setFindingsView = function(mode) {
     compactView = mode === "compact";
-    document.getElementById("viewDetailed").classList.toggle("view-btn-active", !compactView);
-    document.getElementById("viewCompact").classList.toggle("view-btn-active", compactView);
+    document.getElementById("viewDetailed")?.setAttribute("aria-pressed", String(!compactView));
+    document.getElementById("viewCompact")?.setAttribute("aria-pressed", String(compactView));
     document.getElementById("findingsList").classList.toggle("findings-compact", compactView);
     renderFindingsUI();
   };
@@ -3331,7 +3331,7 @@
     }
     return `<div class="stats">${items.map(i =>
       `<div class="stat${i.featured ? " featured" : ""}" data-filter="${i.filter}" title="Click to filter">
-         <span class="num${i.numMod ? " " + i.numMod : ""}">${i.value}</span><span class="lbl">${i.label}</span>
+         <div class="lbl">${i.label}</div><div class="num${i.numMod ? " " + i.numMod : ""}">${i.value}${i.label === "Score /100" ? '<span style="color: var(--ink-3); font-weight: 300; font-size: 20px;"> / 100</span>' : ""}</div>
        </div>`
     ).join("")}</div>`;
   }
@@ -3361,11 +3361,13 @@
     const remediation= typeof f === "object" ? f.remediation  : null;
     const cls        = findingClass(f);
     const catInfo    = category ? (CATEGORY_LABELS[category] || { label: category, cls: "cat-hygiene" }) : null;
-    const tagSpan    = catInfo ? `<span class="tag ${escHtml(catInfo.cls)}">${escHtml(catInfo.label)}</span>` : "";
+    const severity   = cls === "crit" ? "Critical" : cls === "high" ? "High" : cls === "med" ? "Medium" : cls === "low" ? "Low" : "";
+    const tagText    = [catInfo?.label, severity].filter(Boolean).join(" · ");
+    const tagSpan    = tagText ? `<span class="tag ${catInfo ? escHtml(catInfo.cls) : ""}">${escHtml(tagText)}</span>` : "";
     const fixDiv     = (!compactView && remediation)
       ? `<div class="fix">&#8618; ${escHtml(remediation)}</div>`
       : "";
-    return `<div class="finding${cls ? " " + cls : ""}">${tagSpan}<span class="body">${escHtml(msg)}</span>${fixDiv}</div>`;
+    return `<div class="finding${cls ? " " + cls : ""}">${tagSpan}<div class="body">${escHtml(msg)}</div>${fixDiv}</div>`;
   }
 
   function setLoading(btnId, textId, spinnerId, label, loading) {
@@ -3749,6 +3751,13 @@
       loadWebhooks();
     }
   }
+
+  document.querySelectorAll(".settings-nav a[data-pane]").forEach(link => {
+    link.addEventListener("click", e => {
+      e.preventDefault();
+      showSettingsPane(link.dataset.pane);
+    });
+  });
 
   function applySettingsToForm() {
     const reportEl  = document.getElementById("report");
