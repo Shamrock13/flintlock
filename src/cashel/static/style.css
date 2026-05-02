@@ -286,8 +286,8 @@ button { cursor: pointer; border: 0; background: transparent; }
 .settings-pane { display: none; }
 .settings-pane.active { display: block; }
 
-.settings-main h2 { font-size: 24px; font-weight: 500; letter-spacing: -0.02em; margin: 0 0 8px; }
-.settings-main .section-desc { color: var(--ink-2); font-size: 14px; max-width: 60ch; margin-bottom: 0; }
+.settings-main h2 { font-size: 24px; font-weight: 500; letter-spacing: -0.02em; margin: 0 0 14px; }
+.settings-main .section-desc { color: var(--ink-2); font-size: 14px; max-width: 64ch; margin: 0 0 30px; line-height: 1.55; }
 .settings-main .form { border-top: 1px solid var(--line); }
 .settings-main .field { grid-template-columns: minmax(240px, 320px) minmax(0, 1fr); gap: 36px; padding: 30px 0; }
 .settings-main .field .help { max-width: 32ch; }
@@ -358,11 +358,16 @@ html[data-theme="dark"] .run-row .rn-score.bad  { color: oklch(0.78 0.18 25); }
 .lic-meta-row .val.mono { font-family: 'Geist Mono', monospace; font-weight: 400; font-size: 11px; }
 .input.mono { font-family: 'Geist Mono', monospace; font-size: 12px; letter-spacing: 0.02em; }
 .form-actions { display:flex; gap:0.75rem; align-items:center; flex-wrap:wrap; }
-.btn-activate-license { align-self:center; min-height:38px; padding:0 18px; white-space:nowrap; }
+.action-pill-control { min-height:44px; padding:0 28px; border-radius:999px; font-size:15px; font-weight:500; white-space:nowrap; display:inline-flex; align-items:center; justify-content:center; }
+.tgl.action-pill-control { gap:10px; border-color:var(--line-2); }
+.tgl.action-pill-control.on { background:var(--ink); color:var(--bg); border-color:var(--ink); }
+.tgl.action-pill-control .mark { width:16px; height:16px; }
+.btn-activate-license { align-self:center; min-width:132px; }
 .license-activation-field .ctrl { grid-template-columns:minmax(0, 1fr) auto; gap:18px; align-items:end; }
 .license-buy-link { text-decoration:none; }
 .license-buy-link:hover { text-decoration:none; }
 .lic-card + .sub-head { margin-top:32px; }
+.smtp-actions { display:flex; align-items:center; gap:12px; flex-wrap:wrap; margin-top:28px; padding-top:0; }
 .lic-features { display: grid; grid-template-columns: 1fr 1fr; gap: 20px 48px; padding-top: 4px; }
 @media (max-width: 720px) { .lic-features { grid-template-columns: 1fr; } }
 .lic-feat { display: grid; grid-template-columns: auto 1fr; gap: 12px; align-items: start; }

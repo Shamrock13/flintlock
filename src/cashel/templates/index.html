@@ -1357,7 +1357,7 @@
                 </div>
                 <div class="ctrl">
                   <input class="input" type="email" id="setting-smtp-from" placeholder="cashel@example.com" autocomplete="off" />
-                  <label class="tgl on" id="setting-smtp-tls-toggle">
+                  <label class="tgl action-pill-control on" id="setting-smtp-tls-toggle">
                     <input type="checkbox" id="setting-smtp-tls" checked />
                     <span class="mark"></span>
                     Use STARTTLS
@@ -1365,11 +1365,12 @@
                 </div>
               </div>
             </div>
-            <div style="margin-top:1.25rem;display:flex;align-items:center;gap:0.75rem">
+            <div class="smtp-actions">
               <button class="btn-outline" id="testSmtpBtn">
                 <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" style="width:13px;height:13px;vertical-align:-1px;margin-right:4px" aria-hidden="true"><rect x="1" y="3.5" width="14" height="9" rx="1.5"/><path d="M1 5l7 4.5L15 5"/></svg>
                 Test SMTP
               </button>
+              <button class="btn-primary action-pill-control" id="saveEmailSettingsBtn" type="button">Save settings</button>
               <span id="smtpTestResult" style="font-size:0.85rem"></span>
             </div>
           </div>
@@ -1704,7 +1705,7 @@
                 </div>
                 <div class="ctrl">
                   <input class="input mono" id="licenseKeyInput" placeholder="CSL-XXXXXXXX-XXXXXXXX-XXXXXXXX-XXXXXXXX" autocomplete="off" />
-                  <button type="button" class="btn-primary btn-activate-license" id="activateLicenseBtn">Activate</button>
+                  <button type="button" class="btn-primary action-pill-control btn-activate-license" id="activateLicenseBtn">Activate</button>
                 </div>
               </div>
               <div class="field">
@@ -3965,7 +3966,7 @@
     }
   }
 
-  document.getElementById("saveSettingsBtn")?.addEventListener("click", async function () {
+  async function saveSettings() {
     const data = {
       auto_pdf:             document.getElementById("setting-auto-pdf").checked,
       auto_archive:         document.getElementById("setting-auto-archive").checked,
@@ -4004,7 +4005,10 @@
       msg.classList.remove("hidden");
       setTimeout(() => msg.classList.add("hidden"), 2500);
     } catch (_) {}
-  });
+  }
+
+  document.getElementById("saveSettingsBtn")?.addEventListener("click", saveSettings);
+  document.getElementById("saveEmailSettingsBtn")?.addEventListener("click", saveSettings);
 
   // ═══════════════════════════════════════════════ ALERT THRESHOLDS ══
 

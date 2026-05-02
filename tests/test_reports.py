@@ -438,9 +438,26 @@ class TestModalMarkup(unittest.TestCase):
 
         self.assertIn('href="https://shamrock13.gumroad.com/l/cashel"', body)
         self.assertIn('class="btn-outline license-buy-link"', body)
-        self.assertIn('class="btn-primary btn-activate-license" id="activateLicenseBtn">Activate</button>', body)
+        self.assertIn('class="btn-primary action-pill-control btn-activate-license" id="activateLicenseBtn">Activate</button>', body)
         self.assertIn(".license-activation-field .ctrl", css)
         self.assertIn(".btn-activate-license", css)
+        self.assertIn(".action-pill-control", css)
+
+    def test_smtp_actions_are_inline_and_pill_sized(self):
+        body = self._index_template()
+        style_path = os.path.join(
+            os.path.dirname(__file__), "..", "src", "cashel", "static", "style.css"
+        )
+        with open(style_path, encoding="utf-8") as fh:
+            css = fh.read()
+
+        self.assertIn('class="smtp-actions"', body)
+        self.assertIn('id="testSmtpBtn"', body)
+        self.assertIn('id="saveEmailSettingsBtn"', body)
+        self.assertIn('id="setting-smtp-tls-toggle"', body)
+        self.assertIn("document.getElementById(\"saveEmailSettingsBtn\")?.addEventListener(\"click\", saveSettings);", body)
+        self.assertIn(".smtp-actions", css)
+        self.assertIn(".tgl.action-pill-control", css)
 
     def test_theme_auto_option_is_available(self):
         body = self._index_template()
