@@ -1370,7 +1370,6 @@
                 <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" style="width:13px;height:13px;vertical-align:-1px;margin-right:4px" aria-hidden="true"><rect x="1" y="3.5" width="14" height="9" rx="1.5"/><path d="M1 5l7 4.5L15 5"/></svg>
                 Test SMTP
               </button>
-              <button class="btn-primary action-pill-control" id="saveEmailSettingsBtn" type="button">Save settings</button>
               <span id="smtpTestResult" style="font-size:0.85rem"></span>
             </div>
           </div>
@@ -1711,7 +1710,7 @@
               <div class="field">
                 <div>
                   <div class="label">Offline activation</div>
-                  <div class="help">Air-gapped install? Generate a request file, upload it at cashel.dev/activate, then import the response.</div>
+                  <div class="help">Air-gapped install? Generate a request file, upload it at cashel.app/activate, then import the response.</div>
                 </div>
                 <div class="ctrl">
                   <div style="display:flex;gap:8px;flex-wrap:wrap;">
@@ -1732,8 +1731,8 @@
 
             <div style="padding-top:28px;display:flex;gap:8px;flex-wrap:wrap;align-items:center;">
               <button type="button" class="btn-danger" id="deactivateLicenseBtn" style="{% if not licensed %}display:none;{% endif %}">Deactivate license</button>
-              <a href="https://shamrock13.gumroad.com/l/cashel" target="_blank" rel="noopener" class="btn-outline license-buy-link">Buy a license</a>
-              <span style="margin-left:auto;color:var(--ink-3);font-size:13px;">Need help? <a href="mailto:support@cashel.dev" class="ulink">support@cashel.dev</a></span>
+              <a href="https://shamrock13.gumroad.com/l/cashel" target="_blank" rel="noopener" class="btn-outline action-pill-control license-buy-link">Buy a license</a>
+              <span style="margin-left:auto;color:var(--ink-3);font-size:13px;">Need help? <a href="mailto:support@cashel.app" class="ulink">support@cashel.app</a></span>
             </div>
 
             <div id="licenseMsg" class="hidden" style="margin-top:1rem;font-size:13px;padding:10px 14px;border-radius:6px;"></div>
@@ -3933,7 +3932,6 @@
     const pane = document.getElementById(`spane-${id}`);
     if (link) link.classList.add('active');
     if (pane) pane.classList.add('active');
-    document.querySelector('.settings-main')?.classList.toggle('hide-shared-footer', id === 'email');
     /* Side-effects for specific panes */
     if (id === 'general') _syncAppearanceUI();
     if (id === 'alerts') {
@@ -4009,7 +4007,6 @@
   }
 
   document.getElementById("saveSettingsBtn")?.addEventListener("click", saveSettings);
-  document.getElementById("saveEmailSettingsBtn")?.addEventListener("click", saveSettings);
 
   // ═══════════════════════════════════════════════ ALERT THRESHOLDS ══
 

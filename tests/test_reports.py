@@ -437,10 +437,14 @@ class TestModalMarkup(unittest.TestCase):
             css = fh.read()
 
         self.assertIn('href="https://shamrock13.gumroad.com/l/cashel"', body)
-        self.assertIn('class="btn-outline license-buy-link"', body)
+        self.assertIn('class="btn-outline action-pill-control license-buy-link"', body)
+        self.assertIn("support@cashel.app", body)
+        self.assertNotIn("support@cashel.dev", body)
         self.assertIn('class="btn-primary action-pill-control btn-activate-license" id="activateLicenseBtn">Activate</button>', body)
         self.assertIn(".license-activation-field .ctrl", css)
         self.assertIn(".btn-activate-license", css)
+        self.assertIn(".license-buy-link", css)
+        self.assertIn(".settings-footer .btn-primary", css)
         self.assertIn(".action-pill-control", css)
 
     def test_smtp_actions_are_inline_and_pill_sized(self):
@@ -453,13 +457,13 @@ class TestModalMarkup(unittest.TestCase):
 
         self.assertIn('class="smtp-actions"', body)
         self.assertIn('id="testSmtpBtn"', body)
-        self.assertIn('id="saveEmailSettingsBtn"', body)
         self.assertIn('id="setting-smtp-tls-toggle"', body)
-        self.assertIn("document.getElementById(\"saveEmailSettingsBtn\")?.addEventListener(\"click\", saveSettings);", body)
-        self.assertIn("classList.toggle('hide-shared-footer', id === 'email')", body)
+        self.assertNotIn('id="saveEmailSettingsBtn"', body)
+        self.assertNotIn("saveEmailSettingsBtn", body)
+        self.assertNotIn("hide-shared-footer", body)
         self.assertIn(".smtp-actions", css)
         self.assertIn(".tgl.action-pill-control", css)
-        self.assertIn(".settings-main.hide-shared-footer .settings-footer", css)
+        self.assertNotIn(".settings-main.hide-shared-footer .settings-footer", css)
 
     def test_theme_auto_option_is_available(self):
         body = self._index_template()
