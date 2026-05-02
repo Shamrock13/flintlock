@@ -456,8 +456,10 @@ class TestModalMarkup(unittest.TestCase):
         self.assertIn('id="saveEmailSettingsBtn"', body)
         self.assertIn('id="setting-smtp-tls-toggle"', body)
         self.assertIn("document.getElementById(\"saveEmailSettingsBtn\")?.addEventListener(\"click\", saveSettings);", body)
+        self.assertIn("classList.toggle('hide-shared-footer', id === 'email')", body)
         self.assertIn(".smtp-actions", css)
         self.assertIn(".tgl.action-pill-control", css)
+        self.assertIn(".settings-main.hide-shared-footer .settings-footer", css)
 
     def test_theme_auto_option_is_available(self):
         body = self._index_template()

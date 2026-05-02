@@ -3933,6 +3933,7 @@
     const pane = document.getElementById(`spane-${id}`);
     if (link) link.classList.add('active');
     if (pane) pane.classList.add('active');
+    document.querySelector('.settings-main')?.classList.toggle('hide-shared-footer', id === 'email');
     /* Side-effects for specific panes */
     if (id === 'general') _syncAppearanceUI();
     if (id === 'alerts') {

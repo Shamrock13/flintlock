@@ -292,6 +292,7 @@ button { cursor: pointer; border: 0; background: transparent; }
 .settings-main .field { grid-template-columns: minmax(240px, 320px) minmax(0, 1fr); gap: 36px; padding: 30px 0; }
 .settings-main .field .help { max-width: 32ch; }
 .settings-footer { display: flex; gap: 12px; align-items: center; margin-top: 28px; padding-top: 0; }
+.settings-main.hide-shared-footer .settings-footer { display: none; }
 .sub-head { font-size: 11px; color: var(--ink-3); text-transform: uppercase; letter-spacing: 0.06em; margin: 32px 0 16px; padding-top: 20px; border-top: 1px solid var(--line); }
 .sub-head:first-child { border-top: 0; padding-top: 0; margin-top: 24px; }
 
