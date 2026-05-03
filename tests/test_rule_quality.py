@@ -12,8 +12,11 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "src"))
 
 from cashel.rule_quality import (
     check_shadow_rules_asa,
+    check_shadow_rules_azure,
     check_shadow_rules_forti,
+    check_shadow_rules_juniper,
     check_shadow_rules_pa,
+    check_shadow_rules_pfsense,
 )
 from cashel.fortinet import parse_fortinet
 from cashel.paloalto import parse_paloalto
@@ -30,6 +33,12 @@ def _msgs(findings):
 
 def _severities(findings):
     return [f["severity"] for f in findings]
+
+
+def _assert_shadow_metadata(finding, shadowed, shadowing):
+    metadata = finding["metadata"]
+    assert metadata["shadowed_rule"] == shadowed
+    assert metadata["shadowing_rule"] == shadowing
 
 
 def _asa_parse(filepath):
@@ -75,6 +84,11 @@ def test_asa_shadow():
     # Specific shadowed rules mentioned
     assert any("permit tcp any host 10.0.0.1 eq 80" in m for m in msgs)
     assert any("deny ip any any" in m for m in msgs)
+    _assert_shadow_metadata(
+        result[0],
+        "access-list OUTSIDE_IN extended permit tcp any host 10.0.0.1 eq 80",
+        "access-list OUTSIDE_IN extended permit ip any any",
+    )
 
 
 # ── Test 2: Fortinet shadow detection ────────────────────────────────────────
@@ -117,6 +131,7 @@ def test_fortinet_shadow():
     assert all(n == "Allow-All" for n in shadower_names), (
         "Allow-All should be the shadowing rule"
     )
+    _assert_shadow_metadata(result[0], "Allow-Web", "Allow-All")
 
 
 # ── Test 3: Palo Alto shadow detection ───────────────────────────────────────
@@ -153,6 +168,82 @@ def test_paloalto_shadow():
     assert all(n == "Allow-Any-Any" for n in shadower_names), (
         "Allow-Any-Any should be the shadowing rule"
     )
+    _assert_shadow_metadata(result[0], "Allow-Web", "Allow-Any-Any")
+
+
+def test_shadow_metadata_for_pfsense_azure_and_juniper():
+    pfsense = check_shadow_rules_pfsense(
+        [
+            {
+                "descr": "Allow Any",
+                "interface": "wan",
+                "source": "1",
+                "destination": "1",
+                "protocol": "any",
+            },
+            {
+                "descr": "Allow Web",
+                "interface": "wan",
+                "source": "10.0.0.0/24",
+                "destination": "10.0.0.10",
+                "protocol": "tcp",
+            },
+        ]
+    )
+    _assert_shadow_metadata(pfsense[0], "Allow Web", "Allow Any")
+
+    azure = check_shadow_rules_azure(
+        [
+            {
+                "name": "edge-nsg",
+                "securityRules": [
+                    {
+                        "name": "AllowAny",
+                        "properties": {
+                            "direction": "Inbound",
+                            "priority": 100,
+                            "sourceAddressPrefix": "*",
+                            "destinationPortRange": "*",
+                            "protocol": "*",
+                        },
+                    },
+                    {
+                        "name": "AllowWeb",
+                        "properties": {
+                            "direction": "Inbound",
+                            "priority": 200,
+                            "sourceAddressPrefix": "10.0.0.0/24",
+                            "destinationPortRange": "443",
+                            "protocol": "Tcp",
+                        },
+                    },
+                ],
+            }
+        ]
+    )
+    _assert_shadow_metadata(azure[0], "AllowWeb", "AllowAny")
+
+    juniper = check_shadow_rules_juniper(
+        [
+            {
+                "name": "allow-any",
+                "from_zone": "trust",
+                "to_zone": "untrust",
+                "src": ["any"],
+                "dst": ["any"],
+                "app": ["any"],
+            },
+            {
+                "name": "allow-web",
+                "from_zone": "trust",
+                "to_zone": "untrust",
+                "src": ["web-clients"],
+                "dst": ["web-server"],
+                "app": ["junos-https"],
+            },
+        ]
+    )
+    _assert_shadow_metadata(juniper[0], "allow-web", "allow-any")
 
 
 # ── Entrypoint ────────────────────────────────────────────────────────────────

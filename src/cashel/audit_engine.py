@@ -6,17 +6,53 @@ imported without creating circular dependencies.
 
 from ciscoconfparse import CiscoConfParse
 
+from .models.findings import make_finding
+
 
 # ── Finding helpers ────────────────────────────────────────────────────────────
 
 
-def _f(severity, category, message, remediation=""):
-    return {
-        "severity": severity,
-        "category": category,
-        "message": message,
-        "remediation": remediation,
-    }
+def _f(
+    severity,
+    category,
+    message,
+    remediation="",
+    *,
+    id=None,
+    vendor="unknown",
+    title=None,
+    evidence=None,
+    affected_object=None,
+    rule_id=None,
+    rule_name=None,
+    confidence="medium",
+    impact=None,
+    verification=None,
+    rollback=None,
+    compliance_refs=None,
+    suggested_commands=None,
+    metadata=None,
+):
+    return make_finding(
+        severity,
+        category,
+        message,
+        remediation,
+        id=id,
+        vendor=vendor,
+        title=title,
+        evidence=evidence,
+        affected_object=affected_object,
+        rule_id=rule_id,
+        rule_name=rule_name,
+        confidence=confidence,
+        impact=impact,
+        verification=verification,
+        rollback=rollback,
+        compliance_refs=compliance_refs,
+        suggested_commands=suggested_commands,
+        metadata=metadata,
+    )
 
 
 def _finding_msg(f):
@@ -113,6 +149,13 @@ def _build_summary(findings):
 # ── ASA audit helpers ──────────────────────────────────────────────────────────
 
 
+def _acl_name_from_line(line: str) -> str | None:
+    parts = line.strip().split()
+    if len(parts) >= 2 and parts[0].lower() == "access-list":
+        return parts[1]
+    return None
+
+
 def _check_any_any(parse):
     return [
         _f(
@@ -121,6 +164,20 @@ def _check_any_any(parse):
             f"[CRITICAL] Overly permissive rule found: {r.text.strip()}",
             "Restrict source and destination to specific IP ranges. "
             "Remove or scope down any/any permit rules to enforce least-privilege access.",
+            id="CASHEL-ASA-EXPOSURE-001",
+            vendor="asa",
+            title="Overly permissive any-any ACL rule",
+            evidence=r.text.strip(),
+            affected_object=_acl_name_from_line(r.text),
+            rule_name=_acl_name_from_line(r.text),
+            confidence="high",
+            impact="The rule may allow traffic from any source to any destination.",
+            verification="Review hit counts and traffic logs, then re-run the audit after replacing the rule with scoped source and destination objects.",
+            rollback="Restore the original ACL entry from configuration backup if the scoped replacement blocks required traffic.",
+            suggested_commands=[
+                "no access-list <ACL_NAME> permit ip any any",
+                "access-list <ACL_NAME> permit ip <SRC_NET> <SRC_MASK> <DST_NET> <DST_MASK> log",
+            ],
         )
         for r in parse.find_objects(r"access-list.*permit.*any any")
     ]
@@ -134,6 +191,17 @@ def _check_missing_logging(parse):
             f"[MEDIUM] Permit rule missing logging: {r.text.strip()}",
             "Add the 'log' keyword to all permit rules. "
             "Without logging, permitted traffic produces no syslog entries for monitoring.",
+            id="CASHEL-ASA-LOGGING-001",
+            vendor="asa",
+            title="Permit ACL rule missing logging",
+            evidence=r.text.strip(),
+            affected_object=_acl_name_from_line(r.text),
+            rule_name=_acl_name_from_line(r.text),
+            confidence="high",
+            impact="Permitted traffic for this rule may not be visible in syslog or incident review.",
+            verification="Confirm the rule includes the log keyword and verify new matching traffic appears in syslog.",
+            rollback="Remove the log keyword from this ACL entry if logging volume causes operational issues.",
+            suggested_commands=[f"{r.text.strip()} log"],
         )
         for r in parse.find_objects(r"access-list.*permit")
         if "log" not in r.text
@@ -150,6 +218,16 @@ def _check_deny_all(parse):
             "[HIGH] No explicit deny-all rule found at end of ACL",
             "Add an explicit 'access-list <name> deny ip any any log' at the end of each ACL. "
             "Relying on implicit deny produces no log entries and is not auditable.",
+            id="CASHEL-ASA-HYGIENE-001",
+            vendor="asa",
+            title="Explicit deny-all ACL rule missing",
+            evidence=None,
+            affected_object=None,
+            confidence="medium",
+            impact="Traffic denied by the implicit rule may not produce auditable deny logs.",
+            verification="Confirm each ACL terminates with an explicit deny ip any any log entry, then re-run the audit.",
+            rollback="Remove the added explicit deny entry if it creates unexpected logging or policy behavior.",
+            suggested_commands=["access-list <ACL_NAME> deny ip any any log"],
         )
     ]
 
@@ -166,6 +244,18 @@ def _check_redundant_rules(parse):
                     f"[MEDIUM] Redundant rule detected: {rule.text.strip()}",
                     "Remove duplicate ACL entries to keep the access-list clean and auditable. "
                     "Redundant rules indicate configuration drift and complicate change management.",
+                    id="CASHEL-ASA-REDUNDANCY-001",
+                    vendor="asa",
+                    title="Redundant ACL rule",
+                    evidence=rule.text.strip(),
+                    affected_object=_acl_name_from_line(rule.text),
+                    rule_name=_acl_name_from_line(rule.text),
+                    confidence="high",
+                    impact="Duplicate ACL entries add review noise and can obscure intentional policy changes.",
+                    verification="Confirm the remaining ACL entry preserves intended access and re-run the audit.",
+                    rollback="Re-add the duplicate ACL entry from backup if removal affects an approved workflow.",
+                    suggested_commands=["no <DUPLICATE_ACCESS_LIST_LINE>"],
+                    metadata={"duplicate_normalized_rule": text_clean},
                 )
             )
         else:
@@ -181,6 +271,16 @@ def _check_telnet_asa(parse):
             f"[CRITICAL] Telnet management access configured: {r.text.strip()}",
             "Disable Telnet management (no telnet ...) and enforce SSH. "
             "Telnet transmits all data including credentials in cleartext.",
+            id="CASHEL-ASA-PROTOCOL-001",
+            vendor="asa",
+            title="Telnet management access enabled",
+            evidence=r.text.strip(),
+            affected_object="management access",
+            confidence="high",
+            impact="Telnet sends management credentials and session data in cleartext.",
+            verification="Confirm no telnet lines remain and SSH management access is available from approved networks.",
+            rollback="Restore the removed telnet line only if emergency access is required and compensating controls are approved.",
+            suggested_commands=[f"no {r.text.strip()}"],
         )
         for r in parse.find_objects(r"^telnet\s")
     ]
@@ -194,6 +294,20 @@ def _check_icmp_any_asa(parse):
             f"[MEDIUM] Unrestricted ICMP permit rule: {r.text.strip()}",
             "Restrict ICMP to specific source ranges or permit only echo-reply, "
             "unreachable, and time-exceeded message types needed for diagnostics.",
+            id="CASHEL-ASA-EXPOSURE-002",
+            vendor="asa",
+            title="Unrestricted ICMP any-any ACL rule",
+            evidence=r.text.strip(),
+            affected_object=_acl_name_from_line(r.text),
+            rule_name=_acl_name_from_line(r.text),
+            confidence="high",
+            impact="Unrestricted ICMP can increase reconnaissance signal and bypass intended diagnostic scoping.",
+            verification="Confirm ICMP is limited to approved sources and required message types, then re-run the audit.",
+            rollback="Restore the original ICMP ACL entry from backup if troubleshooting traffic is unintentionally blocked.",
+            suggested_commands=[
+                "no access-list <ACL_NAME> permit icmp any any",
+                "access-list <ACL_NAME> permit icmp <TRUSTED_SRC> <MASK> any echo-reply log",
+            ],
         )
         for r in parse.find_objects(r"access-list.*permit icmp any any")
     ]

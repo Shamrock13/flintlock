@@ -13,14 +13,59 @@ does not apply.
 
 import re
 
+from .models.findings import make_finding
 
-def _f(severity, category, message, remediation=""):
-    return {
-        "severity": severity,
-        "category": category,
-        "message": message,
-        "remediation": remediation,
+
+def _f(
+    severity,
+    category,
+    message,
+    remediation="",
+    *,
+    id=None,
+    vendor="unknown",
+    title=None,
+    evidence=None,
+    affected_object=None,
+    rule_id=None,
+    rule_name=None,
+    confidence="medium",
+    impact=None,
+    verification=None,
+    rollback=None,
+    compliance_refs=None,
+    suggested_commands=None,
+    metadata=None,
+):
+    return make_finding(
+        severity,
+        category,
+        message,
+        remediation,
+        id=id,
+        vendor=vendor,
+        title=title,
+        evidence=evidence,
+        affected_object=affected_object,
+        rule_id=rule_id,
+        rule_name=rule_name,
+        confidence=confidence,
+        impact=impact,
+        verification=verification,
+        rollback=rollback,
+        compliance_refs=compliance_refs,
+        suggested_commands=suggested_commands,
+        metadata=metadata,
+    )
+
+
+def _shadow_metadata(shadowed, shadowing, **extra):
+    metadata = {
+        "shadowed_rule": shadowed,
+        "shadowing_rule": shadowing,
     }
+    metadata.update(extra)
+    return metadata
 
 
 def _covers(broad, narrow):
@@ -73,6 +118,22 @@ def check_shadow_rules_pa(rules):
                         f"Rule '{e_name}' appears before '{name}' and covers a superset of its "
                         f"source/destination/application scope. Either remove '{name}' if it is "
                         f"obsolete, or move it above '{e_name}' so it is evaluated first.",
+                        id="CASHEL-PA-REDUNDANCY-001",
+                        vendor="paloalto",
+                        title="Palo Alto rule is shadowed",
+                        evidence=f"Rule '{e_name}' covers rule '{name}'",
+                        affected_object=name,
+                        rule_name=name,
+                        confidence="medium",
+                        verification="Review rule order and traffic logs, then re-run the audit after removing, narrowing, or moving the shadowed rule.",
+                        metadata=_shadow_metadata(
+                            name,
+                            e_name,
+                            source=src,
+                            destination=dst,
+                            application=app,
+                            service=svc,
+                        ),
                     )
                 )
                 break
@@ -113,6 +174,21 @@ def check_shadow_rules_forti(policies):
                         f"Policy '{e_name}' precedes '{name}' and covers a superset of its "
                         f"source/destination/service scope. Remove '{name}' if it is obsolete, "
                         f"or reorder it above '{e_name}' so it is evaluated first.",
+                        id="CASHEL-FORTINET-REDUNDANCY-001",
+                        vendor="fortinet",
+                        title="Fortinet policy is shadowed",
+                        evidence=f"Policy '{e_name}' covers policy '{name}'",
+                        affected_object=name,
+                        rule_name=name,
+                        confidence="medium",
+                        verification="Review policy order and hit counts, then re-run the audit after removing, narrowing, or moving the shadowed policy.",
+                        metadata=_shadow_metadata(
+                            name,
+                            e_name,
+                            source=src,
+                            destination=dst,
+                            service=svc,
+                        ),
                     )
                 )
                 break
@@ -164,6 +240,22 @@ def check_shadow_rules_pfsense(rules):
                             f"Rule '{e_name}' precedes '{name}' on interface '{intf_label}' and "
                             f"covers a superset of its source/destination/protocol scope. "
                             f"Remove or reorder '{name}' to ensure it is evaluated as intended.",
+                            id="CASHEL-PFSENSE-REDUNDANCY-001",
+                            vendor="pfsense",
+                            title="pfSense rule is shadowed",
+                            evidence=f"Interface '{intf_label}': rule '{e_name}' covers rule '{name}'",
+                            affected_object=name,
+                            rule_name=name,
+                            confidence="medium",
+                            verification="Review interface rule order, then re-run the audit after removing, narrowing, or moving the shadowed rule.",
+                            metadata=_shadow_metadata(
+                                name,
+                                e_name,
+                                interface=intf_label,
+                                source=src,
+                                destination=dst,
+                                protocol=proto,
+                            ),
                         )
                     )
                     break
@@ -206,7 +298,7 @@ def _parse_asa_rule(text):
     }
 
 
-def check_shadow_rules_asa(parse):
+def check_shadow_rules_asa(parse, vendor: str = "asa"):
     """Detect rules made unreachable by a broad any-any entry in the same ACL.
 
     When a 'permit|deny ip any any' rule exists at position N in an ACL,
@@ -238,6 +330,21 @@ def check_shadow_rules_asa(parse):
                             f"'{acl_name}' matches all traffic, making every subsequent entry "
                             f"unreachable. Move specific rules above the broad any-any entry, "
                             f"or remove them if they are no longer needed.",
+                            id=f"CASHEL-{vendor.upper()}-REDUNDANCY-002",
+                            vendor=vendor,
+                            title="ACL rule is shadowed by earlier any-any rule",
+                            evidence=f"{rule['raw']} -> {shadowed['raw']}",
+                            affected_object=acl_name,
+                            rule_name=shadowed["raw"],
+                            confidence="high",
+                            verification="Review ACL order and hit counts, then re-run the audit after moving, narrowing, or removing unreachable rules.",
+                            metadata=_shadow_metadata(
+                                shadowed["raw"],
+                                rule["raw"],
+                                acl=acl_name,
+                                shadowing_action=rule["action"],
+                                shadowing_protocol=rule["proto"],
+                            ),
                         )
                     )
                 break  # Only report the first shadowing rule per ACL to avoid noise
@@ -311,6 +418,24 @@ def check_shadow_rules_azure(nsgs):
                                 f"Rule '{e_name}' has a higher priority (lower number) and covers the "
                                 f"same or broader scope. Remove '{name}' if it is redundant, or adjust "
                                 f"its scope to handle traffic not already processed by '{e_name}'.",
+                                id="CASHEL-AZURE-REDUNDANCY-001",
+                                vendor="azure",
+                                title="Azure NSG rule is shadowed",
+                                evidence=f"NSG '{nsg_name}' {direction}: priority {e_prio} rule '{e_name}' covers priority {priority} rule '{name}'",
+                                affected_object=name,
+                                rule_id=str(priority),
+                                rule_name=name,
+                                confidence="medium",
+                                verification="Review NSG effective security rules, then re-run the audit after removing, narrowing, or reprioritizing the shadowed rule.",
+                                metadata=_shadow_metadata(
+                                    name,
+                                    e_name,
+                                    nsg=nsg_name,
+                                    direction=direction,
+                                    priority=priority,
+                                    shadowing_priority=e_prio,
+                                    protocol=proto,
+                                ),
                             )
                         )
                         break
@@ -361,6 +486,23 @@ def check_shadow_rules_juniper(policies: list) -> list:
                             f"Review policies in from-zone {fz} to-zone {tz}.  Either remove '{name}' "
                             f"if it is redundant, or reorder it before '{e_name}', or narrow the scope "
                             f"of '{e_name}' so that '{name}' can be reached.",
+                            id="CASHEL-JUNIPER-REDUNDANCY-001",
+                            vendor="juniper",
+                            title="Juniper policy is shadowed",
+                            evidence=f"Zone pair {fz}->{tz}: policy '{e_name}' covers policy '{name}'",
+                            affected_object=name,
+                            rule_name=name,
+                            confidence="medium",
+                            verification="Review policy order for the zone pair, then re-run the audit after removing, narrowing, or moving the shadowed policy.",
+                            metadata=_shadow_metadata(
+                                name,
+                                e_name,
+                                from_zone=fz,
+                                to_zone=tz,
+                                source=src,
+                                destination=dst,
+                                application=app,
+                            ),
                         )
                     )
                     break
@@ -387,7 +529,7 @@ def run_rule_quality_checks(vendor: str, parse, extra_data) -> list:
     """
     try:
         if vendor in ("asa", "ftd") and parse is not None:
-            return check_shadow_rules_asa(parse)
+            return check_shadow_rules_asa(parse, vendor=vendor)
         if vendor == "paloalto" and extra_data:
             return check_shadow_rules_pa(extra_data)
         if vendor == "fortinet" and extra_data:

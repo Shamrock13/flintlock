@@ -286,6 +286,29 @@ def test_generate_plan_findings_without_remediation_skipped():
     assert plan["total_steps"] == 0
 
 
+def test_generate_plan_prefers_structured_suggested_commands():
+    finding = {
+        "id": "CASHEL-ASA-LOGGING-001",
+        "severity": "MEDIUM",
+        "category": "logging",
+        "title": "Structured logging fix",
+        "message": "[MEDIUM] Missing logging on rule: permit ip any any",
+        "remediation": "Enable logging.",
+        "evidence": "access-list OUTSIDE_IN permit ip any any",
+        "verification": "Confirm syslog receives hits.",
+        "rollback": "Remove the log keyword if needed.",
+        "suggested_commands": ["structured command wins"],
+    }
+
+    plan = generate_plan([finding], "asa")
+    step = plan["phases"][0]["steps"][0]
+    assert step["title"] == "Structured logging fix"
+    assert step["suggested_commands"] == "structured command wins"
+    assert step["evidence"] == "access-list OUTSIDE_IN permit ip any any"
+    assert step["verification"] == "Confirm syslog receives hits."
+    assert step["rollback"] == "Remove the log keyword if needed."
+
+
 # ── Markdown export ──────────────────────────────────────────────────────────
 
 

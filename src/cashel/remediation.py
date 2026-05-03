@@ -313,6 +313,47 @@ def _consolidate_findings(findings: list[dict]) -> list[dict]:
     return consolidated
 
 
+def _commands_from_finding(finding: dict) -> str | None:
+    commands = finding.get("suggested_commands")
+    if isinstance(commands, list):
+        return "\n".join(str(cmd) for cmd in commands if cmd)
+    if commands:
+        return str(commands)
+    return None
+
+
+def _build_step(
+    finding: dict,
+    step_num: int,
+    cli_gen,
+    has_cli: bool,
+) -> dict[str, Any]:
+    step: dict[str, Any] = {
+        "step": step_num,
+        "severity": finding["severity"],
+        "effort": _estimate_effort(finding.get("remediation", "")),
+        "title": finding.get("title") or finding.get("message", ""),
+        "description": finding["message"],
+        "guidance": finding.get("remediation", ""),
+    }
+
+    for key in ("id", "evidence", "verification", "rollback", "affected_object"):
+        if finding.get(key):
+            step[key] = finding[key]
+
+    cmd = _commands_from_finding(finding)
+    if not cmd and has_cli and cli_gen:
+        cmd = cli_gen(finding)
+    if cmd:
+        step["suggested_commands"] = cmd
+
+    if finding.get("_consolidated_count"):
+        step["consolidated_count"] = finding["_consolidated_count"]
+        step["consolidated_items"] = finding["_consolidated_items"]
+
+    return step
+
+
 def generate_plan(
     findings: list[dict],
     vendor: str,
@@ -373,28 +414,7 @@ def generate_plan(
         steps = []
         for f in group:
             step_num += 1
-            effort = _estimate_effort(f.get("remediation", ""))
-
-            step: dict[str, Any] = {
-                "step": step_num,
-                "severity": f["severity"],
-                "effort": effort,
-                "description": f["message"],
-                "guidance": f.get("remediation", ""),
-            }
-
-            # Generate CLI commands if available
-            if has_cli and cli_gen:
-                cmd = cli_gen(f)
-                if cmd:
-                    step["suggested_commands"] = cmd
-
-            # Include consolidated details if applicable
-            if f.get("_consolidated_count"):
-                step["consolidated_count"] = f["_consolidated_count"]
-                step["consolidated_items"] = f["_consolidated_items"]
-
-            steps.append(step)
+            steps.append(_build_step(f, step_num, cli_gen, has_cli))
 
         phases.append(
             {
@@ -409,19 +429,7 @@ def generate_plan(
         steps = []
         for f in group:
             step_num += 1
-            effort = _estimate_effort(f.get("remediation", ""))
-            step = {
-                "step": step_num,
-                "severity": f["severity"],
-                "effort": effort,
-                "description": f["message"],
-                "guidance": f.get("remediation", ""),
-            }
-            if has_cli and cli_gen:
-                cmd = cli_gen(f)
-                if cmd:
-                    step["suggested_commands"] = cmd
-            steps.append(step)
+            steps.append(_build_step(f, step_num, cli_gen, has_cli))
 
         phases.append(
             {
@@ -515,6 +523,10 @@ def plan_to_markdown(plan: dict) -> str:
             lines.append(f"**Finding**: {step['description']}")
             lines.append("")
 
+            if step.get("evidence"):
+                lines.append(f"**Evidence**: `{step['evidence']}`")
+                lines.append("")
+
             if step.get("consolidated_count"):
                 lines.append(
                     f"*This step covers {step['consolidated_count']} related findings:*"
@@ -527,6 +539,14 @@ def plan_to_markdown(plan: dict) -> str:
 
             lines.append(f"**Guidance**: {step['guidance']}")
             lines.append("")
+
+            if step.get("verification"):
+                lines.append(f"**Verification**: {step['verification']}")
+                lines.append("")
+
+            if step.get("rollback"):
+                lines.append(f"**Rollback**: {step['rollback']}")
+                lines.append("")
 
             if step.get("suggested_commands"):
                 lines.append("**Suggested Commands**:")
@@ -594,6 +614,8 @@ def plan_to_pdf(plan: dict, output_path: str) -> str:
         }
 
     def _step_title(step: dict) -> str:
+        if step.get("title"):
+            return str(step["title"])
         desc = re.sub(r"^\[[A-Z]+\]\s*", "", str(step.get("description", ""))).strip()
         if ":" in desc:
             left, right = desc.split(":", 1)
@@ -633,4 +655,6 @@ def plan_to_pdf(plan: dict, output_path: str) -> str:
         "disclaimer": plan.get("disclaimer", ""),
         "tool_version": TOOL_VERSION,
     }
-    return render_template_to_pdf("remediation_report_pdf.html", output_path, report=context)
+    return render_template_to_pdf(
+        "remediation_report_pdf.html", output_path, report=context
+    )
