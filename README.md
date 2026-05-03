@@ -2,7 +2,9 @@
 
 ![CI](https://github.com/Shamrock13/cashel/actions/workflows/ci.yml/badge.svg)
 
-**Cashel** is a firewall configuration auditing tool built for network security engineers. Upload a config, get an instant security score, severity-graded findings with remediation guidance, compliance mapping, and export-ready reports — all from a clean web UI or CLI. Connect directly to live devices via SSH, schedule recurring audits, and track score trends across your fleet over time.
+**Cashel** is a self-hosted firewall configuration auditing and remediation tool built for network security engineers, MSPs, and security teams. Upload firewall configs, audit live devices over SSH, schedule recurring checks, compare configuration changes, and generate client-ready reports, remediation plans, and export bundles.
+
+Cashel's current direction is focused on **trusted, evidence-backed findings** rather than adding more vendor breadth. The app now supports a normalized finding model that preserves legacy UI/API compatibility while adding fields such as stable finding IDs, evidence, affected objects, confidence, verification guidance, rollback notes, compliance references, and suggested commands where available.
 
 **Try the live demo:** [demo.cashel.app](https://demo.cashel.app)
 
@@ -11,100 +13,166 @@
 
 ---
 
-## Supported Vendors
+## Current Application State
 
-Cashel supports **11 vendor platforms** spanning on-premises firewalls and cloud security groups.
+Cashel currently includes:
 
-> **Cisco note:** Cashel supports Cisco ASA and FTD under a single **Cisco** vendor option. The platform auto-detects which appliance type from the config content and applies the appropriate checks.
+- Multi-vendor firewall and cloud security-group auditing
+- Web UI and CLI audit workflows
+- Single-file and bulk config audits
+- Live SSH audits for supported network firewall platforms
+- Scheduled SSH audits with alerting
+- Audit history, activity logging, score trends, and saved report views
+- Rule diffing between two configs of the same vendor
+- Severity scoring with CRITICAL / HIGH / MEDIUM / LOW findings
+- Compliance checks behind a license key
+- Export formats: PDF, JSON, CSV, SARIF, and evidence bundles
+- Structured remediation plans with Markdown and PDF output
+- Vendor-specific suggested commands where safe and practical
+- Normalized finding fields for evidence-backed reporting and future policy-as-code workflows
 
-| Vendor | Config Format | Live SSH |
-|---|---|---|
-| AWS Security Groups | JSON | — |
-| Azure NSG | JSON | — |
-| Cisco (ASA / FTD) | Text | ✓ |
-| Fortinet FortiGate | Text | ✓ |
-| GCP VPC Firewall | JSON | — |
-| iptables / nftables (Linux) | Text | ✓ |
-| Juniper SRX | Text | ✓ |
-| Palo Alto Networks | XML | ✓ |
-| pfSense | XML | ✓ |
+### Evidence-backed finding coverage
+
+The normalized finding model is in place, but not every vendor/check has been fully migrated yet.
+
+Currently enriched:
+
+- Cisco ASA core checks:
+  - overly permissive any-any ACL rules
+  - permit rules missing logging
+  - missing explicit deny-all logging
+  - duplicate/redundant ACL entries
+  - Telnet management exposure
+  - unrestricted ICMP any-any rules
+- Rule shadowing findings for:
+  - Cisco ASA / FTD
+  - Palo Alto Networks
+  - Fortinet FortiGate
+  - pfSense
+  - Azure NSG
+  - Juniper SRX
+- Remediation plans now prefer structured finding fields such as `title`, `id`, `evidence`, `verification`, `rollback`, `affected_object`, and `suggested_commands` before falling back to legacy message parsing.
+- JSON exports preserve enriched finding fields.
+- CSV exports include `id`, `title`, `evidence`, and remediation columns.
+- SARIF exports prefer stable finding IDs as rule IDs when available.
+
+Still being migrated:
+
+- Full structured finding coverage for Fortinet, Palo Alto, Juniper, pfSense, iptables/nftables, AWS, Azure, and GCP vendor-specific checks
+- Deeper object expansion for Fortinet, Palo Alto, and ASA/FTD
+- Data-driven compliance-control mappings
+- Policy-as-code gates for CI/CD
 
 ---
 
-## Features
+## Supported Vendors
 
-### Free (Open Source)
+Cashel supports on-prem firewall configs, Linux host firewall configs, and cloud security-group style policies.
 
-**Audit engine**
-- **4-level severity** — CRITICAL / HIGH / MEDIUM / LOW, with findings sorted and color-coded by risk
-- **Security scoring** — 0–100 per audit: `100 − (CRITICAL×20) − (HIGH×10) − (MEDIUM×3)`
-- **Auto vendor detection** — identifies vendor from file content; no manual selection required
-- **Hostname extraction** — device hostname auto-populated from the config file into the Device Tag field
-- **Category badges** — findings tagged by type: Exposure, Protocol, Logging, Hygiene, Redundancy
-- **Remediation guidance** — every finding includes a plain-English fix recommendation
+> **Cisco note:** Cashel exposes Cisco ASA and FTD under a single Cisco option in the UI. The platform can auto-detect ASA vs. FTD from config content and apply the relevant checks.
 
-**Audit modes**
-- **Single file** — upload one config, get instant results with filterable findings
-- **Bulk** — upload multiple configs at once; each audited independently with per-file score and expandable findings
-- **Live SSH** — connect directly to any SSH-capable device to pull and audit its running config in real time (8 vendor types, PEM key support)
-- **Scheduled** — recurring SSH audits (hourly, daily, weekly) with full CRUD management; results auto-save to Audit History
-
-**Exports**
-- **PDF report** — color-coded findings with score, categories, and remediation text; view inline or download
-- **JSON** — structured findings with severity, category, remediation, and metadata
-- **CSV** — tabular findings for spreadsheets or ticketing systems
-- **SARIF** — Static Analysis Results Interchange Format for CI/CD and security tooling integration
-- **REST API** — `POST /api/v1/audit` returns JSON findings for pipeline integration
-
-**History & trends**
-- **Audit History** — save, browse, filter (vendor / date / tag), and search past audits
-- **Score Trends chart** — security score over time per device, with vendor and tag filters
-- **Archival comparisons** — diff any two saved audits: resolved issues, new issues, severity deltas
-- **Device tag system** — name devices (e.g. `ASA01`, `FortiGate-HQ`) for auto-versioned history and trend tracking
-- **Activity Log** — complete record of every audit, SSH attempt, diff, and scheduled run — including failures
-
-**Rule quality analysis**
-- **Shadow rule detection** — flags rules that can never match because an earlier rule already covers the same traffic
-- **Duplicate rule detection** — identifies exact duplicate rules that add no policy value
-
-**Alerts & integrations**
-- Slack webhook · Microsoft Teams webhook · Email (SMTP) · Syslog forwarding (UDP/TCP)
-- All alert channels are available on scheduled audits; Syslog streams all application events for SIEM integration
-
-**Platform**
-- Rule change diff — upload two configs of the same vendor to see added, removed, and unchanged rules
-- Configurable SSH host key policy — Warn (default), Strict, or Auto-add
-- Webhook SSRF protection — hostname allowlist + private IP blocking
-- HTTP security headers — X-Frame-Options, X-Content-Type-Options, Referrer-Policy, Permissions-Policy on every response
-- XXE injection protection — all XML parsing uses defusedxml
-- Light / dark / auto theme · CLI · Docker Compose deployment
+| Vendor | Config Format | Live SSH | Notes |
+|---|---|---:|---|
+| AWS Security Groups | JSON | — | Audit only; no rule-order shadowing |
+| Azure NSG | JSON | — | Includes priority-based shadow checks |
+| Cisco ASA / FTD | Text | ✓ | ASA has the deepest evidence-backed finding coverage today |
+| Fortinet FortiGate | Text | ✓ | Includes policy checks and shadow detection |
+| GCP VPC Firewall | JSON | — | Audit only |
+| iptables / nftables | Text | ✓ | Linux host firewall checks |
+| Juniper SRX | Text | ✓ | Includes zone-pair shadow detection |
+| Palo Alto Networks | XML | ✓ | Includes rulebase checks and shadow detection |
+| pfSense | XML | ✓ | Includes interface-aware shadow detection |
 
 Full list of vendor-specific checks: [docs/checks.md](docs/checks.md)
 
 ---
 
-### Paid (License Required)
+## Features
 
-Compliance checks require a license key and map findings to specific control references.
+### Audit Engine
+
+- **Severity model** — CRITICAL / HIGH / MEDIUM / LOW findings sorted and color-coded by risk
+- **Security scoring** — 0–100 per audit: `100 − (CRITICAL×20) − (HIGH×10) − (MEDIUM×3)`
+- **Auto vendor detection** — identifies supported vendors from config content
+- **Hostname extraction** — device hostname can auto-populate the Device Tag field when detectable
+- **Category badges** — findings grouped by exposure, protocol, logging, hygiene, redundancy, and compliance
+- **Normalized findings** — additive structured fields for evidence, stable IDs, affected objects, verification, rollback, and suggested commands
+- **Legacy compatibility** — older string/dict findings still render and export
+
+### Audit Modes
+
+- **Single file** — upload one config and receive score, findings, remediation guidance, and exports
+- **Bulk** — upload multiple configs and audit each independently
+- **Live SSH** — connect to SSH-capable devices and audit running configs without storing one-time credentials
+- **Scheduled** — recurring SSH audits with saved history and optional alerting
+
+### Reports and Exports
+
+- **Modern PDF reports** — HTML/CSS-rendered audit reports using Playwright/Chromium
+- **Remediation reports** — grouped remediation steps with evidence, guidance, verification, rollback, and suggested commands when available
+- **Evidence bundles** — ZIP package containing report artifacts such as PDF, JSON, CSV, SARIF, and cover material
+- **JSON** — preserves full enriched finding dictionaries
+- **CSV** — spreadsheet-friendly export with core enriched columns
+- **SARIF** — security tooling integration using stable finding IDs where present
+- **REST API** — pipeline-friendly audit endpoint returning JSON findings
+
+### History and Trends
+
+- **Audit History** — saved audits with vendor/date/tag filtering and search
+- **Score Trends** — score-over-time visualization by device/vendor/tag
+- **Archived comparisons** — compare two saved audits to identify resolved, new, and changed findings
+- **Device tags** — track repeated audits for named devices
+- **Activity Log** — records audits, SSH attempts, diffs, scheduled runs, and failures
+
+### Rule Quality Analysis
+
+- **Shadow detection** — flags rules that cannot match because earlier rules already cover the traffic scope
+- **Duplicate detection** — identifies duplicate rules that add no policy value
+- **Current limitation** — shadow logic is useful but not yet fully scope-aware across nested objects, CIDRs, service groups, NAT context, and all vendor-specific abstractions
+
+### Alerts and Integrations
+
+- Slack webhook
+- Microsoft Teams webhook
+- Email / SMTP
+- Syslog forwarding over UDP/TCP
+- Generic outbound webhooks with HMAC signing and SSRF protections
+
+### Platform and Security
+
+- Docker Compose deployment
+- Flask web UI and Typer CLI
+- SQLite persistence for audits, schedules, users, auth events, alert state, and integrations
+- RBAC roles for admin/auditor/viewer style access patterns
+- Configurable SSH host-key policy: Warn, Strict, or Auto-add
+- HTTP security headers
+- XML parsing via `defusedxml`
+- CI checks for Ruff, format, mypy, tests, XML parser safety, dependency sync, and secret scanning
+
+---
+
+## Paid Features
+
+Compliance checks require a license key and map audit findings to control references.
 
 | Framework | Coverage | Vendors |
 |---|---|---|
-| CIS Benchmark | HIGH / MEDIUM | Cisco (ASA/FTD), Fortinet, Juniper, Palo Alto, pfSense |
-| DISA STIG | CAT-I / CAT-II / CAT-III | Cisco (ASA/FTD), Fortinet, Juniper, Palo Alto, pfSense |
-| HIPAA Security Rule (45 CFR §164) | HIGH / MEDIUM | Cisco (ASA/FTD), Fortinet, Juniper, Palo Alto, pfSense |
-| NIST SP 800-41 | HIGH / MEDIUM | Cisco (ASA/FTD), Fortinet, Juniper, Palo Alto, pfSense |
-| PCI-DSS | HIGH / MEDIUM | Cisco (ASA/FTD), Fortinet, Juniper, Palo Alto, pfSense |
-| SOC2 | HIGH / MEDIUM | Cisco (ASA/FTD), Fortinet, Juniper, Palo Alto, pfSense |
+| CIS Benchmark | HIGH / MEDIUM | Cisco ASA/FTD, Fortinet, Juniper, Palo Alto, pfSense |
+| DISA STIG | CAT-I / CAT-II / CAT-III | Cisco ASA/FTD, Fortinet, Juniper, Palo Alto, pfSense |
+| HIPAA Security Rule | HIGH / MEDIUM | Cisco ASA/FTD, Fortinet, Juniper, Palo Alto, pfSense |
+| NIST SP 800-41 | HIGH / MEDIUM | Cisco ASA/FTD, Fortinet, Juniper, Palo Alto, pfSense |
+| PCI-DSS | HIGH / MEDIUM | Cisco ASA/FTD, Fortinet, Juniper, Palo Alto, pfSense |
+| SOC2 | HIGH / MEDIUM | Cisco ASA/FTD, Fortinet, Juniper, Palo Alto, pfSense |
 
-> **Purchase a license at [Gumroad](https://shamrock13.gumroad.com/l/cashel)**
+> Purchase a license at [Gumroad](https://shamrock13.gumroad.com/l/cashel)
 
 ---
 
 ## Installation
 
-### Option 1 — Docker Compose (Recommended)
+### Option 1 — Docker Compose
 
-**Requirements:** Docker Desktop or OrbStack
+**Requirements:** Docker Desktop, OrbStack, or another Docker-compatible runtime.
 
 ```bash
 git clone https://github.com/Shamrock13/cashel.git
@@ -112,19 +180,25 @@ cd cashel
 docker compose up --build
 ```
 
-Open **http://localhost:8080** in your browser. Reports, audit history, activity log, schedules, and your license key are persisted in a Docker volume across restarts. To set a custom secret, create a `.env` file:
+Open **http://localhost:8080**.
 
+Reports, audit history, activity log, schedules, and license settings persist in Docker storage across restarts.
+
+Recommended `.env` value:
+
+```bash
+CASHEL_SECRET=replace-with-a-long-random-secret
 ```
-CASHEL_SECRET=your-secret-here
+
+Stop the app:
+
+```bash
+docker compose down
 ```
-
-To stop: `docker compose down`
-
----
 
 ### Option 2 — Local Python
 
-**Requirements:** Python 3.11+
+**Requirements:** Python 3.9+.
 
 ```bash
 git clone https://github.com/Shamrock13/cashel.git
@@ -133,20 +207,29 @@ pip install -r requirements.txt
 python -m playwright install chromium
 ```
 
-**Run the web UI:**
+Run the web UI:
+
 ```bash
 PYTHONPATH=src python -m flask --app src/cashel/web.py run
 ```
-Open **http://localhost:5000**
 
-Cashel renders audit, remediation, and evidence-bundle PDFs from the same
-HTML/CSS report templates used by the web app. Playwright's Chromium browser is
-required for PDF export. Set `CASHEL_PDF_PAGE_FORMAT` to override the default
-`Letter` page size, or `CASHEL_PDF_TIMEOUT_MS` to tune the render timeout.
+Open **http://localhost:5000**.
 
-**Run the CLI:**
+Run the CLI:
+
 ```bash
-PYTHONPATH=src python -m cashel.main --file config.txt --vendor cisco
+PYTHONPATH=src python -m cashel.main --file examples/cisco_asa.txt --vendor cisco
+```
+
+### PDF rendering notes
+
+Cashel renders audit, remediation, and evidence-bundle PDFs from HTML/CSS report templates. Playwright's Chromium browser is required for PDF export.
+
+Optional environment variables:
+
+```bash
+CASHEL_PDF_PAGE_FORMAT=Letter
+CASHEL_PDF_TIMEOUT_MS=30000
 ```
 
 ---
@@ -154,11 +237,14 @@ PYTHONPATH=src python -m cashel.main --file config.txt --vendor cisco
 ## Quick Start
 
 ```bash
-# CLI — audit a config file
+# Cisco ASA example
 PYTHONPATH=src python -m cashel.main --file examples/cisco_asa.txt --vendor cisco
+
+# Palo Alto example
 PYTHONPATH=src python -m cashel.main --file examples/palo_alto.xml --vendor paloalto
 
-# Web UI — upload any file from examples/ and select Auto-detect
+# Web UI
+PYTHONPATH=src python -m flask --app src/cashel/web.py run
 ```
 
 Full CLI reference: [docs/cli.md](docs/cli.md)
@@ -167,25 +253,22 @@ Full CLI reference: [docs/cli.md](docs/cli.md)
 
 ## Web UI
 
-The interface is organized into six tabs with SVG navigation icons.
+The interface is organized into six main areas:
 
-**Audit** — Toggle between Single File and Bulk mode. Upload a config, optionally set a Device Tag and compliance framework, then click Run Audit. Results show a security score, severity counts, category-tagged findings with remediation, and export buttons (PDF, JSON, CSV, SARIF).
-
-**Compare** — Upload two configs of the same vendor to diff added, removed, and unchanged rules. Vendor is auto-detected from the baseline file.
-
-**Live Connect** — SSH directly to a device to pull and audit its running config. Credentials are used for the single connection only and are never stored.
-
-**Schedules** — Configure recurring SSH audits (hourly, daily, weekly) with optional Slack, Teams, or email alerts on HIGH/CRITICAL findings or errors. Results are auto-saved to Audit History.
-
-**History** — Browse all saved audits with vendor/date/tag filters. Select any two entries to run a full diff. The Score Trends chart plots each device's security score over time. The Activity Log records every audit, SSH attempt, diff, and scheduled run.
-
-**Settings** — Two-column panel covering: General (auto-PDF, auto-archive, default compliance), Email/SMTP, Security (SSH host key policy, webhook domains, error detail level), and Syslog (host, port, protocol, facility).
+| Area | Purpose |
+|---|---|
+| Audit | Single-file and bulk upload audits with findings and exports |
+| Compare | Diff two configs of the same vendor |
+| Live Connect | Pull and audit running configs over SSH |
+| History | Browse saved audits, compare previous runs, and view trends |
+| Schedules | Manage recurring SSH audits and alert behavior |
+| Settings | Configure email, security settings, syslog, webhooks, license, and app preferences |
 
 ---
 
 ## Example Config Files
 
-The `examples/` directory contains sample configurations for all supported vendors — each with a mix of well-scoped rules and intentional misconfigurations that Cashel will detect.
+The `examples/` directory contains sample configurations for supported vendors.
 
 | File | Vendor |
 |---|---|
@@ -195,33 +278,52 @@ The `examples/` directory contains sample configurations for all supported vendo
 | `examples/palo_alto.xml` | Palo Alto Networks |
 | `examples/pfsense.xml` | pfSense |
 | `examples/juniper_srx.txt` | Juniper SRX |
-| `examples/iptables.txt` | iptables (Linux) |
-| `examples/nftables.txt` | nftables (Linux) |
+| `examples/iptables.txt` | iptables |
+| `examples/nftables.txt` | nftables |
 | `examples/aws_security_groups.json` | AWS Security Groups |
 | `examples/azure_nsg.json` | Azure NSG |
 | `examples/gcp_vpc_firewall.json` | GCP VPC Firewall |
 
 ---
 
-## Changelog
+## Development Status
 
-What's shipped and where to find it:
+Current version in `pyproject.toml`: **2.0.0**.
 
-| Release | Highlights | PR |
-|---|---|---|
-| **v1.5.1** | CRITICAL severity level — engine, parsers, exports, CSS, UI, API | [#73](https://github.com/Shamrock13/cashel/pull/73) |
-| **v1.5.0** | Threshold-based alerting — CRUD UI, alert channels, scheduled evaluation | [#72](https://github.com/Shamrock13/cashel/pull/72) |
-| **v1.5.0** | Auth audit log, OpenAPI/Swagger docs, deployment guide | [#65](https://github.com/Shamrock13/cashel/pull/65) |
-| **v1.4.x** | RBAC (admin/viewer roles), SQLite persistence, multi-user auth, Render deploy hardening | [#40](https://github.com/Shamrock13/cashel/pull/40) |
-| **v1.4.0** | Blueprint decomposition, SQLite, session auth | [#31](https://github.com/Shamrock13/cashel/pull/31) |
-| **Earlier** | All prior features — scoring, vendors, compliance, exports, SSH, scheduling, diff, rule quality | [full history](https://github.com/Shamrock13/cashel/pulls?q=is%3Apr+is%3Aclosed) |
+Recently added or in-flight on the current development branch:
+
+- Modern HTML/CSS-rendered audit PDFs
+- Modern remediation PDFs
+- Report view page
+- HTML-based evidence bundle cover PDFs
+- Normalized finding model
+- Evidence-backed ASA findings
+- Enriched shadow-rule findings across supported ordered-rule vendors
+- Remediation plans that prefer structured fields over regex parsing
+- JSON/CSV/SARIF enriched-field export support
+- Expanded tests for reports, exports, remediation, HTML PDF rendering, and finding normalization
+
+Known cleanup still needed:
+
+- Replace placeholder package author metadata in `pyproject.toml`
+- Continue migrating non-ASA vendor checks to enriched findings
+- Add deeper object/service expansion for Fortinet, Palo Alto, and ASA/FTD
+- Refactor compliance mappings toward data-driven controls
+- Build policy-as-code gates after the finding model is consistently adopted
 
 ---
 
-## Support
+## Roadmap Priority
 
-[![GitHub Sponsors](https://img.shields.io/badge/Sponsor%20on%20GitHub-%E2%9D%A4-ea4aaa?logo=github-sponsors&logoColor=white&style=for-the-badge)](https://github.com/sponsors/Shamrock13)
-[![Ko-fi](https://img.shields.io/badge/Buy%20me%20a%20coffee-Ko--fi-FF5E5B?logo=ko-fi&logoColor=white&style=for-the-badge)](https://ko-fi.com/shamrock13)
+Near-term development should focus on depth and trust:
+
+1. Finish structured finding migration for Fortinet and Palo Alto
+2. Add object and service expansion for Fortinet, Palo Alto, and ASA/FTD
+3. Make shadow detection scope-aware for CIDRs, ports, nested groups, and service objects
+4. Improve compliance mapping using stable finding IDs
+5. Add policy-as-code gates for CI/CD after findings are consistently normalized
+
+Cashel should avoid adding more vendors until the top vendors produce consistently evidence-backed results.
 
 ---
 
