@@ -431,7 +431,7 @@ def run_audit():
             report_name = f"cashel_report_{uuid.uuid4().hex[:8]}.pdf"
             report_path = os.path.join(REPORTS_FOLDER, report_name)
             generate_report(
-                _findings_to_strings(findings),
+                findings,
                 upload.filename,
                 vendor,
                 compliance,
@@ -454,7 +454,7 @@ def run_audit():
             archive_id, _ = save_audit(
                 upload.filename,
                 vendor,
-                _findings_to_strings(findings),
+                findings,
                 summary,
                 config_path=temp_path,
                 tag=tag,
@@ -676,7 +676,7 @@ def live_connect():
         archive_id, _ = save_audit(
             label,
             vendor,
-            _findings_to_strings(findings),
+            findings,
             summary,
             config_path=temp_path,
             tag=tag,
@@ -825,7 +825,7 @@ def bulk_audit():
                 archive_id, _ = save_audit(
                     upload.filename,
                     vendor,
-                    _findings_to_strings(findings),
+                    findings,
                     summary,
                     config_path=temp_path,
                     tag=tag,

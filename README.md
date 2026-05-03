@@ -130,6 +130,7 @@ To stop: `docker compose down`
 git clone https://github.com/Shamrock13/cashel.git
 cd cashel
 pip install -r requirements.txt
+python -m playwright install chromium
 ```
 
 **Run the web UI:**
@@ -137,6 +138,11 @@ pip install -r requirements.txt
 PYTHONPATH=src python -m flask --app src/cashel/web.py run
 ```
 Open **http://localhost:5000**
+
+Cashel renders audit, remediation, and evidence-bundle PDFs from the same
+HTML/CSS report templates used by the web app. Playwright's Chromium browser is
+required for PDF export. Set `CASHEL_PDF_PAGE_FORMAT` to override the default
+`Letter` page size, or `CASHEL_PDF_TIMEOUT_MS` to tune the render timeout.
 
 **Run the CLI:**
 ```bash

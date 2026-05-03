@@ -542,230 +542,95 @@ def plan_to_markdown(plan: dict) -> str:
 
 
 def plan_to_pdf(plan: dict, output_path: str) -> str:
-    """Render a remediation plan as a branded PDF.
-
-    Reuses the CashelReport class from reporter.py for consistent branding.
-    """
-    from .reporter import (
-        CashelReport,
-        _sanitize,
-        _draw_summary_boxes,
-        _section_header,
-        VENDOR_DISPLAY,
-        _NAVY,
-        _WHITE,
-        _LIGHT_BG,
-        _BORDER,
-        _TEXT,
-        _MUTED,
-        _HIGH,
-        _HIGH_BG,
-        _MEDIUM,
-        _MEDIUM_BG,
-        _COMP,
-        _PASS,
-        _CRITICAL,
-        _CRITICAL_BG,
-    )
+    """Render a remediation plan as a modern HTML-rendered PDF."""
     from .export import TOOL_VERSION
+    from .html_pdf import render_template_to_pdf
+    from .reporter import VENDOR_DISPLAY, compliance_label
 
-    _EFFORT_COLORS = {
-        "quick-fix": (26, 128, 85),  # green
-        "moderate": (153, 102, 0),  # amber
-        "change-window": (204, 34, 0),  # red
-    }
-
-    _CATEGORY_BAR_COLORS = {
-        "exposure": _HIGH,
-        "protocol": (170, 68, 255),
-        "logging": _MEDIUM,
-        "hygiene": _COMP,
-        "redundancy": _MUTED,
-        "compliance": _COMP,
-    }
-
-    class RemediationReport(CashelReport):
-        def header(self):
-            self.set_fill_color(*_NAVY)
-            self.rect(0, 0, 210, 42, "F")
-            self.set_text_color(*_WHITE)
-            self.set_font("Helvetica", "B", 24)
-            self.set_xy(12, 10)
-            self.cell(120, 9, "Cashel")
-            self.set_font("Helvetica", "B", 8.5)
-            self.set_text_color(180, 200, 235)
-            self.set_xy(12, 28)
-            self.cell(120, 6, f"Remediation report  |  Cashel {TOOL_VERSION}")
-            self.set_xy(0, 28)
-            self.cell(
-                198,
-                6,
-                f"Generated: {plan.get('generated', '')}",
-                align="R",
-            )
-            self.set_fill_color(255, 104, 128)
-            self.rect(0, 41.3, 210, 0.8, "F")
-            self.set_y(50)
-
-    pdf = RemediationReport()
-    pdf.set_auto_page_break(auto=True, margin=18)
-    pdf.add_page()
-
-    # Meta bar
-    vendor_name = VENDOR_DISPLAY.get(plan["vendor"], plan["vendor"].upper())
-    framework = plan["compliance"].upper() if plan.get("compliance") else "None"
-    pdf.set_fill_color(*_LIGHT_BG)
-    y = pdf.get_y()
-    pdf.rect(10, y, 190, 13, "F")
-    meta = f"File: {plan.get('filename', 'N/A')}   |   Vendor: {vendor_name}   |   Framework: {framework}   |   Steps: {plan['total_steps']}"
-    pdf.set_font("Helvetica", "B", 8)
-    pdf.set_text_color(*_MUTED)
-    pdf.set_xy(13, y + 3.5)
-    pdf.cell(184, 6, _sanitize(meta))
-    pdf.set_y(y + 17)
-
-    # Summary boxes
-    summary = plan.get("summary", {})
-    if summary:
-        _draw_summary_boxes(
-            pdf,
-            summary.get("high", 0),
-            summary.get("medium", 0),
-            summary.get("total", 0),
-            score=summary.get("score"),
-            critical=summary.get("critical", 0),
-        )
-        pdf.ln(3)
-
-    # Disclaimer
-    if plan.get("disclaimer"):
-        pdf.set_fill_color(255, 248, 230)
-        pdf.set_draw_color(*_MEDIUM)
-        y = pdf.get_y()
-        pdf.set_line_width(0.4)
-        pdf.rect(10, y, 190, 14, "FD")
-        pdf.set_font("Helvetica", "B", 7)
-        pdf.set_text_color(*_MEDIUM)
-        pdf.set_xy(13, y + 3)
-        pdf.multi_cell(184, 4, _sanitize(plan["disclaimer"]))
-        pdf.set_y(y + 18)
-
-    # Divider
-    pdf.set_draw_color(*_BORDER)
-    pdf.set_line_width(0.3)
-    pdf.line(10, pdf.get_y(), 200, pdf.get_y())
-    pdf.ln(6)
-
-    if not plan.get("phases"):
-        pdf.set_font("Helvetica", "B", 10)
-        pdf.set_text_color(*_PASS)
-        pdf.cell(0, 8, "No remediation steps required — all checks passed.", align="C")
-    else:
-        for phase in plan["phases"]:
-            bar_color = _CATEGORY_BAR_COLORS.get(phase["category"], _COMP)
-            _section_header(pdf, phase["phase"], bar_color)
-
-            for step in phase["steps"]:
-                if step["severity"] == "CRITICAL":
-                    sev_color = _CRITICAL
-                    bg = _CRITICAL_BG
-                elif step["severity"] == "HIGH":
-                    sev_color = _HIGH
-                    bg = _HIGH_BG
-                else:
-                    sev_color = _MEDIUM
-                    bg = _MEDIUM_BG
-                effort_color = _EFFORT_COLORS.get(step["effort"], _MUTED)
-
-                # Estimate row height
-                desc = step["description"]
-                guidance = step.get("guidance", "")
-                cmds = step.get("suggested_commands", "")
-                char_w = 2.3
-                inner_w = 183
-                desc_lines = max(
-                    1, (len(desc) + int(inner_w / char_w) - 1) // int(inner_w / char_w)
+    def _fmt_generated(value: str) -> tuple[str, str]:
+        if value:
+            try:
+                dt = datetime.fromisoformat(value.replace("Z", "+00:00"))
+                if dt.tzinfo:
+                    dt = dt.astimezone(timezone.utc)
+                return (
+                    dt.strftime("%B %d, %Y").replace(" 0", " "),
+                    dt.strftime("%H:%M:%S UTC"),
                 )
-                row_h: float = 18 + desc_lines * 4.4
-                if guidance:
-                    g_lines = max(
-                        1,
-                        (len(guidance) + int(inner_w / 2.0) - 1) // int(inner_w / 2.0),
-                    )
-                    row_h += g_lines * 4 + 6
-                if cmds:
-                    c_lines = cmds.count("\n") + 1
-                    row_h += c_lines * 3.6 + 9
+            except ValueError:
+                pass
+        dt = datetime.now(timezone.utc)
+        return dt.strftime("%B %d, %Y").replace(" 0", " "), dt.strftime("%H:%M:%S UTC")
 
-                y = pdf.get_y()
-                if y + row_h > 272:
-                    pdf.add_page()
-                    y = pdf.get_y()
+    def _all_steps() -> list[dict]:
+        return [s for phase in plan.get("phases", []) for s in phase.get("steps", [])]
 
-                # Step card
-                pdf.set_fill_color(*bar_color)
-                pdf.rect(10, y, 3.5, row_h, "F")
-                pdf.set_fill_color(*_WHITE)
-                pdf.set_draw_color(*_BORDER)
-                pdf.set_line_width(0.25)
-                pdf.rect(13.5, y, 186.5, row_h, "FD")
+    def _summary() -> dict:
+        steps = _all_steps()
+        counts = {"CRITICAL": 0, "HIGH": 0, "MEDIUM": 0, "LOW": 0}
+        for step in steps:
+            sev = str(step.get("severity", "MEDIUM")).upper()
+            if sev in counts:
+                counts[sev] += 1
+        source = plan.get("summary", {}) or {}
+        total = int(source.get("total", sum(counts.values())) or sum(counts.values()))
+        score = source.get("score")
+        if score is None:
+            score = max(
+                0,
+                100
+                - counts["CRITICAL"] * 20
+                - counts["HIGH"] * 10
+                - counts["MEDIUM"] * 3
+                - counts["LOW"],
+            )
+        return {
+            "critical": int(source.get("critical", counts["CRITICAL"]) or 0),
+            "high": int(source.get("high", counts["HIGH"]) or 0),
+            "medium": int(source.get("medium", counts["MEDIUM"]) or 0),
+            "low": int(source.get("low", counts["LOW"]) or 0),
+            "total": total,
+            "score": score,
+        }
 
-                cur_y = y + 3.2
+    def _step_title(step: dict) -> str:
+        desc = re.sub(r"^\[[A-Z]+\]\s*", "", str(step.get("description", ""))).strip()
+        if ":" in desc:
+            left, right = desc.split(":", 1)
+            return left.strip() if len(left) < 86 else right.strip()
+        return desc or "Remediation step"
 
-                # Step number + severity + effort badges
-                pdf.set_font("Helvetica", "B", 9)
-                pdf.set_text_color(*_TEXT)
-                pdf.set_xy(15, cur_y)
-                pdf.cell(22, 5, f"Step {step['step']}")
+    generated_date, generated_time = _fmt_generated(plan.get("generated", ""))
+    vendor = plan.get("vendor", "unknown")
+    phases = []
+    for phase in plan.get("phases", []):
+        steps = []
+        for step in phase.get("steps", []):
+            sev = str(step.get("severity", "MEDIUM")).upper()
+            steps.append(
+                {
+                    **step,
+                    "title": _step_title(step),
+                    "severity": sev.title(),
+                    "severity_key": sev.lower(),
+                    "effort_label": _EFFORT_ICONS.get(
+                        step.get("effort", ""), step.get("effort", "")
+                    ),
+                }
+            )
+        phases.append({**phase, "steps": steps})
 
-                pdf.set_fill_color(*bg)
-                pdf.set_draw_color(*sev_color)
-                pdf.set_font("Helvetica", "B", 6.5)
-                pdf.set_text_color(*sev_color)
-                pdf.set_xy(38, cur_y)
-                pdf.cell(22, 5, step["severity"], border=1, align="C", fill=True)
-
-                pdf.set_text_color(*effort_color)
-                pdf.set_font("Helvetica", "", 6.5)
-                pdf.set_xy(63, cur_y)
-                effort_label = _EFFORT_ICONS.get(step["effort"], step["effort"])
-                pdf.cell(38, 5, effort_label)
-                cur_y += 8
-
-                # Finding description
-                pdf.set_text_color(*_TEXT)
-                pdf.set_font("Helvetica", "", 8)
-                pdf.set_xy(17, cur_y)
-                pdf.multi_cell(inner_w - 4, 4.4, _sanitize(desc))
-                cur_y = pdf.get_y() + 2
-
-                # Guidance
-                if guidance:
-                    pdf.set_fill_color(*_LIGHT_BG)
-                    g_y = cur_y
-                    g_h = max(7, ((len(guidance) + int(inner_w / 2.0) - 1) // int(inner_w / 2.0)) * 4 + 4)
-                    pdf.rect(17, g_y, inner_w - 4, g_h, "F")
-                    pdf.set_text_color(*_MUTED)
-                    pdf.set_font("Helvetica", "", 6.8)
-                    pdf.set_xy(19, g_y + 2)
-                    pdf.multi_cell(inner_w - 8, 4, _sanitize("Guidance: " + guidance))
-                    cur_y = g_y + g_h + 2
-
-                # CLI commands
-                if cmds:
-                    pdf.set_fill_color(244, 246, 252)
-                    cmd_y = cur_y
-                    cmd_lines = cmds.count("\n") + 1
-                    cmd_h = cmd_lines * 3.6 + 5
-                    pdf.rect(17, cmd_y, inner_w - 4, cmd_h, "F")
-                    pdf.set_text_color(50, 57, 92)
-                    pdf.set_font("Courier", "", 6.5)
-                    pdf.set_xy(19, cmd_y + 2)
-                    pdf.multi_cell(inner_w - 8, 3.6, _sanitize(cmds))
-
-                pdf.set_y(y + row_h + 2)
-
-            pdf.ln(3)
-
-    pdf.output(output_path)
-    return output_path
+    context = {
+        "filename": plan.get("filename") or "Firewall audit",
+        "vendor": vendor,
+        "vendor_label": VENDOR_DISPLAY.get(vendor, vendor.upper()),
+        "compliance": compliance_label(plan.get("compliance")),
+        "generated_date": generated_date,
+        "generated_time": generated_time,
+        "summary": _summary(),
+        "total_steps": plan.get("total_steps", 0),
+        "phases": phases,
+        "disclaimer": plan.get("disclaimer", ""),
+        "tool_version": TOOL_VERSION,
+    }
+    return render_template_to_pdf("remediation_report_pdf.html", output_path, report=context)

@@ -1,0 +1,102 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<title>Cashel - Remediation Report - {{ report.filename }}</title>
+{% include "_modern_report_pdf_styles.html" %}
+</head>
+<body>
+<main class="paper">
+  <header class="masthead">
+    <div>
+      <div class="brand">
+        <svg viewBox="0 0 120 120" width="18" height="18" xmlns="http://www.w3.org/2000/svg" aria-label="Cashel">
+          <rect x="0" y="0" width="120" height="120" rx="22" fill="var(--ink)" />
+          <path d="M24 86 V42 H38 V58 H52 V42 H68 V58 H82 V42 H96 V86 Z" fill="var(--acc)" />
+        </svg>
+        <span>Cashel</span>
+        <span class="sep">/</span>
+        <span class="kind">Remediation report</span>
+      </div>
+      <h1>{{ report.filename }}<br /><span>Remediation plan</span></h1>
+      <div class="subtitle">{{ report.vendor_label }} remediation plan with {{ report.total_steps }} planned step{{ '' if report.total_steps == 1 else 's' }}.</div>
+    </div>
+    <div class="meta-right">
+      <div class="grp"><b>Generated</b><div class="val">{{ report.generated_date }}</div><div>{{ report.generated_time }}</div></div>
+      <div class="grp"><b>Vendor</b><div class="val">{{ report.vendor_label }}</div></div>
+      <div class="grp"><b>Framework</b><div class="val">{{ report.compliance }}</div></div>
+    </div>
+  </header>
+
+  <div class="section-lbl"><h2>Executive summary</h2><span class="idx">01</span></div>
+  <section class="exec">
+    <div class="score-block">
+      <div>
+        <div class="tiny-label">Security score</div>
+        <div><span class="score-big">{{ report.summary.score if report.summary.score is not none else 'N/A' }}</span>{% if report.summary.score is not none %}<span class="score-over"> / 100</span>{% endif %}</div>
+        <div class="grade">Critical {{ report.summary.critical }} / High {{ report.summary.high }} / Medium {{ report.summary.medium }}</div>
+      </div>
+    </div>
+    <div>
+      <div class="tiny-label">Finding breakdown</div>
+      <div class="exec-breakdown">
+        {% set total = report.summary.total if report.summary.total else 0 %}
+        <div class="band-row c"><span class="dot"></span><div><div class="name">Critical</div><div class="bar"><i style="width: {{ (report.summary.critical / total * 100) if total else 0 }}%"></i></div></div><span class="val">{{ report.summary.critical }}</span></div>
+        <div class="band-row h"><span class="dot"></span><div><div class="name">High</div><div class="bar"><i style="width: {{ (report.summary.high / total * 100) if total else 0 }}%"></i></div></div><span class="val">{{ report.summary.high }}</span></div>
+        <div class="band-row m"><span class="dot"></span><div><div class="name">Medium</div><div class="bar"><i style="width: {{ (report.summary.medium / total * 100) if total else 0 }}%"></i></div></div><span class="val">{{ report.summary.medium }}</span></div>
+        <div class="band-row l"><span class="dot"></span><div><div class="name">Low</div><div class="bar"><i style="width: {{ (report.summary.low / total * 100) if total else 0 }}%"></i></div></div><span class="val">{{ report.summary.low }}</span></div>
+      </div>
+    </div>
+  </section>
+
+  <div class="verdict">
+    <h3>{{ 'Immediate action required' if report.summary.critical or report.summary.high else 'Remediation plan ready' }}</h3>
+    <p>{{ report.disclaimer or 'Review the guidance below, apply approved changes, and re-run the audit to verify the result.' }}</p>
+  </div>
+
+  <div class="section-lbl"><h2>Scope &amp; metadata</h2><span class="idx">02</span></div>
+  <table class="meta-table">
+    <tr><td>Device / file</td><td class="mono">{{ report.filename }}</td></tr>
+    <tr><td>Vendor / syntax</td><td>{{ report.vendor_label }}</td></tr>
+    <tr><td>Framework</td><td>{{ report.compliance }}</td></tr>
+    <tr><td>Remediation steps</td><td>{{ report.total_steps }}</td></tr>
+    <tr><td>Engine</td><td>Cashel {{ report.tool_version }} - deterministic, offline</td></tr>
+  </table>
+
+  <div class="section-lbl"><h2>Findings &amp; remediation</h2><span class="idx">03</span></div>
+  {% if report.phases %}
+    {% for phase in report.phases %}
+      <h3 class="phase-title">{{ phase.phase }}</h3>
+      {% for step in phase.steps %}
+      <article class="step-card {{ step.severity_key }}">
+        <div class="step-head">
+          <div class="fid">{{ "%02d"|format(step.step) }}</div>
+          <div>
+            <div class="title">{{ step.title }}</div>
+            <div class="sub">Step {{ step.step }} / {{ step.effort_label }}</div>
+          </div>
+          <span class="sev">{{ step.severity }}</span>
+        </div>
+        <div class="step-body">
+          <div class="kv-row"><span class="k">Finding</span><span class="v mono-line">{{ step.description }}</span></div>
+          {% if step.guidance %}<div class="kv-row"><span class="k">Guidance</span><span class="v">{{ step.guidance }}</span></div>{% endif %}
+          {% if step.consolidated_count %}<div class="kv-row"><span class="k">Coverage</span><span class="v">Covers {{ step.consolidated_count }} related findings.</span></div>{% endif %}
+          {% if step.suggested_commands %}<div class="kv-row"><span class="k">Commands</span><span class="v command-block">{{ step.suggested_commands }}</span></div>{% endif %}
+        </div>
+      </article>
+      {% endfor %}
+    {% endfor %}
+  {% else %}
+    <div class="fallback-note">
+      <h3>No remediation steps required</h3>
+      <p>No remediation actions were generated for this audit.</p>
+    </div>
+  {% endif %}
+
+  <footer class="doc-foot">
+    <div>Cashel {{ report.tool_version }} / Remediation report</div>
+    <div>Confidential - internal use only</div>
+  </footer>
+</main>
+</body>
+</html>

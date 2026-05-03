@@ -154,8 +154,13 @@ def compare_entries(id_a, id_b):
         )
 
     s_a, s_b = entry_a["summary"], entry_b["summary"]
-    set_a = set(entry_a.get("findings", []))
-    set_b = set(entry_b.get("findings", []))
+    def _finding_key(finding):
+        if isinstance(finding, dict):
+            return finding.get("message") or json.dumps(finding, sort_keys=True)
+        return str(finding)
+
+    set_a = {_finding_key(f) for f in entry_a.get("findings", [])}
+    set_b = {_finding_key(f) for f in entry_b.get("findings", [])}
 
     return {
         "entry_a": entry_a,

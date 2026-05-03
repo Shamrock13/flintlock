@@ -479,27 +479,12 @@
           <div class="side-block">
             <h3>Recent <span class="count">last 24h</span></h3>
             <div id="sideRecentRuns">
-              {% if recent_audits %}
-                {% for a in recent_audits[:4] %}
-                <div class="run-row">
-                  <div>
-                    <div class="rn">{{ a.filename | truncate(22, True) }}</div>
-                    <div class="rn-sub">{{ a.vendor | default('&mdash;') }}{% if a.compliance %} &middot; {{ a.compliance | upper }}{% endif %}</div>
-                  </div>
-                  <div>
-                    <div class="rn-score {% if a.score >= 85 %}ok{% elif a.score >= 65 %}warn{% else %}bad{% endif %}">{{ a.score | int }}</div>
-                    <div class="rn-score-sub">{{ a.created_at | default('&mdash;') }}</div>
-                  </div>
+              <div class="run-row is-empty">
+                <div>
+                  <div class="rn" style="color:var(--ink-4)">No recent runs</div>
+                  <div class="rn-sub">Run your first audit to see results here</div>
                 </div>
-                {% endfor %}
-              {% else %}
-                <div class="run-row" style="cursor:default">
-                  <div>
-                    <div class="rn" style="color:var(--ink-4)">No recent runs</div>
-                    <div class="rn-sub">Run your first audit to see results here</div>
-                  </div>
-                </div>
-              {% endif %}
+              </div>
             </div>
           </div>
 
@@ -518,10 +503,10 @@
           <div class="side-block">
             <h3>Shortcuts</h3>
             <div class="kbds">
-              <div class="kbd-row"><span class="lab">Run audit</span><span class="keys"><kbd>&#8984;</kbd><kbd>&#8629;</kbd></span></div>
-              <div class="kbd-row"><span class="lab">Open last report</span><span class="keys"><kbd>&#8984;</kbd><kbd>L</kbd></span></div>
-              <div class="kbd-row"><span class="lab">Toggle theme</span><span class="keys"><kbd>&#8984;</kbd><kbd>J</kbd></span></div>
-              <div class="kbd-row"><span class="lab">Clear form</span><span class="keys"><kbd>&#8984;</kbd><kbd>K</kbd></span></div>
+              <button class="kbd-row" type="button" data-shortcut-action="run"><span class="lab">Run audit</span><span class="keys"><kbd>Alt</kbd><kbd>Enter</kbd></span></button>
+              <button class="kbd-row" type="button" data-shortcut-action="report"><span class="lab">Open last report</span><span class="keys"><kbd>Alt</kbd><kbd>L</kbd></span></button>
+              <button class="kbd-row" type="button" data-shortcut-action="theme"><span class="lab">Toggle theme</span><span class="keys"><kbd>Alt</kbd><kbd>J</kbd></span></button>
+              <button class="kbd-row" type="button" data-shortcut-action="clear"><span class="lab">Clear form</span><span class="keys"><kbd>Alt</kbd><kbd>K</kbd></span></button>
             </div>
           </div>
 
@@ -2247,6 +2232,87 @@
     iptables: "iptables (Linux)", nftables: "nftables (Linux)"
   };
 
+  let recentRunCache = [];
+  function _recentScoreClass(score) {
+    const n = Number(score);
+    if (!Number.isFinite(n)) return "";
+    return n >= 85 ? "ok" : n >= 65 ? "warn" : "bad";
+  }
+  function _recentTimeLabel(value) {
+    if (!value) return "now";
+    const dt = new Date(value);
+    if (Number.isNaN(dt.getTime())) return "now";
+    const seconds = Math.max(0, Math.floor((Date.now() - dt.getTime()) / 1000));
+    if (seconds < 60) return "now";
+    const minutes = Math.floor(seconds / 60);
+    if (minutes < 60) return `${minutes}m ago`;
+    const hours = Math.floor(minutes / 60);
+    if (hours < 24) return `${hours}h ago`;
+    return dt.toLocaleDateString();
+  }
+  function renderRecentRuns() {
+    const el = document.getElementById("sideRecentRuns");
+    if (!el) return;
+    const runs = recentRunCache.slice(0, 5);
+    if (!runs.length) {
+      el.innerHTML = `<div class="run-row is-empty">
+        <div>
+          <div class="rn" style="color:var(--ink-4)">No recent runs</div>
+          <div class="rn-sub">Run your first audit to see results here</div>
+        </div>
+      </div>`;
+      return;
+    }
+    el.innerHTML = runs.map(r => {
+      const vendor = VENDOR_LABELS[r.vendor] || r.vendor || "Unknown";
+      const score = r.summary?.score ?? r.score;
+      const reportAttr = r.report ? ` data-report="${escHtml(r.report)}"` : "";
+      return `<div class="run-row"${reportAttr}>
+        <div>
+          <div class="rn">${escHtml(r.tag || r.filename || "Audit run")}</div>
+          <div class="rn-sub">${escHtml(vendor)}${r.summary?.total != null ? " &middot; " + escHtml(String(r.summary.total)) + " findings" : ""}</div>
+        </div>
+        <div>
+          <div class="rn-score ${_recentScoreClass(score)}">${score != null ? escHtml(String(score)) : "—"}</div>
+          <div class="rn-score-sub">${escHtml(_recentTimeLabel(r.timestamp))}</div>
+        </div>
+      </div>`;
+    }).join("");
+    el.querySelectorAll("[data-report]").forEach(row => {
+      row.addEventListener("click", () => window.open(`/reports/${encodeURIComponent(row.dataset.report)}/view`, "_blank"));
+    });
+  }
+  function addRecentRun(run) {
+    const normalized = {
+      filename: run.filename || "Audit run",
+      vendor: run.detected_vendor || run.vendor || "",
+      tag: run.tag || document.getElementById("deviceTag")?.value?.trim() || "",
+      summary: run.summary || {},
+      score: run.summary?.score,
+      report: run.report || "",
+      timestamp: run.timestamp || new Date().toISOString(),
+    };
+    recentRunCache = [normalized, ...recentRunCache].slice(0, 5);
+    renderRecentRuns();
+  }
+  async function loadRecentRuns() {
+    try {
+      const res = await fetch("/archive");
+      if (!res.ok) return;
+      const entries = await res.json();
+      recentRunCache = (entries || []).slice(0, 5).map(e => ({
+        filename: e.filename,
+        vendor: e.vendor,
+        tag: e.tag,
+        summary: e.summary || {},
+        score: e.summary?.score,
+        timestamp: e.timestamp,
+      }));
+      renderRecentRuns();
+    } catch (_) {}
+  }
+  loadRecentRuns();
+
   function detectVendorFromContent(text, filename) {
     const lower = text.toLowerCase();
     const fname = filename.toLowerCase();
@@ -2365,13 +2431,47 @@
     });
   })();
 
-  // ⌘/Ctrl+Enter submits the audit form
+  function isAuditSingleVisible() {
+    return !document.getElementById('tab-audit')?.classList.contains('hidden')
+        && !document.getElementById('audit-mode-single')?.classList.contains('hidden');
+  }
+  function submitSingleAuditShortcut() {
+    if (!isAuditSingleVisible()) switchTab("audit");
+    document.getElementById('auditForm')?.requestSubmit?.();
+  }
+  function clearSingleAuditForm() {
+    switchTab("audit");
+    const form = document.getElementById("auditForm");
+    form?.reset();
+    updateFileField("configFileField", "fileName", null);
+    document.getElementById("resultsSection")?.classList.add("hidden");
+    document.getElementById("auditFormMeta").textContent = "Ready";
+    syncComplianceSelector();
+  }
+  function openLastReportShortcut() {
+    const report = lastAuditData?.report || recentRunCache.find(r => r.report)?.report;
+    if (report) window.open(`/reports/${encodeURIComponent(report)}/view`, "_blank");
+  }
+  function runShortcutAction(action) {
+    if (action === "run") submitSingleAuditShortcut();
+    if (action === "report") openLastReportShortcut();
+    if (action === "theme") document.getElementById("themeToggle")?.click();
+    if (action === "clear") clearSingleAuditForm();
+  }
+  document.querySelectorAll("[data-shortcut-action]").forEach(btn => {
+    btn.addEventListener("click", () => runShortcutAction(btn.dataset.shortcutAction));
+  });
   document.addEventListener('keydown', function(e) {
     if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') {
       e.preventDefault();
-      const singleVisible = !document.getElementById('audit-mode-single')?.classList.contains('hidden');
-      if (singleVisible) document.getElementById('auditForm')?.dispatchEvent(new Event('submit', {bubbles: true, cancelable: true}));
+      submitSingleAuditShortcut();
+      return;
     }
+    if (!e.altKey || e.metaKey || e.ctrlKey || e.shiftKey) return;
+    if (e.key === "Enter") { e.preventDefault(); runShortcutAction("run"); }
+    if (e.key === "l" || e.key === "L") { e.preventDefault(); runShortcutAction("report"); }
+    if (e.key === "j" || e.key === "J") { e.preventDefault(); runShortcutAction("theme"); }
+    if (e.key === "k" || e.key === "K") { e.preventDefault(); runShortcutAction("clear"); }
   });
 
   // ── Findings display state ─────────────────────────────────────────────────
@@ -2693,6 +2793,7 @@
     else { document.getElementById("archiveRow").classList.add("hidden"); }
 
     lastAuditData = data;
+    addRecentRun(data);
     document.getElementById("exportRow").classList.remove("hidden");
 
     /* Show remediation plan button when there are findings */
@@ -3000,6 +3101,7 @@
         return;
       }
       renderConnectResults(data);
+      addRecentRun(data);
     } catch (err) {
       document.getElementById("connectResults").classList.remove("hidden");
       document.getElementById("connFindingsList").innerHTML = `<div class="alert alert-error">Unexpected error: ${escHtml(err.message)}</div>`;
@@ -4879,7 +4981,7 @@
     {% if not demo_mode %}
     document.getElementById("remPlanOpenPdf")?.addEventListener("click", async () => {
       if (!lastPlanPayload) return;
-      const win = window.open("", "_blank", "noopener");
+      const win = window.open("about:blank", "_blank");
       if (!win) {
         alert("Could not open a new tab for the PDF. Please allow popups for this site.");
         return;

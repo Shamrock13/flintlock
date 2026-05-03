@@ -1,11 +1,9 @@
 """Route tests for /remediation-plan and /demo/sample-report.pdf."""
 
 import os
-import re
 import sys
 import tempfile
 import unittest
-import zlib
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "src"))
 
@@ -132,14 +130,33 @@ class TestRemediationPdfInline(unittest.TestCase):
         self.assertIn("attachment", cd)
 
     def test_remediation_pdf_uses_platform_version(self):
+        from cashel.html_pdf import render_report_html
+
         resp = self.client.post(
             "/remediation-plan?fmt=pdf",
             json={**SAMPLE_PAYLOAD, "summary": SAMPLE_SUMMARY},
         )
         self.assertEqual(resp.status_code, 200)
-        streams = re.findall(rb"stream\n(.*?)\nendstream", resp.data, flags=re.S)
-        decoded = b"\n".join(zlib.decompress(s) for s in streams)
-        self.assertIn(b"2.0.0", decoded)
+        self.assertTrue(resp.data.startswith(b"%PDF"))
+
+        html = render_report_html(
+            "remediation_report_pdf.html",
+            report={
+                "filename": "test.txt",
+                "vendor_label": "Cisco",
+                "compliance": "Basic hygiene",
+                "generated_date": "May 1, 2026",
+                "generated_time": "12:00:00 UTC",
+                "summary": SAMPLE_SUMMARY,
+                "total_steps": 1,
+                "phases": [],
+                "disclaimer": "Review commands before applying them.",
+                "tool_version": "2.0.0",
+            },
+        )
+        self.assertIn("Cashel", html)
+        self.assertIn("Remediation report", html)
+        self.assertIn("2.0.0", html)
 
 
 class TestReportViewer(unittest.TestCase):
@@ -366,9 +383,21 @@ class TestModalMarkup(unittest.TestCase):
     def test_remediation_open_pdf_uses_synchronous_blank_tab(self):
         body = self._index_template()
 
-        self.assertIn('const win = window.open("", "_blank", "noopener");', body)
+        self.assertIn('const win = window.open("about:blank", "_blank");', body)
         self.assertIn("win.location.href = url;", body)
         self.assertNotIn("Popup blocked", body)
+
+    def test_recent_runs_and_shortcuts_are_wired(self):
+        body = self._index_template()
+
+        self.assertIn("let recentRunCache = []", body)
+        self.assertIn("function addRecentRun(run)", body)
+        self.assertIn("addRecentRun(data);", body)
+        self.assertIn('data-shortcut-action="run"', body)
+        self.assertIn('data-shortcut-action="report"', body)
+        self.assertIn('data-shortcut-action="theme"', body)
+        self.assertIn('data-shortcut-action="clear"', body)
+        self.assertIn("Alt</kbd><kbd>Enter", body)
 
     def test_history_and_schedule_actions_are_clickable(self):
         body = self._index_template()

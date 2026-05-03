@@ -26,6 +26,18 @@ This guide covers deploying Cashel behind a TLS-terminating reverse proxy. The a
 - A domain name with DNS pointed at your server (for TLS)
 - Ports 80 and 443 open on the host firewall
 
+Cashel generates audit reports, remediation reports, and evidence bundle covers
+from HTML/CSS using Playwright Chromium. The official Docker image installs
+Chromium during build. For non-Docker deployments, install Python dependencies
+and then run:
+
+```bash
+python -m playwright install chromium
+```
+
+Set `CASHEL_PDF_PAGE_FORMAT` to override the default `Letter` page size, or
+`CASHEL_PDF_TIMEOUT_MS` to tune the render timeout.
+
 ---
 
 ## Environment Variables
