@@ -10,7 +10,13 @@ from cashel.pfsense import (
     audit_pfsense,
     check_any_any_pf,
     check_missing_logging_pf,
+    check_redundant_rules_pf,
     check_wan_any_source_pf,
+    expand_address,
+    expand_addresses,
+    expand_port,
+    expand_ports,
+    parse_pfsense_config,
     parse_pfsense,
 )
 from cashel.remediation import generate_plan
@@ -58,6 +64,88 @@ PFSENSE_RICH = """\
 </pfsense>
 """
 
+PFSENSE_ALIASES = """\
+<?xml version="1.0"?>
+<pfsense>
+  <aliases>
+    <alias>
+      <name>LAN_NETS</name>
+      <type>network</type>
+      <address>10.10.0.0/16 10.20.0.0/16</address>
+      <descr>Internal LAN networks</descr>
+    </alias>
+    <alias>
+      <name>WEB_SERVERS</name>
+      <type>host</type>
+      <address>10.30.20.10 10.30.20.11</address>
+    </alias>
+    <alias>
+      <name>ANY_SOURCES</name>
+      <type>network</type>
+      <address>any</address>
+    </alias>
+    <alias>
+      <name>MGMT_PORTS</name>
+      <type>port</type>
+      <address>22 443 8443</address>
+    </alias>
+    <alias>
+      <name>REMOTE_SOURCES</name>
+      <type>urltable</type>
+      <url>https://example.com/sources.txt</url>
+      <descr>Remote source table</descr>
+    </alias>
+  </aliases>
+  <filter>
+    <rule>
+      <tracker>2001</tracker>
+      <type>pass</type>
+      <interface>wan</interface>
+      <source><address>ANY_SOURCES</address></source>
+      <destination>
+        <any/>
+        <port>MGMT_PORTS</port>
+      </destination>
+      <protocol>tcp</protocol>
+      <descr>Alias Any Pass</descr>
+    </rule>
+    <rule>
+      <tracker>2002</tracker>
+      <type>pass</type>
+      <interface>lan</interface>
+      <source><address>LAN_NETS</address></source>
+      <destination>
+        <address>WEB_SERVERS</address>
+        <port>MGMT_PORTS</port>
+      </destination>
+      <protocol>tcp</protocol>
+      <descr>Alias Web A</descr>
+    </rule>
+    <rule>
+      <tracker>2003</tracker>
+      <type>pass</type>
+      <interface>lan</interface>
+      <source><address>LAN_NETS</address></source>
+      <destination>
+        <address>WEB_SERVERS</address>
+        <port>MGMT_PORTS</port>
+      </destination>
+      <protocol>tcp</protocol>
+      <descr>Alias Web B</descr>
+    </rule>
+    <rule>
+      <tracker>2004</tracker>
+      <type>block</type>
+      <interface>wan</interface>
+      <source><address>ANY_SOURCES</address></source>
+      <destination><any/></destination>
+      <protocol>any</protocol>
+      <descr>Alias Block All</descr>
+    </rule>
+  </filter>
+</pfsense>
+"""
+
 
 def _write_tmp(content: str) -> str:
     fd, path = tempfile.mkstemp(suffix=".xml")
@@ -72,12 +160,32 @@ def _rules():
     return rules
 
 
+def _alias_config():
+    path = _write_tmp(PFSENSE_ALIASES)
+    try:
+        config, error = parse_pfsense_config(path)
+    finally:
+        os.unlink(path)
+    assert error is None
+    return config
+
+
 def test_parse_pfsense_returns_rules_and_error_tuple():
     rules, error = parse_pfsense(os.path.join(TESTS_DIR, "test_pfsense.xml"))
 
     assert error is None
     assert rules
     assert rules[0]["descr"] == "Allow All"
+
+
+def test_parse_pfsense_config_returns_rules_and_alias_dictionaries():
+    config = _alias_config()
+
+    assert config["rules"]
+    assert "LAN_NETS" in config["aliases"]
+    assert "LAN_NETS" in config["address_aliases"]
+    assert "MGMT_PORTS" in config["port_aliases"]
+    assert "REMOTE_SOURCES" in config["url_aliases"]
 
 
 def test_parse_pfsense_captures_rule_evidence_and_metadata_fields():
@@ -102,6 +210,14 @@ def test_audit_pfsense_returns_existing_public_shape():
     assert findings
     assert rules
     assert all(isinstance(finding, dict) for finding in findings)
+
+
+def test_rule_quality_still_accepts_parse_pfsense_rule_list():
+    rules, error = parse_pfsense(os.path.join(TESTS_DIR, "test_pfsense.xml"))
+
+    assert error is None
+    findings = check_shadow_rules_pfsense(rules)
+    assert findings
 
 
 def test_pfsense_legacy_helper_shape_still_works():
@@ -145,6 +261,10 @@ def test_pfsense_any_any_finding_includes_rule_metadata():
     assert metadata["type"] == "pass"
     assert metadata["action"] == "pass"
     assert metadata["log"] is False
+    assert metadata["raw_source"] == "1"
+    assert metadata["raw_destination"] == "1"
+    assert metadata["expanded_source"] == ["any"]
+    assert metadata["expanded_destination"] == ["any"]
 
 
 def test_pfsense_missing_logging_finding_includes_logging_metadata():
@@ -215,8 +335,84 @@ def test_pfsense_old_and_plain_findings_remain_compatible():
     assert "suggested_commands" not in step
 
 
-def test_rule_quality_still_accepts_pfsense_rule_list():
-    findings = check_shadow_rules_pfsense(_rules())
+def test_pfsense_alias_parser_captures_addresses_ports_urls_and_descriptions():
+    config = _alias_config()
 
-    assert findings
-    assert findings[0]["id"] == "CASHEL-PFSENSE-REDUNDANCY-001"
+    assert config["address_aliases"]["LAN_NETS"]["address"] == [
+        "10.10.0.0/16",
+        "10.20.0.0/16",
+    ]
+    assert config["address_aliases"]["WEB_SERVERS"]["type"] == "host"
+    assert config["port_aliases"]["MGMT_PORTS"]["address"] == ["22", "443", "8443"]
+    assert config["url_aliases"]["REMOTE_SOURCES"]["url"] == (
+        "https://example.com/sources.txt"
+    )
+    assert config["url_aliases"]["REMOTE_SOURCES"]["descr"] == "Remote source table"
+
+
+def test_pfsense_alias_expansion_preserves_unknowns_and_normalizes_broad_values():
+    config = _alias_config()
+
+    assert expand_address("LAN_NETS", config["address_aliases"]) == [
+        "10.10.0.0/16",
+        "10.20.0.0/16",
+    ]
+    assert expand_address("REMOTE_SOURCES", config["address_aliases"]) == [
+        "https://example.com/sources.txt"
+    ]
+    assert expand_address("UNKNOWN_ALIAS", config["address_aliases"]) == [
+        "UNKNOWN_ALIAS"
+    ]
+    assert expand_addresses(["1", "*", "any"], config["address_aliases"]) == ["any"]
+    assert expand_port("MGMT_PORTS", config["port_aliases"]) == ["22", "443", "8443"]
+    assert expand_port("UNKNOWN_PORT", config["port_aliases"]) == ["UNKNOWN_PORT"]
+    assert expand_ports(["", "*", "1"], config["port_aliases"]) == ["any"]
+
+
+def test_pfsense_any_any_detection_uses_alias_expansion():
+    finding = check_any_any_pf(_alias_config()["rules"])[0]
+
+    assert finding["rule_name"] == "Alias Any Pass"
+    assert finding["metadata"]["raw_source"] == "ANY_SOURCES"
+    assert finding["metadata"]["expanded_source"] == ["any"]
+    assert "Replace source alias ANY_SOURCES" in "\n".join(
+        finding["suggested_commands"]
+    )
+
+
+def test_pfsense_wan_any_source_detection_uses_alias_expansion():
+    finding = check_wan_any_source_pf(_alias_config()["rules"])[0]
+
+    assert finding["rule_name"] == "Alias Any Pass"
+    assert finding["metadata"]["expanded_source"] == ["any"]
+
+
+def test_pfsense_redundant_detection_uses_expanded_alias_scope():
+    findings = check_redundant_rules_pf(_alias_config()["rules"])
+    duplicate = next(f for f in findings if f["rule_name"] == "Alias Web B")
+
+    assert duplicate["id"] == "CASHEL-PFSENSE-REDUNDANCY-002"
+    assert duplicate["metadata"]["expanded_source"] == [
+        "10.10.0.0/16",
+        "10.20.0.0/16",
+    ]
+    assert duplicate["metadata"]["expanded_destination_port"] == ["22", "443", "8443"]
+
+
+def test_pfsense_alias_exports_preserve_expanded_fields():
+    finding = check_any_any_pf(_alias_config()["rules"])[0]
+    entry = {
+        "filename": "config.xml",
+        "vendor": "pfsense",
+        "findings": [finding],
+        "summary": {"total": 1},
+    }
+
+    json_out = json.loads(to_json(entry))
+    assert json_out["findings"][0]["metadata"]["raw_source"] == "ANY_SOURCES"
+    assert json_out["findings"][0]["metadata"]["expanded_source"] == ["any"]
+
+    sarif_out = json.loads(to_sarif(entry))
+    assert sarif_out["runs"][0]["results"][0]["ruleId"] == (
+        "CASHEL-PFSENSE-EXPOSURE-001"
+    )

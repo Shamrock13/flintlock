@@ -4,6 +4,8 @@ from defusedxml import ElementTree as ET
 
 from .models.findings import make_finding
 
+_BROAD_VALUES = {"", "1", "any", "*"}
+
 
 def _f(
     severity,
@@ -66,6 +68,7 @@ def _rule_evidence(rule):
 
 
 def _rule_metadata(rule):
+    scope = _rule_scope(rule)
     return {
         "rule_description": rule.get("descr", ""),
         "interface": rule.get("interface", ""),
@@ -80,6 +83,7 @@ def _rule_metadata(rule):
         "disabled": rule.get("disabled", False),
         "tracker": rule.get("tracker", ""),
         "raw": _rule_evidence(rule),
+        **scope,
     }
 
 
@@ -130,13 +134,133 @@ def _rule_endpoint(rule, field):
     return rule.findtext(f"{field}/address") or "specific"
 
 
-def parse_pfsense(filepath):
-    """Parse a pfSense XML config and return firewall rules"""
+def _split_alias_values(value):
+    return sorted(part for part in (value or "").split() if part)
+
+
+def _normalize_broad(value):
+    text = (value or "").strip()
+    if text.lower() in _BROAD_VALUES:
+        return "any"
+    return text
+
+
+def _stable_unique(values):
+    seen = set()
+    output = []
+    for value in values:
+        if value not in seen:
+            seen.add(value)
+            output.append(value)
+    return sorted(output)
+
+
+def _parse_aliases(root):
+    aliases = {}
+    address_aliases = {}
+    port_aliases = {}
+    url_aliases = {}
+
+    for alias in root.findall(".//aliases/alias"):
+        name = alias.findtext("name") or ""
+        if not name:
+            continue
+        alias_type = (alias.findtext("type") or "unknown").lower()
+        address_values = _split_alias_values(alias.findtext("address") or "")
+        data = {
+            "name": name,
+            "type": alias_type,
+            "address": address_values,
+            "url": alias.findtext("url") or "",
+            "descr": alias.findtext("descr") or "",
+        }
+        aliases[name] = data
+        if alias_type == "port":
+            port_aliases[name] = data
+        if alias_type in {"host", "network", "url", "urltable", "urltable_ports"}:
+            address_aliases[name] = data
+        if alias_type in {"url", "urltable", "urltable_ports"}:
+            url_aliases[name] = data
+
+    return aliases, address_aliases, port_aliases, url_aliases
+
+
+def expand_address(name, aliases):
+    normalized = _normalize_broad(name)
+    if normalized == "any":
+        return ["any"]
+    alias = aliases.get(normalized)
+    if alias:
+        if alias.get("url"):
+            return [alias["url"]]
+        values = alias.get("address") or []
+        if values:
+            return _stable_unique(_normalize_broad(value) for value in values)
+    return [normalized]
+
+
+def expand_addresses(names, aliases):
+    return _stable_unique(
+        value for name in names for value in expand_address(name, aliases)
+    )
+
+
+def expand_port(name, aliases):
+    normalized = _normalize_broad(name)
+    if normalized == "any":
+        return ["any"]
+    alias = aliases.get(normalized)
+    if alias:
+        values = alias.get("address") or []
+        if values:
+            return _stable_unique(_normalize_broad(value) for value in values)
+    return [normalized]
+
+
+def expand_ports(names, aliases):
+    return _stable_unique(
+        value for name in names for value in expand_port(name, aliases)
+    )
+
+
+def _attach_alias_context(config):
+    for rule in config["rules"]:
+        rule["_aliases"] = config["aliases"]
+        rule["_address_aliases"] = config["address_aliases"]
+        rule["_port_aliases"] = config["port_aliases"]
+        rule["_url_aliases"] = config["url_aliases"]
+
+
+def _rule_scope(rule):
+    address_aliases = rule.get("_address_aliases", {})
+    port_aliases = rule.get("_port_aliases", {})
+    raw_source = rule.get("source", "")
+    raw_destination = rule.get("destination", "")
+    raw_source_port = rule.get("source_port", "")
+    raw_destination_port = rule.get("destination_port", "")
+    return {
+        "raw_source": raw_source,
+        "raw_destination": raw_destination,
+        "raw_source_port": raw_source_port,
+        "raw_destination_port": raw_destination_port,
+        "expanded_source": expand_addresses([raw_source], address_aliases),
+        "expanded_destination": expand_addresses([raw_destination], address_aliases),
+        "expanded_source_port": expand_ports([raw_source_port], port_aliases),
+        "expanded_destination_port": expand_ports([raw_destination_port], port_aliases),
+    }
+
+
+def _is_broad(values):
+    return "any" in {_normalize_broad(value).lower() for value in values}
+
+
+def parse_pfsense_config(filepath):
+    """Parse a pfSense XML config into rules and alias dictionaries."""
     try:
         tree = ET.parse(filepath)
         root = tree.getroot()
     except ET.ParseError as e:
-        return None, f"Failed to parse pfSense config: {e}"
+        return {}, f"Failed to parse pfSense config: {e}"
 
     rules = []
     for rule in root.findall(".//filter/rule"):
@@ -156,14 +280,46 @@ def parse_pfsense(filepath):
         }
         rules.append(r)
 
-    return rules, None
+    aliases, address_aliases, port_aliases, url_aliases = _parse_aliases(root)
+    config = {
+        "rules": rules,
+        "aliases": aliases,
+        "address_aliases": address_aliases,
+        "port_aliases": port_aliases,
+        "url_aliases": url_aliases,
+    }
+    _attach_alias_context(config)
+    return config, None
+
+
+def parse_pfsense(filepath):
+    """Parse a pfSense XML config and return firewall rules"""
+    config, error = parse_pfsense_config(filepath)
+    if error:
+        return None, error
+    return config["rules"], None
 
 
 def check_any_any_pf(rules):
     findings = []
     for r in rules:
-        if r["type"] == "pass" and r["source"] == "1" and r["destination"] == "1":
+        scope = _rule_scope(r)
+        if (
+            r["type"] == "pass"
+            and _is_broad(scope["expanded_source"])
+            and _is_broad(scope["expanded_destination"])
+        ):
             name = r["descr"] or "unnamed"
+            source_action = (
+                f"Replace source alias {r['source']} with <SPECIFIC_SOURCE_ALIAS>"
+                if r["source"] not in {"1", "any", "*", ""}
+                else "Set source to <SPECIFIC_SOURCE_ALIAS>"
+            )
+            destination_action = (
+                f"Replace destination alias {r['destination']} with <SPECIFIC_DESTINATION_ALIAS>"
+                if r["destination"] not in {"1", "any", "*", ""}
+                else "Set destination to <SPECIFIC_DESTINATION_ALIAS>"
+            )
             findings.append(
                 _f(
                     "HIGH",
@@ -183,8 +339,8 @@ def check_any_any_pf(rules):
                         rollback="Restore the prior rule from a pfSense config backup if approved traffic is disrupted.",
                         suggested_commands=_rule_guidance(
                             r,
-                            "Set source to <SPECIFIC_SOURCE_ALIAS>",
-                            "Set destination to <SPECIFIC_DESTINATION_ALIAS>",
+                            source_action,
+                            destination_action,
                             "Disable or remove the rule only after confirming no approved traffic depends on it",
                         ),
                     ),
@@ -224,7 +380,9 @@ def check_missing_logging_pf(rules):
 
 def check_deny_all_pf(rules):
     has_deny_all = any(
-        r["type"] == "block" and r["source"] == "1" and r["destination"] == "1"
+        r["type"] == "block"
+        and _is_broad(_rule_scope(r)["expanded_source"])
+        and _is_broad(_rule_scope(r)["expanded_destination"])
         for r in rules
     )
     if has_deny_all:
@@ -261,7 +419,15 @@ def check_redundant_rules_pf(rules):
     seen = []
     for r in rules:
         name = r["descr"] or "unnamed"
-        sig = (r["type"], r["source"], r["destination"], r["protocol"])
+        scope = _rule_scope(r)
+        sig = (
+            r["type"],
+            tuple(scope["expanded_source"]),
+            tuple(scope["expanded_destination"]),
+            r["protocol"],
+            tuple(scope["expanded_source_port"]),
+            tuple(scope["expanded_destination_port"]),
+        )
         if sig in seen:
             findings.append(
                 _f(
@@ -334,9 +500,14 @@ def check_wan_any_source_pf(rules):
         if (
             r["type"] == "pass"
             and r["interface"].lower() == "wan"
-            and r["source"] == "1"
+            and _is_broad(_rule_scope(r)["expanded_source"])
         ):
             name = r["descr"] or "unnamed"
+            source_action = (
+                f"Replace source alias {r['source']} with <APPROVED_EXTERNAL_SOURCE_ALIAS>"
+                if r["source"] not in {"1", "any", "*", ""}
+                else "Set source to <APPROVED_EXTERNAL_SOURCE_ALIAS>"
+            )
             findings.append(
                 _f(
                     "HIGH",
@@ -356,7 +527,7 @@ def check_wan_any_source_pf(rules):
                         rollback="Restore the prior source value from a pfSense config backup if approved access is disrupted.",
                         suggested_commands=_rule_guidance(
                             r,
-                            "Set source to <APPROVED_EXTERNAL_SOURCE_ALIAS>",
+                            source_action,
                             "Confirm destination and destination port match only the required service",
                         ),
                     ),
@@ -366,7 +537,7 @@ def check_wan_any_source_pf(rules):
 
 
 def audit_pfsense(filepath):
-    rules, error = parse_pfsense(filepath)
+    config, error = parse_pfsense_config(filepath)
     if error:
         return [
             _f(
@@ -383,6 +554,7 @@ def audit_pfsense(filepath):
                 metadata={"filepath": filepath},
             )
         ], []
+    rules = config["rules"]
 
     findings = []
     findings += check_any_any_pf(rules)
