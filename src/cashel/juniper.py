@@ -25,6 +25,7 @@ _INSECURE_APPS = {
     "junos-snmp-agentx",
 }
 _BROAD_ADDRS = {"any", "any-ipv4", "any-ipv6"}
+_BROAD_APPS = {"any", "any-ipv4", "any-ipv6", "junos-any", "all", "*"}
 
 
 def _f(
@@ -89,6 +90,7 @@ def _policy_evidence(policy: dict) -> str:
 
 
 def _policy_metadata(policy: dict) -> dict:
+    scope = _policy_scope(policy)
     return {
         "policy_name": policy.get("name", ""),
         "from_zone": policy.get("from_zone", ""),
@@ -102,6 +104,7 @@ def _policy_metadata(policy: dict) -> dict:
         "session_close": policy.get("session_close", False),
         "disabled": policy.get("disabled", False),
         "raw": _policy_evidence(policy),
+        **scope,
     }
 
 
@@ -156,6 +159,295 @@ def _system_metadata(
     }
     data.update(extra)
     return data
+
+
+def _empty_address_book() -> dict:
+    return {"addresses": {}, "address_sets": {}}
+
+
+def _normalize_broad(value: str) -> str:
+    text = (value or "").strip()
+    if text.lower() in _BROAD_APPS:
+        return "any"
+    return text
+
+
+def _stable_unique(values) -> list[str]:
+    seen = set()
+    output = []
+    for value in values:
+        if value not in seen:
+            seen.add(value)
+            output.append(value)
+    return sorted(output)
+
+
+def _is_broad(values: list[str]) -> bool:
+    return "any" in {_normalize_broad(value).lower() for value in values}
+
+
+def _address_book_for_zone(address_books: dict, zone: str | None) -> dict:
+    if zone and zone in address_books.get("zones", {}):
+        return address_books["zones"][zone]
+    return _empty_address_book()
+
+
+def _parse_address_value(rest: str) -> tuple[str, str]:
+    if rest.startswith("dns-name "):
+        return "dns-name", rest[len("dns-name ") :].strip()
+    if rest.startswith("range-address "):
+        return "range-address", rest[len("range-address ") :].strip()
+    if rest:
+        return "ip-prefix", rest
+    return "unknown", rest
+
+
+def _parse_address_books(content: str) -> dict:
+    books = {"global": _empty_address_book(), "zones": {}}
+    for raw_line in content.splitlines():
+        line = raw_line.strip()
+
+        m = re.match(r"^set security address-book global address (\S+) (.+)$", line)
+        if m:
+            name, rest = m.groups()
+            value_type, value = _parse_address_value(rest)
+            books["global"]["addresses"][name] = {
+                "name": name,
+                "value": value,
+                "type": value_type,
+                "scope": "global",
+            }
+            continue
+
+        m = re.match(
+            r"^set security address-book global address-set (\S+) (address|address-set) (\S+)$",
+            line,
+        )
+        if m:
+            set_name, member_type, member = m.groups()
+            address_set = books["global"]["address_sets"].setdefault(
+                set_name,
+                {
+                    "name": set_name,
+                    "addresses": [],
+                    "address_sets": [],
+                    "scope": "global",
+                },
+            )
+            key = "addresses" if member_type == "address" else "address_sets"
+            address_set[key].append(member)
+            continue
+
+        m = re.match(
+            r"^set security zones security-zone (\S+) address-book address (\S+) (.+)$",
+            line,
+        )
+        if m:
+            zone, name, rest = m.groups()
+            zone_book = books["zones"].setdefault(zone, _empty_address_book())
+            value_type, value = _parse_address_value(rest)
+            zone_book["addresses"][name] = {
+                "name": name,
+                "value": value,
+                "type": value_type,
+                "scope": zone,
+            }
+            continue
+
+        m = re.match(
+            r"^set security zones security-zone (\S+) address-book address-set (\S+) (address|address-set) (\S+)$",
+            line,
+        )
+        if m:
+            zone, set_name, member_type, member = m.groups()
+            zone_book = books["zones"].setdefault(zone, _empty_address_book())
+            address_set = zone_book["address_sets"].setdefault(
+                set_name,
+                {"name": set_name, "addresses": [], "address_sets": [], "scope": zone},
+            )
+            key = "addresses" if member_type == "address" else "address_sets"
+            address_set[key].append(member)
+
+    return books
+
+
+def _parse_applications(content: str) -> tuple[dict, dict]:
+    applications: dict = {}
+    application_sets: dict = {}
+    for raw_line in content.splitlines():
+        line = raw_line.strip()
+
+        m = re.match(
+            r"^set applications application (\S+) (protocol|destination-port|source-port) (.+)$",
+            line,
+        )
+        if m:
+            name, field, value = m.groups()
+            app = applications.setdefault(
+                name,
+                {
+                    "name": name,
+                    "protocol": "",
+                    "destination-port": "",
+                    "source-port": "",
+                },
+            )
+            app[field] = value.strip()
+            continue
+
+        m = re.match(
+            r"^set applications application-set (\S+) (application|application-set) (\S+)$",
+            line,
+        )
+        if m:
+            set_name, member_type, member = m.groups()
+            app_set = application_sets.setdefault(
+                set_name,
+                {"name": set_name, "applications": [], "application_sets": []},
+            )
+            key = "applications" if member_type == "application" else "application_sets"
+            app_set[key].append(member)
+
+    return applications, application_sets
+
+
+def expand_address(name, address_books, zone=None, _seen=None) -> list[str]:
+    normalized = _normalize_broad(name)
+    if normalized == "any":
+        return ["any"]
+
+    seen = set() if _seen is None else set(_seen)
+    scope_key = (zone or "global", normalized)
+    if scope_key in seen:
+        return []
+    seen.add(scope_key)
+
+    zone_book = _address_book_for_zone(address_books, zone)
+    global_book = address_books.get("global", _empty_address_book())
+
+    if normalized in zone_book.get("address_sets", {}):
+        address_set = zone_book["address_sets"][normalized]
+        return _stable_unique(
+            [
+                value
+                for member in address_set.get("addresses", [])
+                for value in expand_address(member, address_books, zone, seen)
+            ]
+            + [
+                value
+                for member in address_set.get("address_sets", [])
+                for value in expand_address(member, address_books, zone, seen)
+            ]
+        )
+
+    if normalized in global_book.get("address_sets", {}):
+        address_set = global_book["address_sets"][normalized]
+        return _stable_unique(
+            [
+                value
+                for member in address_set.get("addresses", [])
+                for value in expand_address(member, address_books, zone, seen)
+            ]
+            + [
+                value
+                for member in address_set.get("address_sets", [])
+                for value in expand_address(member, address_books, zone, seen)
+            ]
+        )
+
+    if normalized in zone_book.get("addresses", {}):
+        return [zone_book["addresses"][normalized].get("value") or normalized]
+
+    if normalized in global_book.get("addresses", {}):
+        return [global_book["addresses"][normalized].get("value") or normalized]
+
+    return [normalized]
+
+
+def expand_addresses(names, address_books, zone=None) -> list[str]:
+    return _stable_unique(
+        value for name in names for value in expand_address(name, address_books, zone)
+    )
+
+
+def expand_application(name, applications, application_sets, _seen=None) -> list[str]:
+    normalized = _normalize_broad(name)
+    if normalized == "any":
+        return ["any"]
+
+    seen = set() if _seen is None else set(_seen)
+    if normalized in seen:
+        return []
+    seen.add(normalized)
+
+    if normalized in application_sets:
+        app_set = application_sets[normalized]
+        return _stable_unique(
+            [
+                value
+                for member in app_set.get("applications", [])
+                for value in expand_application(
+                    member, applications, application_sets, seen
+                )
+            ]
+            + [
+                value
+                for member in app_set.get("application_sets", [])
+                for value in expand_application(
+                    member, applications, application_sets, seen
+                )
+            ]
+        )
+
+    if normalized in applications:
+        app = applications[normalized]
+        protocol = app.get("protocol", "")
+        destination_port = app.get("destination-port", "")
+        if protocol and destination_port:
+            return [f"{protocol}/{destination_port}"]
+        return [normalized]
+
+    return [normalized]
+
+
+def expand_applications(names, applications, application_sets) -> list[str]:
+    return _stable_unique(
+        value
+        for name in names
+        for value in expand_application(name, applications, application_sets)
+    )
+
+
+def _attach_expansion_context(config: dict) -> None:
+    for policy in config["policies"]:
+        policy["_address_books"] = config["address_books"]
+        policy["_applications"] = config["applications"]
+        policy["_application_sets"] = config["application_sets"]
+
+
+def _policy_scope(policy: dict) -> dict:
+    address_books = policy.get(
+        "_address_books", {"global": _empty_address_book(), "zones": {}}
+    )
+    applications = policy.get("_applications", {})
+    application_sets = policy.get("_application_sets", {})
+    raw_src = policy.get("src", [])
+    raw_dst = policy.get("dst", [])
+    raw_app = policy.get("app", [])
+    return {
+        "raw_source_address": raw_src,
+        "raw_destination_address": raw_dst,
+        "raw_application": raw_app,
+        "expanded_source_address": expand_addresses(
+            raw_src or ["any"], address_books, policy.get("from_zone")
+        ),
+        "expanded_destination_address": expand_addresses(
+            raw_dst or ["any"], address_books, policy.get("to_zone")
+        ),
+        "expanded_application": expand_applications(
+            raw_app or ["any"], applications, application_sets
+        ),
+    }
 
 
 # ── Config-style detection ────────────────────────────────────────────────────
@@ -345,23 +637,42 @@ def _parse_hierarchical(content: str) -> list[dict]:
 # ── Public parser ─────────────────────────────────────────────────────────────
 
 
-def parse_juniper(filepath: str) -> tuple[list[dict], str | None]:
-    """Parse a Juniper SRX config file.
-
-    Returns (policies, error_message).  error_message is None on success.
-    """
+def parse_juniper_config(filepath: str) -> tuple[dict, str | None]:
+    """Parse a Juniper SRX config into policies, raw content, and objects."""
     try:
         with open(filepath) as fh:
             content = fh.read()
     except OSError as exc:
-        return [], f"Failed to read Juniper config: {exc}"
+        return {}, f"Failed to read Juniper config: {exc}"
 
     if _is_set_style(content):
         policies = _parse_set_style(content)
     else:
         policies = _parse_hierarchical(content)
 
-    return policies, content  # return content so caller can do system checks
+    address_books = _parse_address_books(content)
+    applications, application_sets = _parse_applications(content)
+    config = {
+        "policies": policies,
+        "content": content,
+        "address_books": address_books,
+        "global_address_book": address_books["global"],
+        "applications": applications,
+        "application_sets": application_sets,
+    }
+    _attach_expansion_context(config)
+    return config, None
+
+
+def parse_juniper(filepath: str) -> tuple[list[dict], str | None]:
+    """Parse a Juniper SRX config file.
+
+    Returns (policies, error_message). error_message is None on success.
+    """
+    config, error = parse_juniper_config(filepath)
+    if error:
+        return [], error
+    return config["policies"], None
 
 
 # ── Policy-level checks ───────────────────────────────────────────────────────
@@ -373,12 +684,10 @@ def check_any_any_juniper(policies: list[dict]) -> list[dict]:
     for p in policies:
         if p.get("disabled") or p.get("action") != "permit":
             continue
-        src_broad = all(s.lower() in _BROAD_ADDRS for s in (p["src"] or ["any"]))
-        dst_broad = all(d.lower() in _BROAD_ADDRS for d in (p["dst"] or ["any"]))
-        app_any = any(
-            a.lower() in ("any", "any-ipv4", "any-ipv6", "junos-any")
-            for a in (p["app"] or ["any"])
-        )
+        scope = _policy_scope(p)
+        src_broad = _is_broad(scope["expanded_source_address"])
+        dst_broad = _is_broad(scope["expanded_destination_address"])
+        app_any = _is_broad(scope["expanded_application"])
         if src_broad and dst_broad and app_any:
             label = _policy_label(p)
             findings.append(
@@ -451,12 +760,18 @@ def check_insecure_apps_juniper(policies: list[dict]) -> list[dict]:
     for p in policies:
         if p.get("disabled") or p.get("action") != "permit":
             continue
-        bad = [a for a in p.get("app", []) if a.lower() in _INSECURE_APPS]
+        expanded_apps = _policy_scope(p)["expanded_application"]
+        bad = [
+            a
+            for a in expanded_apps
+            if a.lower() in _INSECURE_APPS
+            or a.lower() in {"tcp/23", "tcp/21", "udp/69"}
+        ]
         if not bad:
             continue
         label = _policy_label(p)
         # Telnet is CRITICAL; other insecure apps are HIGH
-        has_telnet = any(a.lower() in ("telnet", "junos-telnet") for a in bad)
+        has_telnet = any(a.lower() in ("telnet", "junos-telnet", "tcp/23") for a in bad)
         severity = "CRITICAL" if has_telnet else "HIGH"
         findings.append(
             _f(
@@ -500,11 +815,10 @@ def check_deny_all_juniper(policies: list[dict]) -> list[dict]:
     findings = []
     for (fz, tz), pollist in zone_pairs.items():
         last = pollist[-1]
-        src_any = all(s.lower() in _BROAD_ADDRS for s in (last["src"] or ["any"]))
-        dst_any = all(d.lower() in _BROAD_ADDRS for d in (last["dst"] or ["any"]))
-        app_any = any(
-            a.lower() in ("any", "junos-any") for a in (last["app"] or ["any"])
-        )
+        scope = _policy_scope(last)
+        src_any = _is_broad(scope["expanded_source_address"])
+        dst_any = _is_broad(scope["expanded_destination_address"])
+        app_any = _is_broad(scope["expanded_application"])
         is_deny = last.get("action") in ("deny", "reject")
         if not (src_any and dst_any and app_any and is_deny):
             findings.append(
@@ -762,19 +1076,18 @@ def audit_juniper(filepath: str) -> tuple[list[dict], list[dict]]:
     Returns (findings, policies) where policies is the normalised list of
     security policy dicts (used for compliance re-checks and shadow detection).
     """
-    policies, content_or_err = parse_juniper(filepath)
+    config, error = parse_juniper_config(filepath)
 
-    if isinstance(content_or_err, str) and not policies:
-        # parse_juniper returned an error string
+    if error:
         return [
             _f(
                 "HIGH",
                 "parse",
-                f"[HIGH] Parse error: {content_or_err}",
+                f"[HIGH] Parse error: {error}",
                 "",
                 id="CASHEL-JUNIPER-PARSE-001",
                 title="Juniper configuration could not be parsed",
-                evidence=content_or_err,
+                evidence=error,
                 affected_object=filepath,
                 confidence="high",
                 verification="Confirm the file exists and is a readable Juniper SRX configuration, then re-run the audit.",
@@ -782,7 +1095,8 @@ def audit_juniper(filepath: str) -> tuple[list[dict], list[dict]]:
             )
         ], []
 
-    content: str = content_or_err or ""  # parse_juniper returns content on success
+    policies = config["policies"]
+    content = config["content"]
 
     findings: list[dict] = []
     findings += check_system_juniper(content)

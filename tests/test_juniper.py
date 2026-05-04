@@ -15,12 +15,18 @@ from cashel.juniper import (
     _f,
     _parse_set_style,
     _parse_hierarchical,
-    check_any_any_juniper,
-    check_missing_log_juniper,
-    check_insecure_apps_juniper,
-    check_deny_all_juniper,
-    check_system_juniper,
     audit_juniper,
+    check_any_any_juniper,
+    check_deny_all_juniper,
+    check_insecure_apps_juniper,
+    check_missing_log_juniper,
+    check_system_juniper,
+    expand_address,
+    expand_addresses,
+    expand_application,
+    expand_applications,
+    parse_juniper,
+    parse_juniper_config,
 )
 from cashel.remediation import generate_plan
 from cashel.rule_quality import check_shadow_rules_juniper
@@ -116,6 +122,53 @@ security {
         }
     }
 }
+"""
+
+SET_STYLE_OBJECTS = """\
+set system host-name srx-objects
+set system services telnet
+set security address-book global address HR-NET 10.20.10.0/24
+set security address-book global address WEB-SERVER 10.30.20.50/32
+set security address-book global address APP-FQDN dns-name app.example.com
+set security address-book global address RANGE-OBJ range-address 10.40.1.10 to 10.40.1.20
+set security address-book global address ANY-OBJ any
+set security address-book global address-set INTERNAL-USERS address HR-NET
+set security address-book global address-set INTERNAL-USERS address VPN-USERS
+set security address-book global address-set NESTED-USERS address-set INTERNAL-USERS
+set security address-book global address-set NESTED-USERS address WEB-SERVER
+set security address-book global address-set BROAD-USERS address ANY-OBJ
+set security address-book global address-set CYCLE-A address-set CYCLE-B
+set security address-book global address-set CYCLE-B address-set CYCLE-A
+set security zones security-zone trust address-book address TRUST-HOST 10.10.10.10/32
+set security zones security-zone trust address-book address-set TRUST-USERS address HR-NET
+set applications application TCP-8443 protocol tcp
+set applications application TCP-8443 destination-port 8443
+set applications application UDP-5353 protocol udp
+set applications application UDP-5353 destination-port 5353
+set applications application SRC-RANGE protocol tcp
+set applications application SRC-RANGE source-port 1024-65535
+set applications application SRC-RANGE destination-port 9443
+set applications application LEGACY-TELNET protocol tcp
+set applications application LEGACY-TELNET destination-port 23
+set applications application-set APP-SERVICES application junos-https
+set applications application-set APP-SERVICES application TCP-8443
+set applications application-set APP-SERVICES application LEGACY-TELNET
+set applications application-set NESTED-SERVICES application-set APP-SERVICES
+set applications application-set BROAD-APPS application junos-any
+set applications application-set APP-CYCLE-A application-set APP-CYCLE-B
+set applications application-set APP-CYCLE-B application-set APP-CYCLE-A
+set security policies from-zone trust to-zone untrust policy broad-object-rule match source-address BROAD-USERS
+set security policies from-zone trust to-zone untrust policy broad-object-rule match destination-address any
+set security policies from-zone trust to-zone untrust policy broad-object-rule match application BROAD-APPS
+set security policies from-zone trust to-zone untrust policy broad-object-rule then permit
+set security policies from-zone trust to-zone untrust policy app-set-telnet match source-address TRUST-USERS
+set security policies from-zone trust to-zone untrust policy app-set-telnet match destination-address WEB-SERVER
+set security policies from-zone trust to-zone untrust policy app-set-telnet match application APP-SERVICES
+set security policies from-zone trust to-zone untrust policy app-set-telnet then permit log
+set security policies from-zone trust to-zone untrust policy expanded-deny match source-address BROAD-USERS
+set security policies from-zone trust to-zone untrust policy expanded-deny match destination-address any
+set security policies from-zone trust to-zone untrust policy expanded-deny match application BROAD-APPS
+set security policies from-zone trust to-zone untrust policy expanded-deny then deny
 """
 
 
@@ -368,6 +421,182 @@ def _write_tmp(content: str) -> str:
     with os.fdopen(fd, "w") as fh:
         fh.write(content)
     return path
+
+
+def _object_config():
+    path = _write_tmp(SET_STYLE_OBJECTS)
+    try:
+        config, error = parse_juniper_config(path)
+    finally:
+        os.unlink(path)
+    assert error is None
+    return config
+
+
+def test_parse_juniper_success_returns_policies_and_no_error():
+    path = _write_tmp(SET_STYLE_CLEAN)
+    try:
+        policies, error = parse_juniper(path)
+    finally:
+        os.unlink(path)
+
+    assert error is None
+    assert policies
+    assert all(isinstance(policy, dict) for policy in policies)
+
+
+def test_parse_juniper_missing_file_returns_error_tuple():
+    policies, error = parse_juniper("/nonexistent/path.conf")
+
+    assert policies == []
+    assert error
+    assert "Failed to read Juniper config" in error
+
+
+def test_parse_juniper_config_returns_content_and_objects():
+    config = _object_config()
+
+    assert config["policies"]
+    assert "set applications application TCP-8443 protocol tcp" in config["content"]
+    assert (
+        config["global_address_book"]["addresses"]["HR-NET"]["value"] == "10.20.10.0/24"
+    )
+    assert config["address_books"]["global"] is config["global_address_book"]
+    assert config["applications"]["TCP-8443"]["protocol"] == "tcp"
+    assert config["application_sets"]["APP-SERVICES"]["applications"] == [
+        "junos-https",
+        "TCP-8443",
+        "LEGACY-TELNET",
+    ]
+
+
+def test_rule_quality_accepts_parse_juniper_policy_list():
+    path = _write_tmp(SET_STYLE_RISKY)
+    try:
+        policies, error = parse_juniper(path)
+    finally:
+        os.unlink(path)
+
+    assert error is None
+    findings = check_shadow_rules_juniper(policies)
+    assert findings
+
+
+def test_audit_juniper_uses_policy_and_raw_system_checks():
+    path = _write_tmp(SET_STYLE_OBJECTS)
+    try:
+        findings, policies = audit_juniper(path)
+    finally:
+        os.unlink(path)
+
+    assert policies
+    assert any(f["id"] == "CASHEL-JUNIPER-EXPOSURE-001" for f in findings)
+    assert any(f["id"] == "CASHEL-JUNIPER-MANAGEMENT-001" for f in findings)
+
+
+def test_juniper_global_and_zone_address_parsing():
+    config = _object_config()
+    global_book = config["address_books"]["global"]
+    zone_book = config["address_books"]["zones"]["trust"]
+
+    assert global_book["addresses"]["HR-NET"]["type"] == "ip-prefix"
+    assert global_book["addresses"]["APP-FQDN"]["type"] == "dns-name"
+    assert global_book["addresses"]["APP-FQDN"]["value"] == "app.example.com"
+    assert global_book["addresses"]["RANGE-OBJ"]["type"] == "range-address"
+    assert global_book["addresses"]["RANGE-OBJ"]["value"] == "10.40.1.10 to 10.40.1.20"
+    assert zone_book["addresses"]["TRUST-HOST"]["value"] == "10.10.10.10/32"
+
+
+def test_juniper_address_set_parsing_and_nested_expansion():
+    config = _object_config()
+    address_books = config["address_books"]
+
+    assert address_books["global"]["address_sets"]["INTERNAL-USERS"]["addresses"] == [
+        "HR-NET",
+        "VPN-USERS",
+    ]
+    assert expand_address("NESTED-USERS", address_books) == [
+        "10.20.10.0/24",
+        "10.30.20.50/32",
+        "VPN-USERS",
+    ]
+    assert expand_address("TRUST-USERS", address_books, zone="trust") == [
+        "10.20.10.0/24"
+    ]
+
+
+def test_juniper_address_cycle_unknown_and_broad_normalization():
+    address_books = _object_config()["address_books"]
+
+    assert expand_address("CYCLE-A", address_books) == []
+    assert expand_address("UNKNOWN-ADDR", address_books) == ["UNKNOWN-ADDR"]
+    assert expand_addresses(["all", "*", "any-ipv4"], address_books) == ["any"]
+
+
+def test_juniper_application_parsing_and_expansion():
+    config = _object_config()
+    applications = config["applications"]
+    application_sets = config["application_sets"]
+
+    assert applications["TCP-8443"]["protocol"] == "tcp"
+    assert applications["TCP-8443"]["destination-port"] == "8443"
+    assert applications["UDP-5353"]["protocol"] == "udp"
+    assert applications["UDP-5353"]["destination-port"] == "5353"
+    assert applications["SRC-RANGE"]["source-port"] == "1024-65535"
+    assert expand_application("NESTED-SERVICES", applications, application_sets) == [
+        "junos-https",
+        "tcp/23",
+        "tcp/8443",
+    ]
+
+
+def test_juniper_application_cycle_unknown_and_broad_normalization():
+    config = _object_config()
+
+    assert (
+        expand_application(
+            "APP-CYCLE-A", config["applications"], config["application_sets"]
+        )
+        == []
+    )
+    assert expand_application(
+        "UNKNOWN-APP", config["applications"], config["application_sets"]
+    ) == ["UNKNOWN-APP"]
+    assert expand_applications(
+        ["all", "*", "junos-any"], config["applications"], config["application_sets"]
+    ) == ["any"]
+
+
+def test_juniper_findings_include_raw_and_expanded_scope_metadata():
+    finding = check_any_any_juniper(_object_config()["policies"])[0]
+    metadata = finding["metadata"]
+
+    assert metadata["raw_source_address"] == ["BROAD-USERS"]
+    assert metadata["raw_destination_address"] == ["any"]
+    assert metadata["raw_application"] == ["BROAD-APPS"]
+    assert metadata["expanded_source_address"] == ["any"]
+    assert metadata["expanded_destination_address"] == ["any"]
+    assert metadata["expanded_application"] == ["any"]
+
+
+def test_any_any_detection_uses_expanded_address_and_application_sets():
+    findings = check_any_any_juniper(_object_config()["policies"])
+
+    assert any(f["rule_name"] == "broad-object-rule" for f in findings)
+
+
+def test_insecure_application_detection_uses_expanded_application_sets():
+    findings = check_insecure_apps_juniper(_object_config()["policies"])
+    finding = next(f for f in findings if f["rule_name"] == "app-set-telnet")
+
+    assert finding["id"] == "CASHEL-JUNIPER-PROTOCOL-001"
+    assert "tcp/23" in finding["metadata"]["insecure_applications"]
+
+
+def test_deny_all_detection_recognizes_expanded_any_policy():
+    findings = check_deny_all_juniper(_object_config()["policies"])
+
+    assert findings == []
 
 
 def test_audit_juniper_risky():
