@@ -2845,13 +2845,25 @@
   function exportCSV() {
     if (!lastAuditData) return;
     const findings = lastAuditData.enriched_findings || [];
-    const rows = [["severity","category","message","remediation"]];
+    const rows = [["id","vendor","severity","category","title","message","remediation","evidence","affected_object","rule_name","confidence"]];
     for (const f of findings) {
       if (typeof f === "string") {
         const sev = f.includes("[HIGH]") ? "HIGH" : f.includes("[MEDIUM]") ? "MEDIUM" : "";
-        rows.push([sev, "", f, ""]);
+        rows.push(["", "", sev, "", "", f, "", "", "", "", ""]);
       } else {
-        rows.push([f.severity||"", f.category||"", f.message||"", f.remediation||""]);
+        rows.push([
+          f.id || "",
+          f.vendor || "",
+          f.severity || "",
+          f.category || "",
+          f.title || "",
+          f.message || "",
+          f.remediation || "",
+          f.evidence || "",
+          f.affected_object || "",
+          f.rule_name || "",
+          f.confidence || "",
+        ]);
       }
     }
     const csv = rows.map(r => r.map(v => '"' + String(v).replace(/"/g, '""') + '"').join(",")).join("\n");
@@ -2868,16 +2880,24 @@
       const severity   = (!isStr && f.severity)   || (String(f).includes("[HIGH]") ? "HIGH" : "MEDIUM");
       const message    = (!isStr && f.message)    || String(f);
       const remediation = (!isStr && f.remediation) || "";
-      const ruleId     = "FLK-" + category.toUpperCase();
+      const title      = (!isStr && f.title) || category.replace(/-/g," ").replace(/\b\w/g, c => c.toUpperCase());
+      const ruleId     = (!isStr && f.id) || "FLK-" + category.toUpperCase();
       if (!seenRules[ruleId]) {
         seenRules[ruleId] = {
           id: ruleId,
-          name: category.replace(/-/g," ").replace(/\b\w/g, c => c.toUpperCase()),
-          shortDescription: {text: "Cashel " + category + " check"},
+          name: title,
+          shortDescription: {text: title},
           properties: {category},
         };
       }
       const result = {ruleId, level: severity === "HIGH" ? "error" : "warning", message: {text: message}, locations: []};
+      if (!isStr) {
+        const props = {};
+        ["vendor","category","evidence","affected_object","rule_name","confidence","verification","rollback"].forEach(k => {
+          if (f[k]) props[k] = f[k];
+        });
+        if (Object.keys(props).length) result.properties = props;
+      }
       if (remediation) result.fixes = [{description: {text: remediation}}];
       return result;
     });

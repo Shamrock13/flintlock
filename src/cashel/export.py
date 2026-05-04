@@ -68,19 +68,35 @@ def to_csv(entry: dict) -> str:
     buf = io.StringIO()
     writer = csv.writer(buf, quoting=csv.QUOTE_ALL)
     writer.writerow(
-        ["id", "title", "severity", "category", "message", "evidence", "remediation"]
+        [
+            "id",
+            "vendor",
+            "severity",
+            "category",
+            "title",
+            "message",
+            "remediation",
+            "evidence",
+            "affected_object",
+            "rule_name",
+            "confidence",
+        ]
     )
     for f in entry.get("findings", []):
         severity, category, message, remediation = _parse_plain(f)
         writer.writerow(
             [
                 _field(f, "id"),
-                _field(f, "title"),
+                _field(f, "vendor"),
                 severity,
                 category,
+                _field(f, "title"),
                 message,
-                _field(f, "evidence"),
                 remediation,
+                _field(f, "evidence"),
+                _field(f, "affected_object"),
+                _field(f, "rule_name"),
+                _field(f, "confidence"),
             ]
         )
     return buf.getvalue()
@@ -126,7 +142,16 @@ def to_sarif(entry: dict) -> str:
         }
         if isinstance(f, dict):
             properties = {}
-            for key in ("evidence", "affected_object", "confidence"):
+            for key in (
+                "vendor",
+                "category",
+                "evidence",
+                "affected_object",
+                "rule_name",
+                "confidence",
+                "verification",
+                "rollback",
+            ):
                 if f.get(key):
                     properties[key] = f[key]
             if properties:

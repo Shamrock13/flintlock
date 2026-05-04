@@ -94,6 +94,24 @@ def _finding_title(message: str) -> str:
     return text.strip(" :-") or "Finding"
 
 
+def _finding_commands(finding) -> str:
+    if not isinstance(finding, dict):
+        return ""
+    commands = finding.get("suggested_commands")
+    if isinstance(commands, list):
+        return "\n".join(str(command) for command in commands if command)
+    return str(commands or "")
+
+
+def _finding_metadata(finding) -> str:
+    if not isinstance(finding, dict) or not isinstance(finding.get("metadata"), dict):
+        return ""
+    metadata = {
+        k: v for k, v in finding["metadata"].items() if not str(k).startswith("_")
+    }
+    return json.dumps(metadata, sort_keys=True) if metadata else ""
+
+
 def finding_rows(findings) -> list[dict[str, Any]]:
     rows = []
     for idx, finding in enumerate(findings or [], start=1):
@@ -104,16 +122,44 @@ def finding_rows(findings) -> list[dict[str, Any]]:
                 "index": idx,
                 "severity": sev.title(),
                 "severity_key": sev.lower(),
-                "title": _finding_title(msg),
+                "id": finding.get("id", "") if isinstance(finding, dict) else "",
+                "vendor": finding.get("vendor", "")
+                if isinstance(finding, dict)
+                else "",
+                "title": (
+                    finding.get("title")
+                    if isinstance(finding, dict) and finding.get("title")
+                    else _finding_title(msg)
+                ),
                 "message": msg,
                 "category": (
                     finding.get("category", "") if isinstance(finding, dict) else ""
                 ),
                 "remediation": (
-                    finding.get("remediation", "")
+                    finding.get("remediation", "") if isinstance(finding, dict) else ""
+                ),
+                "evidence": finding.get("evidence", "")
+                if isinstance(finding, dict)
+                else "",
+                "affected_object": (
+                    finding.get("affected_object", "")
                     if isinstance(finding, dict)
                     else ""
                 ),
+                "rule_name": (
+                    finding.get("rule_name", "") if isinstance(finding, dict) else ""
+                ),
+                "confidence": (
+                    finding.get("confidence", "") if isinstance(finding, dict) else ""
+                ),
+                "verification": (
+                    finding.get("verification", "") if isinstance(finding, dict) else ""
+                ),
+                "rollback": (
+                    finding.get("rollback", "") if isinstance(finding, dict) else ""
+                ),
+                "suggested_commands": _finding_commands(finding),
+                "metadata": _finding_metadata(finding),
             }
         )
     return rows
@@ -137,7 +183,9 @@ def _summary_from_findings(findings, summary=None) -> dict[str, Any]:
         if sev in counts:
             counts[sev] += 1
     total = sum(counts.values())
-    score = max(0, 100 - counts["CRITICAL"] * 20 - counts["HIGH"] * 10 - counts["MEDIUM"] * 3)
+    score = max(
+        0, 100 - counts["CRITICAL"] * 20 - counts["HIGH"] * 10 - counts["MEDIUM"] * 3
+    )
     return {
         "critical": counts["CRITICAL"],
         "high": counts["HIGH"],

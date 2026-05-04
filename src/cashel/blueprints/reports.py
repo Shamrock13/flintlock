@@ -17,6 +17,7 @@ from cashel.extensions import limiter
 from cashel.remediation import generate_plan, plan_to_markdown, plan_to_pdf
 from cashel.reporter import (
     VENDOR_DISPLAY,
+    finding_rows,
     generate_cover_pdf,
     generate_report,
     report_sidecar_path,
@@ -65,9 +66,7 @@ def _fmt_generated(value, fallback_ts):
                 dt.strftime("%H:%M:%S UTC"),
             )
     dt = datetime.fromtimestamp(fallback_ts, timezone.utc)
-    return dt.strftime("%B %d, %Y").replace(" 0", " "), dt.strftime(
-        "%H:%M:%S UTC"
-    )
+    return dt.strftime("%B %d, %Y").replace(" 0", " "), dt.strftime("%H:%M:%S UTC")
 
 
 def _compliance_label(value):
@@ -84,63 +83,12 @@ def _compliance_label(value):
     return labels.get(str(value).lower(), str(value))
 
 
-def _finding_message(finding):
-    return finding.get("message", "") if isinstance(finding, dict) else str(finding)
-
-
-def _finding_severity(finding):
-    if isinstance(finding, dict) and finding.get("severity"):
-        return str(finding["severity"]).upper()
-    msg = _finding_message(finding).upper()
-    if "[CRITICAL]" in msg or "CRITICAL" in msg:
-        return "CRITICAL"
-    if "[HIGH]" in msg or "HIGH" in msg:
-        return "HIGH"
-    if "[MEDIUM]" in msg or "MEDIUM" in msg:
-        return "MEDIUM"
-    if "[LOW]" in msg or "LOW" in msg:
-        return "LOW"
-    return "INFO"
-
-
-def _finding_title(message):
-    text = message
-    for tag in ("[CRITICAL]", "[HIGH]", "[MEDIUM]", "[LOW]", "[INFO]"):
-        text = text.replace(tag, "")
-    return text.strip(" :-") or "Finding"
-
-
-def _finding_rows(findings):
-    rows = []
-    for idx, finding in enumerate(findings or [], start=1):
-        msg = _finding_message(finding)
-        sev = _finding_severity(finding)
-        rows.append(
-            {
-                "index": idx,
-                "severity": sev.title(),
-                "severity_key": sev.lower(),
-                "title": _finding_title(msg),
-                "message": msg,
-                "category": (
-                    finding.get("category", "") if isinstance(finding, dict) else ""
-                ),
-                "remediation": (
-                    finding.get("remediation", "")
-                    if isinstance(finding, dict)
-                    else ""
-                ),
-            }
-        )
-    return rows
-
-
 def _viewer_context(path, filename):
     metadata = _load_report_metadata(path) or {}
     fallback = not bool(metadata)
     summary = metadata.get("summary") or {}
     findings = metadata.get("findings") or []
-    rows = _finding_rows(findings)
+    rows = finding_rows(findings)
     total = summary.get("total", len(rows))
     critical = summary.get("critical", 0)
     high = summary.get("high", 0)

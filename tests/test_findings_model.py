@@ -1,6 +1,10 @@
 """Tests for normalized finding helpers."""
 
-from cashel.models.findings import make_finding, normalize_finding
+from cashel.models.findings import (
+    make_finding,
+    normalize_finding,
+    validate_finding_shape,
+)
 
 
 def test_make_finding_returns_backward_compatible_dict():
@@ -51,3 +55,35 @@ def test_normalize_finding_handles_plain_string():
     assert finding["category"] == ""
     assert finding["message"] == "[HIGH] Plain archive finding"
     assert finding["remediation"] == ""
+
+
+def test_validate_finding_shape_reports_normalized_shape_issues():
+    finding = make_finding(
+        "HIGH",
+        "exposure",
+        "[HIGH] Test finding",
+        "Fix it.",
+        id="CASHEL-TEST-001",
+        vendor="ASA",
+        title="Test finding",
+        evidence="permit ip any any",
+        affected_object="OUTSIDE_IN",
+        suggested_commands=["access-list <ACL_NAME> deny ip any any log"],
+        metadata={"acl": "OUTSIDE_IN"},
+    )
+
+    problems = validate_finding_shape(finding)
+
+    assert "vendor must be lowercase: ASA" in problems
+
+
+def test_validate_finding_shape_accepts_legacy_and_plain_findings():
+    legacy = {
+        "severity": "MEDIUM",
+        "category": "logging",
+        "message": "[MEDIUM] Missing logging",
+        "remediation": "Enable logging.",
+    }
+
+    assert validate_finding_shape(legacy) == []
+    assert validate_finding_shape("[HIGH] Plain archive finding") == []

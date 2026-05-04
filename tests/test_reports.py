@@ -32,9 +32,19 @@ def _ensure_user_exists():
 SAMPLE_PAYLOAD = {
     "findings": [
         {
+            "id": "CASHEL-ASA-EXPOSURE-001",
+            "vendor": "asa",
             "severity": "HIGH",
             "category": "exposure",
+            "title": "Any-any rule",
             "message": "[HIGH] permit ip any any",
+            "evidence": "access-list OUTSIDE_IN permit ip any any",
+            "affected_object": "OUTSIDE_IN",
+            "confidence": "high",
+            "verification": "Re-run the audit after replacing the rule.",
+            "rollback": "Restore the prior ACL line from backup.",
+            "suggested_commands": ["no access-list <ACL_NAME> permit ip any any"],
+            "metadata": {"acl": "OUTSIDE_IN"},
             "remediation": "Replace with specific rules.",
         }
     ],
@@ -42,7 +52,14 @@ SAMPLE_PAYLOAD = {
     "filename": "test.txt",
 }
 
-SAMPLE_SUMMARY = {"critical": 1, "high": 2, "medium": 3, "low": 0, "total": 6, "score": 51}
+SAMPLE_SUMMARY = {
+    "critical": 1,
+    "high": 2,
+    "medium": 3,
+    "low": 0,
+    "total": 6,
+    "score": 51,
+}
 
 
 class TestRemediationPdfInline(unittest.TestCase):
@@ -214,7 +231,11 @@ class TestReportViewer(unittest.TestCase):
         )
 
     def _write_report_with_sidecar(self):
-        from cashel.reporter import generate_report, report_sidecar_path, write_report_sidecar
+        from cashel.reporter import (
+            generate_report,
+            report_sidecar_path,
+            write_report_sidecar,
+        )
 
         path = os.path.join(self.tmp_dir, "cashel_report_test.pdf")
         findings = SAMPLE_PAYLOAD["findings"]
@@ -251,6 +272,9 @@ class TestReportViewer(unittest.TestCase):
         self.assertIn("Cisco", body)
         self.assertIn("51", body)
         self.assertIn("permit ip any any", body)
+        self.assertIn("CASHEL-ASA-EXPOSURE-001", body)
+        self.assertIn("Re-run the audit after replacing the rule.", body)
+        self.assertIn("no access-list", body)
         self.assertIn("csh_test_123", body)
 
     def test_report_viewer_falls_back_without_sidecar(self):
@@ -333,7 +357,14 @@ class TestModalMarkup(unittest.TestCase):
         self.assertIn(">View Remediation Plan<", body)
         self.assertIn(">Download<", body)
         self.assertIn("downloadMenuPanel", body)
-        for label in (">Report PDF<", ">Remediation PDF<", ">JSON<", ">CSV<", ">SARIF<", ">Markdown<"):
+        for label in (
+            ">Report PDF<",
+            ">Remediation PDF<",
+            ">JSON<",
+            ">CSV<",
+            ">SARIF<",
+            ">Markdown<",
+        ):
             self.assertIn(label, body)
         action_area = body[
             body.index('<div class="actions-row">') : body.index(
@@ -343,6 +374,22 @@ class TestModalMarkup(unittest.TestCase):
         for glyph in ("&#8681;", "&#128196;", "&#10003;"):
             self.assertNotIn(glyph, action_area)
 
+    def test_browser_exports_preserve_enriched_finding_fields(self):
+        body = self._index_template()
+
+        self.assertIn(
+            '[["id","vendor","severity","category","title","message","remediation","evidence","affected_object","rule_name","confidence"]]',
+            body,
+        )
+        self.assertIn(
+            'const ruleId     = (!isStr && f.id) || "FLK-" + category.toUpperCase();',
+            body,
+        )
+        self.assertIn(
+            '["vendor","category","evidence","affected_object","rule_name","confidence","verification","rollback"]',
+            body,
+        )
+
     def test_download_menu_flows_right_from_pill(self):
         style_path = os.path.join(
             os.path.dirname(__file__), "..", "src", "cashel", "static", "style.css"
@@ -350,12 +397,22 @@ class TestModalMarkup(unittest.TestCase):
         with open(style_path, encoding="utf-8") as fh:
             css = fh.read()
 
-        self.assertIn(".download-menu-panel { position: absolute; top: calc(100% + 10px); left: 0;", css)
-        self.assertNotIn(".download-menu-panel { position: absolute; top: calc(100% + 10px); right: 0;", css)
+        self.assertIn(
+            ".download-menu-panel { position: absolute; top: calc(100% + 10px); left: 0;",
+            css,
+        )
+        self.assertNotIn(
+            ".download-menu-panel { position: absolute; top: calc(100% + 10px); right: 0;",
+            css,
+        )
 
     def test_bulk_results_use_modal_actions_not_details(self):
         body = self._index_template()
-        bulk_fn = body[body.index("function renderBulkResults") : body.index("// ══════════════════════════════════════════════════════ SCHEDULES")]
+        bulk_fn = body[
+            body.index("function renderBulkResults") : body.index(
+                "// ══════════════════════════════════════════════════════ SCHEDULES"
+            )
+        ]
 
         self.assertIn("bulk-item", bulk_fn)
         self.assertIn("View Results", bulk_fn)
@@ -367,13 +424,13 @@ class TestModalMarkup(unittest.TestCase):
     def test_remediation_modal_has_branding_and_glyph_free_tools(self):
         body = self._index_template()
         rem_modal = body[
-            body.index('<div class="modal-overlay hidden" id="remediationModal"') : body.index(
-                '<div id="remediationModalBody">'
-            )
+            body.index(
+                '<div class="modal-overlay hidden" id="remediationModal"'
+            ) : body.index('<div id="remediationModalBody">')
         ]
 
         self.assertIn("<span>Cashel</span>", rem_modal)
-        self.assertIn("<span class=\"kind\">Remediation report</span>", rem_modal)
+        self.assertIn('<span class="kind">Remediation report</span>', rem_modal)
         self.assertIn(">Open PDF<", rem_modal)
         self.assertIn(">Download PDF<", rem_modal)
         self.assertIn(">Markdown<", rem_modal)
@@ -415,7 +472,9 @@ class TestModalMarkup(unittest.TestCase):
     def test_schedule_form_sections_and_notification_targets(self):
         body = self._index_template()
         schedule = body[
-            body.index('<form id="scheduleForm">') : body.index("</form>", body.index('<form id="scheduleForm">'))
+            body.index('<form id="scheduleForm">') : body.index(
+                "</form>", body.index('<form id="scheduleForm">')
+            )
         ]
         labels = [
             '<div class="label">Name &amp; platform</div>',
@@ -445,8 +504,14 @@ class TestModalMarkup(unittest.TestCase):
         with open(style_path, encoding="utf-8") as fh:
             css = fh.read()
 
-        self.assertIn('class="log-tag ${e.action ? escHtml(e.action) : ""}${ok ? "" : " fail"}"', body)
-        self.assertIn('class="log-tag ${e.event ? escHtml(e.event) : ""}${ok ? "" : " fail"}"', body)
+        self.assertIn(
+            'class="log-tag ${e.action ? escHtml(e.action) : ""}${ok ? "" : " fail"}"',
+            body,
+        )
+        self.assertIn(
+            'class="log-tag ${e.event ? escHtml(e.event) : ""}${ok ? "" : " fail"}"',
+            body,
+        )
         for selector in (
             ".log-tag.file_audit",
             ".log-tag.ssh_connect",
@@ -469,7 +534,10 @@ class TestModalMarkup(unittest.TestCase):
         self.assertIn('class="btn-outline action-pill-control license-buy-link"', body)
         self.assertIn("support@cashel.app", body)
         self.assertNotIn("support@cashel.dev", body)
-        self.assertIn('class="btn-primary action-pill-control btn-activate-license" id="activateLicenseBtn">Activate</button>', body)
+        self.assertIn(
+            'class="btn-primary action-pill-control btn-activate-license" id="activateLicenseBtn">Activate</button>',
+            body,
+        )
         self.assertIn(".license-activation-field .ctrl", css)
         self.assertIn(".btn-activate-license", css)
         self.assertIn(".license-buy-link", css)
@@ -554,12 +622,18 @@ class TestModalMarkup(unittest.TestCase):
     def test_uptime_formatter_thresholds_are_encoded(self):
         body = self._index_template()
 
-        self.assertIn('if (days > 0) return `${days}d ${hours}h`;', body)
-        self.assertIn('if (hours > 0) return `${hours}h ${minutes}m`;', body)
-        self.assertIn('if (minutes > 0) return `${minutes}m ${seconds}s`;', body)
-        self.assertIn('return `${seconds}s`;', body)
+        self.assertIn("if (days > 0) return `${days}d ${hours}h`;", body)
+        self.assertIn("if (hours > 0) return `${hours}h ${minutes}m`;", body)
+        self.assertIn("if (minutes > 0) return `${minutes}m ${seconds}s`;", body)
+        self.assertIn("return `${seconds}s`;", body)
 
     def test_tab_lists_do_not_render_transient_loading_text(self):
         body = self._index_template()
-        self.assertNotIn('id="schedulesList" class="schedules-list">\n          <p class="text-muted">Loading', body)
-        self.assertNotIn('id="historyList" class="history-list" style="margin-top:24px">\n          <p class="text-muted">Loading', body)
+        self.assertNotIn(
+            'id="schedulesList" class="schedules-list">\n          <p class="text-muted">Loading',
+            body,
+        )
+        self.assertNotIn(
+            'id="historyList" class="history-list" style="margin-top:24px">\n          <p class="text-muted">Loading',
+            body,
+        )

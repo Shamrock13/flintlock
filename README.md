@@ -75,13 +75,13 @@ Cashel supports on-prem firewall configs, Linux host firewall configs, and cloud
 |---|---|---:|---|
 | AWS Security Groups | JSON | — | Audit only; no rule-order shadowing |
 | Azure NSG | JSON | — | Includes priority-based shadow checks |
-| Cisco ASA / FTD | Text | ✓ | ASA has the deepest evidence-backed finding coverage today |
-| Fortinet FortiGate | Text | ✓ | Includes policy checks and shadow detection |
+| Cisco ASA / FTD | Text | ✓ | ASA audit findings are evidence-backed and normalized |
+| Fortinet FortiGate | Text | ✓ | Enriched findings with address/service object expansion and shadow detection |
 | GCP VPC Firewall | JSON | — | Audit only |
 | iptables / nftables | Text | ✓ | Linux host firewall checks |
-| Juniper SRX | Text | ✓ | Includes zone-pair shadow detection |
-| Palo Alto Networks | XML | ✓ | Includes rulebase checks and shadow detection |
-| pfSense | XML | ✓ | Includes interface-aware shadow detection |
+| Juniper SRX | Text | ✓ | Enriched findings with address-book/application-set expansion and zone-pair shadow detection |
+| Palo Alto Networks | XML | ✓ | Enriched findings with address/service/application expansion and shadow detection |
+| pfSense | XML | ✓ | Enriched findings with alias expansion and interface-aware shadow detection |
 
 Full list of vendor-specific checks: [docs/checks.md](docs/checks.md)
 
@@ -112,7 +112,7 @@ Full list of vendor-specific checks: [docs/checks.md](docs/checks.md)
 - **Remediation reports** — grouped remediation steps with evidence, guidance, verification, rollback, and suggested commands when available
 - **Evidence bundles** — ZIP package containing report artifacts such as PDF, JSON, CSV, SARIF, and cover material
 - **JSON** — preserves full enriched finding dictionaries
-- **CSV** — spreadsheet-friendly export with core enriched columns
+- **CSV** — spreadsheet-friendly export with stable IDs, vendor, title, evidence, affected object, rule name, confidence, and remediation columns
 - **SARIF** — security tooling integration using stable finding IDs where present
 - **REST API** — pipeline-friendly audit endpoint returning JSON findings
 

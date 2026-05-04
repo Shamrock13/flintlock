@@ -272,8 +272,14 @@ body {
       </div>
       <div class="finding-body">
         <div class="kv-row"><span class="k">Finding</span><span class="v mono-line">{{ finding.message }}</span></div>
+        {% if finding.id %}<div class="kv-row"><span class="k">ID</span><span class="v mono-line">{{ finding.id }}</span></div>{% endif %}
         {% if finding.category %}<div class="kv-row"><span class="k">Category</span><span class="v">{{ finding.category }}</span></div>{% endif %}
+        {% if finding.evidence %}<div class="kv-row"><span class="k">Evidence</span><span class="v command-block">{{ finding.evidence }}</span></div>{% endif %}
+        {% if finding.affected_object or finding.rule_name %}<div class="kv-row"><span class="k">Affected</span><span class="v">{{ finding.affected_object or finding.rule_name }}</span></div>{% endif %}
         {% if finding.remediation %}<div class="kv-row"><span class="k">Fix</span><span class="v">{{ finding.remediation }}</span></div>{% endif %}
+        {% if finding.verification %}<div class="kv-row"><span class="k">Verification</span><span class="v">{{ finding.verification }}</span></div>{% endif %}
+        {% if finding.rollback %}<div class="kv-row"><span class="k">Rollback</span><span class="v">{{ finding.rollback }}</span></div>{% endif %}
+        {% if finding.suggested_commands %}<div class="kv-row"><span class="k">Commands</span><span class="v command-block">{{ finding.suggested_commands }}</span></div>{% endif %}
       </div>
     </article>
     {% endfor %}

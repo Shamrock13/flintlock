@@ -5,6 +5,7 @@ from .findings import (
     finding_to_dict,
     make_finding,
     normalize_finding,
+    validate_finding_shape,
 )
 
 __all__ = [
@@ -12,4 +13,5 @@ __all__ = [
     "finding_to_dict",
     "make_finding",
     "normalize_finding",
+    "validate_finding_shape",
 ]
