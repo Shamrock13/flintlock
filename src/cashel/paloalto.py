@@ -1,8 +1,13 @@
 # defusedxml prevents XXE (XML External Entity) injection attacks when parsing
 # user-supplied firewall configs.  Drop-in replacement for ElementTree.
+from typing import Any
+
 from defusedxml import ElementTree as ET
 
 from .models.findings import make_finding
+
+_RULE_CONTEXT: dict[int, dict[str, Any]] = {}
+_BROAD_VALUES = {"any", "all", "*"}
 
 
 def _f(
@@ -53,6 +58,27 @@ def _members(rule, path):
     return [m.text or "" for m in rule.findall(path)]
 
 
+def _entry_name(entry):
+    return entry.get("name", "")
+
+
+def _normalize_broad(value):
+    text = (value or "").strip()
+    if text.lower() in _BROAD_VALUES:
+        return "any"
+    return text
+
+
+def _stable_unique(values):
+    seen = set()
+    output = []
+    for value in values:
+        if value not in seen:
+            seen.add(value)
+            output.append(value)
+    return sorted(output)
+
+
 def _rule_name(rule):
     return rule.get("name", "unnamed")
 
@@ -61,6 +87,43 @@ def _profile_group(rule):
     return rule.findtext(".//profile-setting/group/member") or rule.findtext(
         ".//profile-setting/group"
     )
+
+
+def _rule_context(rule):
+    return _RULE_CONTEXT.get(id(rule), {})
+
+
+def _rule_scope(rule):
+    context = _rule_context(rule)
+    raw_src = _members(rule, ".//source/member")
+    raw_dst = _members(rule, ".//destination/member")
+    raw_apps = _members(rule, ".//application/member")
+    raw_services = _members(rule, ".//service/member")
+    return {
+        "raw_source_addresses": raw_src,
+        "raw_destination_addresses": raw_dst,
+        "raw_applications": raw_apps,
+        "raw_services": raw_services,
+        "expanded_source_addresses": expand_addresses(
+            raw_src,
+            context.get("address_objects", {}),
+            context.get("address_groups", {}),
+        ),
+        "expanded_destination_addresses": expand_addresses(
+            raw_dst,
+            context.get("address_objects", {}),
+            context.get("address_groups", {}),
+        ),
+        "expanded_applications": expand_applications(
+            raw_apps,
+            context.get("application_groups", {}),
+        ),
+        "expanded_services": expand_services(
+            raw_services,
+            context.get("service_objects", {}),
+            context.get("service_groups", {}),
+        ),
+    }
 
 
 def _rule_metadata(rule):
@@ -82,6 +145,7 @@ def _rule_metadata(rule):
         else "",
         "profile_group": _profile_group(rule) or "",
         "description": (rule.findtext(".//description") or "").strip(),
+        **_rule_scope(rule),
     }
 
 
@@ -104,27 +168,219 @@ def _base_kwargs(rule, title, confidence="high", **extra):
     return kwargs
 
 
-def parse_paloalto(filepath):
-    """Parse a Palo Alto XML config and return security rules"""
+def _parse_address_objects(root):
+    objects = {}
+    for entry in root.findall(".//address/entry"):
+        name = _entry_name(entry)
+        if not name:
+            continue
+        objects[name] = {
+            "name": name,
+            "ip-netmask": entry.findtext("ip-netmask") or "",
+            "fqdn": entry.findtext("fqdn") or "",
+            "ip-range": entry.findtext("ip-range") or "",
+        }
+    return objects
+
+
+def _parse_address_groups(root):
+    groups = {}
+    for entry in root.findall(".//address-group/entry"):
+        name = _entry_name(entry)
+        if not name:
+            continue
+        groups[name] = {
+            "name": name,
+            "members": _members(entry, "static/member"),
+            "dynamic": entry.findtext("dynamic/filter") or "",
+        }
+    return groups
+
+
+def _parse_service_objects(root):
+    services = {}
+    for entry in root.findall(".//service/entry"):
+        name = _entry_name(entry)
+        if not name:
+            continue
+        protocol = ""
+        port = ""
+        if entry.find("protocol/tcp") is not None:
+            protocol = "tcp"
+            port = entry.findtext("protocol/tcp/port") or ""
+        elif entry.find("protocol/udp") is not None:
+            protocol = "udp"
+            port = entry.findtext("protocol/udp/port") or ""
+        services[name] = {"name": name, "protocol": protocol, "port": port}
+    return services
+
+
+def _parse_service_groups(root):
+    groups = {}
+    for entry in root.findall(".//service-group/entry"):
+        name = _entry_name(entry)
+        if not name:
+            continue
+        groups[name] = {"name": name, "members": _members(entry, "members/member")}
+    return groups
+
+
+def _parse_application_groups(root):
+    groups = {}
+    for entry in root.findall(".//application-group/entry"):
+        name = _entry_name(entry)
+        if not name:
+            continue
+        groups[name] = {"name": name, "members": _members(entry, "members/member")}
+    return groups
+
+
+def expand_address(name, objects, groups, _seen=None):
+    """Expand a Palo Alto address object or static group into deterministic values."""
+    normalized = _normalize_broad(name)
+    if normalized == "any":
+        return ["any"]
+
+    seen = set() if _seen is None else set(_seen)
+    if normalized in seen:
+        return []
+    seen.add(normalized)
+
+    if normalized in groups:
+        members = groups[normalized].get("members", [])
+        return _stable_unique(
+            value
+            for member in members
+            for value in expand_address(member, objects, groups, seen)
+        )
+
+    if normalized in objects:
+        obj = objects[normalized]
+        for key in ("ip-netmask", "fqdn", "ip-range"):
+            if obj.get(key):
+                return [obj[key]]
+        return [normalized]
+
+    return [normalized]
+
+
+def expand_addresses(names, objects, groups):
+    return _stable_unique(
+        value for name in names for value in expand_address(name, objects, groups)
+    )
+
+
+def expand_service(name, services, service_groups, _seen=None):
+    """Expand a Palo Alto service object or group into deterministic values."""
+    normalized = _normalize_broad(name)
+    if normalized == "any":
+        return ["any"]
+
+    seen = set() if _seen is None else set(_seen)
+    if normalized in seen:
+        return []
+    seen.add(normalized)
+
+    if normalized in service_groups:
+        members = service_groups[normalized].get("members", [])
+        return _stable_unique(
+            value
+            for member in members
+            for value in expand_service(member, services, service_groups, seen)
+        )
+
+    if normalized in services:
+        service = services[normalized]
+        protocol = service.get("protocol", "")
+        port = service.get("port", "")
+        if protocol and port:
+            return [f"{protocol}/{port}"]
+        return [normalized]
+
+    return [normalized]
+
+
+def expand_services(names, services, service_groups):
+    return _stable_unique(
+        value
+        for name in names
+        for value in expand_service(name, services, service_groups)
+    )
+
+
+def expand_application(name, application_groups, _seen=None):
+    """Expand a Palo Alto application group into deterministic application names."""
+    normalized = _normalize_broad(name)
+    if normalized == "any":
+        return ["any"]
+
+    seen = set() if _seen is None else set(_seen)
+    if normalized in seen:
+        return []
+    seen.add(normalized)
+
+    if normalized in application_groups:
+        members = application_groups[normalized].get("members", [])
+        return _stable_unique(
+            value
+            for member in members
+            for value in expand_application(member, application_groups, seen)
+        )
+
+    return [normalized]
+
+
+def expand_applications(names, application_groups):
+    return _stable_unique(
+        value
+        for name in names
+        for value in expand_application(name, application_groups)
+    )
+
+
+def parse_paloalto_config(filepath):
+    """Parse Palo Alto XML into rules plus policy object dictionaries."""
     try:
         tree = ET.parse(filepath)
         root = tree.getroot()
     except ET.ParseError as e:
         return None, f"Failed to parse Palo Alto config: {e}"
 
-    rules = root.findall(".//security/rules/entry")
-    return rules, None
+    config = {
+        "rules": root.findall(".//security/rules/entry"),
+        "address_objects": _parse_address_objects(root),
+        "address_groups": _parse_address_groups(root),
+        "service_objects": _parse_service_objects(root),
+        "service_groups": _parse_service_groups(root),
+        "application_groups": _parse_application_groups(root),
+    }
+    for rule in config["rules"]:
+        _RULE_CONTEXT[id(rule)] = config
+    return config, None
+
+
+def parse_paloalto(filepath):
+    """Parse a Palo Alto XML config and return security rules"""
+    config, error = parse_paloalto_config(filepath)
+    if error:
+        return None, error
+    return config["rules"], None
+
+
+def _is_broad(values):
+    return "any" in values
 
 
 def check_any_any_pa(rules):
     findings = []
     for rule in rules:
         name = _rule_name(rule)
-        src = _members(rule, ".//source/member")
-        dst = _members(rule, ".//destination/member")
+        scope = _rule_scope(rule)
+        src = scope["expanded_source_addresses"]
+        dst = scope["expanded_destination_addresses"]
         action = rule.findtext(".//action")
 
-        if action == "allow" and "any" in src and "any" in dst:
+        if action == "allow" and _is_broad(src) and _is_broad(dst):
             findings.append(
                 _f(
                     "HIGH",
@@ -191,10 +447,11 @@ def check_missing_logging_pa(rules):
 
 def check_deny_all_pa(rules):
     for rule in rules:
-        src = _members(rule, ".//source/member")
-        dst = _members(rule, ".//destination/member")
+        scope = _rule_scope(rule)
+        src = scope["expanded_source_addresses"]
+        dst = scope["expanded_destination_addresses"]
         action = rule.findtext(".//action")
-        if action == "deny" and "any" in src and "any" in dst:
+        if action == "deny" and _is_broad(src) and _is_broad(dst):
             return []
     return [
         _f(
@@ -232,10 +489,11 @@ def check_redundant_rules_pa(rules):
     seen = {}
     for rule in rules:
         name = _rule_name(rule)
-        src = tuple(sorted(_members(rule, ".//source/member")))
-        dst = tuple(sorted(_members(rule, ".//destination/member")))
-        app = tuple(sorted(_members(rule, ".//application/member")))
-        svc = tuple(sorted(_members(rule, ".//service/member")))
+        scope = _rule_scope(rule)
+        src = tuple(scope["expanded_source_addresses"])
+        dst = tuple(scope["expanded_destination_addresses"])
+        app = tuple(scope["expanded_applications"])
+        svc = tuple(scope["expanded_services"])
         action = rule.findtext(".//action")
 
         sig = (src, dst, app, svc, action)
@@ -276,8 +534,8 @@ def check_any_application_pa(rules):
     for rule in rules:
         name = _rule_name(rule)
         action = rule.findtext(".//action")
-        apps = _members(rule, ".//application/member")
-        if action == "allow" and "any" in apps:
+        apps = _rule_scope(rule)["expanded_applications"]
+        if action == "allow" and _is_broad(apps):
             findings.append(
                 _f(
                     "MEDIUM",
@@ -307,8 +565,8 @@ def check_any_service_pa(rules):
     for rule in rules:
         name = _rule_name(rule)
         action = rule.findtext(".//action")
-        services = _members(rule, ".//service/member")
-        if action == "allow" and "any" in services:
+        services = _rule_scope(rule)["expanded_services"]
+        if action == "allow" and _is_broad(services):
             findings.append(
                 _f(
                     "MEDIUM",
