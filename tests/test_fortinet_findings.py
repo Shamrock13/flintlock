@@ -11,9 +11,14 @@ from cashel.fortinet import (
     check_any_any_forti,
     check_any_service_forti,
     check_deny_all_forti,
+    check_insecure_services_forti,
     check_missing_logging_forti,
     check_missing_utm_forti,
     check_redundant_rules_forti,
+    expand_address,
+    expand_addresses,
+    expand_service,
+    expand_services,
     parse_fortinet,
 )
 from cashel.remediation import generate_plan
@@ -246,6 +251,145 @@ end
     assert policy["dstaddr"] == ["Web Server"]
 
 
+def test_address_object_and_group_parsing_and_expansion():
+    policies = _parse_text(
+        """
+config firewall address
+    edit "HR-NET"
+        set subnet 10.20.10.0 255.255.255.0
+    next
+    edit "WEB-SERVER"
+        set subnet 10.30.20.50 255.255.255.255
+    next
+end
+config firewall addrgrp
+    edit "INTERNAL-USERS"
+        set member "HR-NET" "VPN-USERS"
+    next
+    edit "NESTED-USERS"
+        set member "INTERNAL-USERS" "WEB-SERVER"
+    next
+end
+config firewall policy
+    edit 1
+        set name "Object Policy"
+        set srcintf "lan"
+        set dstintf "dmz"
+        set srcaddr "NESTED-USERS"
+        set dstaddr "WEB-SERVER"
+        set action accept
+        set service "HTTPS"
+        set logtraffic all
+    next
+end
+"""
+    )
+    policy = policies[0]
+    objects = policy["_address_objects"]
+    groups = policy["_address_groups"]
+
+    assert objects["HR-NET"]["subnet"] == "10.20.10.0 255.255.255.0"
+    assert objects["WEB-SERVER"]["subnet"] == "10.30.20.50 255.255.255.255"
+    assert groups["INTERNAL-USERS"]["member"] == ["HR-NET", "VPN-USERS"]
+    assert expand_address("HR-NET", objects, groups) == ["10.20.10.0 255.255.255.0"]
+    assert expand_addresses(["NESTED-USERS"], objects, groups) == [
+        "10.20.10.0 255.255.255.0",
+        "VPN-USERS",
+        "10.30.20.50 255.255.255.255",
+    ]
+
+
+def test_address_group_cycle_protection_and_unknown_preservation():
+    objects = {"HR-NET": {"name": "HR-NET", "subnet": "10.20.10.0 255.255.255.0"}}
+    groups = {
+        "A": {"name": "A", "member": ["B", "UNKNOWN"]},
+        "B": {"name": "B", "member": ["A", "HR-NET"]},
+    }
+
+    expanded = expand_addresses(["A"], objects, groups)
+
+    assert "UNKNOWN" in expanded
+    assert "10.20.10.0 255.255.255.0" in expanded
+    assert len(expanded) < 6
+
+
+def test_custom_service_and_group_parsing_and_expansion():
+    policies = _parse_text(
+        """
+config firewall service custom
+    edit "TCP-8443"
+        set tcp-portrange 8443
+    next
+    edit "LEGACY-TELNET"
+        set tcp-portrange 23
+    next
+    edit "UDP-5353"
+        set udp-portrange 5353
+    next
+end
+config firewall service group
+    edit "APP-SERVICES"
+        set member "HTTPS" "TCP-8443" "LEGACY-TELNET"
+    next
+    edit "NESTED-SERVICES"
+        set member "APP-SERVICES" "UDP-5353"
+    next
+end
+config firewall policy
+    edit 1
+        set name "Service Policy"
+        set srcintf "lan"
+        set dstintf "wan1"
+        set srcaddr "TrustedUsers"
+        set dstaddr "WebServer"
+        set action accept
+        set service "NESTED-SERVICES"
+        set logtraffic all
+    next
+end
+"""
+    )
+    policy = policies[0]
+    services = policy["_service_objects"]
+    service_groups = policy["_service_groups"]
+
+    assert services["TCP-8443"]["tcp-portrange"] == "8443"
+    assert services["LEGACY-TELNET"]["tcp-portrange"] == "23"
+    assert services["UDP-5353"]["udp-portrange"] == "5353"
+    assert service_groups["APP-SERVICES"]["member"] == [
+        "HTTPS",
+        "TCP-8443",
+        "LEGACY-TELNET",
+    ]
+    assert expand_services(["NESTED-SERVICES"], services, service_groups) == [
+        "HTTPS",
+        "tcp/8443",
+        "tcp/23",
+        "udp/5353",
+    ]
+
+
+def test_service_group_cycle_protection_and_unknown_preservation():
+    services = {"TCP-8443": {"name": "TCP-8443", "tcp-portrange": "8443"}}
+    service_groups = {
+        "A": {"name": "A", "member": ["B", "UNKNOWN-SVC"]},
+        "B": {"name": "B", "member": ["A", "TCP-8443"]},
+    }
+
+    expanded = expand_services(["A"], services, service_groups)
+
+    assert "UNKNOWN-SVC" in expanded
+    assert "tcp/8443" in expanded
+    assert len(expanded) < 6
+
+
+def test_unknown_objects_are_preserved_and_broad_values_normalize():
+    assert expand_address("MISSING-NET", {}, {}) == ["MISSING-NET"]
+    assert expand_service("MISSING-SVC", {}, {}) == ["MISSING-SVC"]
+    assert expand_addresses(["all", "any", "*", "ALL"], {}, {}) == ["ALL"]
+    assert expand_services(["all", "any", "*", "ALL"], {}, {}) == ["ALL"]
+
+
 def test_evidence_and_metadata_include_extended_policy_fields():
     policy = _policy(
         schedule="business-hours",
@@ -273,6 +417,57 @@ def test_evidence_and_metadata_include_extended_policy_fields():
     assert finding["metadata"]["comments"] == "Owner: app team"
     assert finding["metadata"]["av_profile"] == "default"
     assert finding["metadata"]["profile_protocol_options"] == "protocol-default"
+
+
+def test_fortinet_findings_include_raw_and_expanded_scope_metadata():
+    policies = _parse_text(
+        """
+config firewall address
+    edit "HR-NET"
+        set subnet 10.20.10.0 255.255.255.0
+    next
+end
+config firewall addrgrp
+    edit "BROAD-USERS"
+        set member "all"
+    next
+end
+config firewall service custom
+    edit "LEGACY-TELNET"
+        set tcp-portrange 23
+    next
+end
+config firewall service group
+    edit "BAD-SERVICES"
+        set member "LEGACY-TELNET"
+    next
+end
+config firewall policy
+    edit 10
+        set name "Expanded Any"
+        set srcintf "wan1"
+        set dstintf "lan"
+        set srcaddr "BROAD-USERS"
+        set dstaddr "all"
+        set action accept
+        set service "BAD-SERVICES"
+        set logtraffic disable
+    next
+end
+"""
+    )
+
+    exposure = check_any_any_forti(policies)[0]
+    insecure = check_insecure_services_forti(policies)[0]
+
+    assert exposure["metadata"]["raw_srcaddr"] == ["BROAD-USERS"]
+    assert exposure["metadata"]["raw_dstaddr"] == ["all"]
+    assert exposure["metadata"]["expanded_srcaddr"] == ["ALL"]
+    assert exposure["metadata"]["expanded_dstaddr"] == ["ALL"]
+    assert exposure["metadata"]["expanded_service"] == ["tcp/23"]
+    assert "expanded_srcaddr=ALL" in exposure["evidence"]
+    assert "expanded_service=tcp/23" in exposure["evidence"]
+    assert insecure["metadata"]["insecure_services"] == ["TELNET"]
 
 
 def test_duplicate_detection_includes_interfaces_schedule_and_nat():
@@ -325,3 +520,61 @@ def test_duplicate_detection_includes_interfaces_schedule_and_nat():
         [base, different_srcintf, different_schedule, different_nat]
     )
     assert distinct_findings == []
+
+
+def test_duplicate_detection_uses_expanded_effective_scope():
+    policies = _parse_text(
+        """
+config firewall address
+    edit "HR-NET"
+        set subnet 10.20.10.0 255.255.255.0
+    next
+end
+config firewall addrgrp
+    edit "HR-GROUP"
+        set member "HR-NET"
+    next
+end
+config firewall service custom
+    edit "TCP-8443"
+        set tcp-portrange 8443
+    next
+end
+config firewall service group
+    edit "APP-GROUP"
+        set member "TCP-8443"
+    next
+end
+config firewall policy
+    edit 1
+        set name "Object Policy"
+        set srcintf "lan"
+        set dstintf "wan1"
+        set srcaddr "HR-GROUP"
+        set dstaddr "Unknown-Web"
+        set action accept
+        set service "APP-GROUP"
+        set schedule "always"
+        set nat enable
+    next
+    edit 2
+        set name "Expanded Duplicate"
+        set srcintf "lan"
+        set dstintf "wan1"
+        set srcaddr "HR-NET"
+        set dstaddr "Unknown-Web"
+        set action accept
+        set service "TCP-8443"
+        set schedule "always"
+        set nat enable
+    next
+end
+"""
+    )
+
+    findings = check_redundant_rules_forti(policies)
+
+    assert len(findings) == 1
+    assert findings[0]["id"] == "CASHEL-FORTINET-REDUNDANCY-002"
+    assert findings[0]["metadata"]["expanded_srcaddr"] == ["10.20.10.0 255.255.255.0"]
+    assert findings[0]["metadata"]["expanded_service"] == ["tcp/8443"]

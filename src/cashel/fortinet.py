@@ -6,6 +6,27 @@ from .models.findings import make_finding
 _INSECURE_SERVICES = {"TELNET", "HTTP", "FTP", "TFTP", "SNMP"}
 
 _WAN_INTFS = {"wan", "wan1", "wan2", "internet", "outside", "untrust"}
+_BROAD_VALUES = {"all", "any", "*"}
+
+
+def _dedupe_stable(values):
+    seen = set()
+    result = []
+    for value in values:
+        if value not in seen:
+            result.append(value)
+            seen.add(value)
+    return result
+
+
+def _normalize_broad(value):
+    if str(value).lower() in _BROAD_VALUES:
+        return "ALL"
+    return value
+
+
+def _is_broad(values):
+    return "ALL" in values
 
 
 def _f(
@@ -62,6 +83,9 @@ def _policy_id(p):
 
 
 def _policy_evidence(p):
+    expanded_src = ",".join(_expanded_srcaddr(p)) or "unset"
+    expanded_dst = ",".join(_expanded_dstaddr(p)) or "unset"
+    expanded_service = ",".join(_expanded_service(p)) or "unset"
     fields = [
         f"policy_id={p.get('id')}",
         f"name={_policy_name(p)}",
@@ -70,6 +94,9 @@ def _policy_evidence(p):
         f"srcaddr={','.join(p.get('srcaddr', [])) or 'unset'}",
         f"dstaddr={','.join(p.get('dstaddr', [])) or 'unset'}",
         f"service={','.join(p.get('service', [])) or 'unset'}",
+        f"expanded_srcaddr={expanded_src}",
+        f"expanded_dstaddr={expanded_dst}",
+        f"expanded_service={expanded_service}",
         f"action={p.get('action') or 'unset'}",
         f"logtraffic={p.get('logtraffic') or 'unset'}",
         f"status={p.get('status') or 'unset'}",
@@ -90,6 +117,12 @@ def _policy_metadata(p):
     return {
         "policy_id": _policy_id(p),
         "policy_name": _policy_name(p),
+        "raw_srcaddr": p.get("srcaddr", []),
+        "raw_dstaddr": p.get("dstaddr", []),
+        "raw_service": p.get("service", []),
+        "expanded_srcaddr": _expanded_srcaddr(p),
+        "expanded_dstaddr": _expanded_dstaddr(p),
+        "expanded_service": _expanded_service(p),
         "srcintf": p.get("srcintf", []),
         "dstintf": p.get("dstintf", []),
         "srcaddr": p.get("srcaddr", []),
@@ -110,6 +143,40 @@ def _policy_metadata(p):
     }
 
 
+def _address_objects(p):
+    return p.get("_address_objects", {})
+
+
+def _address_groups(p):
+    return p.get("_address_groups", {})
+
+
+def _service_objects(p):
+    return p.get("_service_objects", {})
+
+
+def _service_groups(p):
+    return p.get("_service_groups", {})
+
+
+def _expanded_srcaddr(p):
+    return expand_addresses(
+        p.get("srcaddr", []), _address_objects(p), _address_groups(p)
+    )
+
+
+def _expanded_dstaddr(p):
+    return expand_addresses(
+        p.get("dstaddr", []), _address_objects(p), _address_groups(p)
+    )
+
+
+def _expanded_service(p):
+    return expand_services(
+        p.get("service", []), _service_objects(p), _service_groups(p)
+    )
+
+
 def _set_values(line, prefix):
     return [x.strip('"') for x in shlex.split(line.replace(prefix, "", 1).strip())]
 
@@ -117,6 +184,98 @@ def _set_values(line, prefix):
 def _set_value(line, prefix):
     values = _set_values(line, prefix)
     return " ".join(values)
+
+
+def expand_address(name, objects, groups) -> list[str]:
+    return _expand_address(name, objects, groups, set())
+
+
+def _expand_address(name, objects, groups, seen) -> list[str]:
+    normalized = _normalize_broad(name)
+    if normalized == "ALL":
+        return ["ALL"]
+    if name in seen:
+        return [name]
+    if name in groups:
+        seen.add(name)
+        values = []
+        for member in groups[name].get("member", []):
+            values.extend(_expand_address(member, objects, groups, seen.copy()))
+        return _dedupe_stable(values)
+    if name in objects:
+        obj = objects[name]
+        if obj.get("subnet"):
+            return [obj["subnet"]]
+    return [name]
+
+
+def expand_addresses(names, objects, groups) -> list[str]:
+    values = []
+    for name in names or []:
+        values.extend(expand_address(name, objects, groups))
+    return _dedupe_stable(values)
+
+
+def expand_service(name, services, service_groups) -> list[str]:
+    return _expand_service(name, services, service_groups, set())
+
+
+def _expand_service(name, services, service_groups, seen) -> list[str]:
+    normalized = _normalize_broad(name)
+    if normalized == "ALL":
+        return ["ALL"]
+    if name in seen:
+        return [name]
+    if name in service_groups:
+        seen.add(name)
+        values = []
+        for member in service_groups[name].get("member", []):
+            values.extend(
+                _expand_service(member, services, service_groups, seen.copy())
+            )
+        return _dedupe_stable(values)
+    if name in services:
+        service = services[name]
+        values = []
+        if service.get("tcp-portrange"):
+            values.append(f"tcp/{service['tcp-portrange']}")
+        if service.get("udp-portrange"):
+            values.append(f"udp/{service['udp-portrange']}")
+        if not values and service.get("protocol"):
+            values.append(f"protocol/{service['protocol']}")
+        return values or [name]
+    return [normalized]
+
+
+def expand_services(names, services, service_groups) -> list[str]:
+    values = []
+    for name in names or []:
+        values.extend(expand_service(name, services, service_groups))
+    return _dedupe_stable(values)
+
+
+def _new_policy(policy_id):
+    return {
+        "id": policy_id,
+        "name": "",
+        "srcintf": [],
+        "dstintf": [],
+        "srcaddr": [],
+        "dstaddr": [],
+        "service": [],
+        "action": "",
+        "logtraffic": "",
+        "status": "enable",
+        "utm-status": "",
+        "schedule": "",
+        "nat": "",
+        "comments": "",
+        "av-profile": "",
+        "ips-sensor": "",
+        "application-list": "",
+        "webfilter-profile": "",
+        "profile-protocol-options": "",
+    }
 
 
 def parse_fortinet(filepath):
@@ -128,80 +287,126 @@ def parse_fortinet(filepath):
         return None, f"Failed to read FortiGate config: {e}"
 
     policies = []
-    current_policy = None
+    address_objects = {}
+    address_groups = {}
+    service_objects = {}
+    service_groups = {}
+    section = None
+    current = None
 
     for line in content.splitlines():
         line = line.strip()
 
-        if line.startswith("edit "):
-            current_policy = {
-                "id": line.split("edit ")[1],
-                "name": "",
-                "srcintf": [],
-                "dstintf": [],
-                "srcaddr": [],
-                "dstaddr": [],
-                "service": [],
-                "action": "",
-                "logtraffic": "",
-                "status": "enable",
-                "utm-status": "",
-                "schedule": "",
-                "nat": "",
-                "comments": "",
-                "av-profile": "",
-                "ips-sensor": "",
-                "application-list": "",
-                "webfilter-profile": "",
-                "profile-protocol-options": "",
-            }
+        if not line:
+            continue
+        if line == "config firewall policy":
+            section = "policy"
+            continue
+        if line == "config firewall address":
+            section = "address"
+            continue
+        if line == "config firewall addrgrp":
+            section = "addrgrp"
+            continue
+        if line == "config firewall service custom":
+            section = "service"
+            continue
+        if line == "config firewall service group":
+            section = "service_group"
+            continue
+        if line == "end":
+            section = None
+            current = None
+            continue
+        if line.startswith("edit ") and section:
+            name = _set_value(line, "edit ")
+            if section == "policy":
+                current = _new_policy(name)
+            elif section == "address":
+                current = {"name": name, "subnet": ""}
+            elif section == "addrgrp":
+                current = {"name": name, "member": []}
+            elif section == "service":
+                current = {
+                    "name": name,
+                    "tcp-portrange": "",
+                    "udp-portrange": "",
+                    "protocol": "",
+                }
+            elif section == "service_group":
+                current = {"name": name, "member": []}
+            continue
 
-        elif current_policy is not None:
+        if current is not None:
             if line.startswith("set name "):
-                current_policy["name"] = _set_value(line, "set name ")
+                current["name"] = _set_value(line, "set name ")
             elif line.startswith("set srcintf "):
-                current_policy["srcintf"] = _set_values(line, "set srcintf ")
+                current["srcintf"] = _set_values(line, "set srcintf ")
             elif line.startswith("set dstintf "):
-                current_policy["dstintf"] = _set_values(line, "set dstintf ")
+                current["dstintf"] = _set_values(line, "set dstintf ")
             elif line.startswith("set srcaddr "):
-                current_policy["srcaddr"] = _set_values(line, "set srcaddr ")
+                current["srcaddr"] = _set_values(line, "set srcaddr ")
             elif line.startswith("set dstaddr "):
-                current_policy["dstaddr"] = _set_values(line, "set dstaddr ")
+                current["dstaddr"] = _set_values(line, "set dstaddr ")
             elif line.startswith("set service "):
-                current_policy["service"] = _set_values(line, "set service ")
+                current["service"] = _set_values(line, "set service ")
             elif line.startswith("set action "):
-                current_policy["action"] = _set_value(line, "set action ")
+                current["action"] = _set_value(line, "set action ")
             elif line.startswith("set logtraffic "):
-                current_policy["logtraffic"] = _set_value(line, "set logtraffic ")
+                current["logtraffic"] = _set_value(line, "set logtraffic ")
             elif line.startswith("set status "):
-                current_policy["status"] = _set_value(line, "set status ")
+                current["status"] = _set_value(line, "set status ")
             elif line.startswith("set utm-status "):
-                current_policy["utm-status"] = _set_value(line, "set utm-status ")
+                current["utm-status"] = _set_value(line, "set utm-status ")
             elif line.startswith("set schedule "):
-                current_policy["schedule"] = _set_value(line, "set schedule ")
+                current["schedule"] = _set_value(line, "set schedule ")
             elif line.startswith("set nat "):
-                current_policy["nat"] = _set_value(line, "set nat ")
+                current["nat"] = _set_value(line, "set nat ")
             elif line.startswith("set comments "):
-                current_policy["comments"] = _set_value(line, "set comments ")
+                current["comments"] = _set_value(line, "set comments ")
             elif line.startswith("set av-profile "):
-                current_policy["av-profile"] = _set_value(line, "set av-profile ")
+                current["av-profile"] = _set_value(line, "set av-profile ")
             elif line.startswith("set ips-sensor "):
-                current_policy["ips-sensor"] = _set_value(line, "set ips-sensor ")
+                current["ips-sensor"] = _set_value(line, "set ips-sensor ")
             elif line.startswith("set application-list "):
-                current_policy["application-list"] = _set_value(
-                    line, "set application-list "
-                )
+                current["application-list"] = _set_value(line, "set application-list ")
             elif line.startswith("set webfilter-profile "):
-                current_policy["webfilter-profile"] = _set_value(
+                current["webfilter-profile"] = _set_value(
                     line, "set webfilter-profile "
                 )
             elif line.startswith("set profile-protocol-options "):
-                current_policy["profile-protocol-options"] = _set_value(
+                current["profile-protocol-options"] = _set_value(
                     line, "set profile-protocol-options "
                 )
+            elif line.startswith("set subnet "):
+                parts = _set_values(line, "set subnet ")
+                current["subnet"] = " ".join(parts)
+            elif line.startswith("set member "):
+                current["member"] = _set_values(line, "set member ")
+            elif line.startswith("set tcp-portrange "):
+                current["tcp-portrange"] = _set_value(line, "set tcp-portrange ")
+            elif line.startswith("set udp-portrange "):
+                current["udp-portrange"] = _set_value(line, "set udp-portrange ")
+            elif line.startswith("set protocol "):
+                current["protocol"] = _set_value(line, "set protocol ")
             elif line == "next":
-                policies.append(current_policy)
-                current_policy = None
+                if section == "policy":
+                    policies.append(current)
+                elif section == "address":
+                    address_objects[current["name"]] = current
+                elif section == "addrgrp":
+                    address_groups[current["name"]] = current
+                elif section == "service":
+                    service_objects[current["name"]] = current
+                elif section == "service_group":
+                    service_groups[current["name"]] = current
+                current = None
+
+    for policy in policies:
+        policy["_address_objects"] = address_objects
+        policy["_address_groups"] = address_groups
+        policy["_service_objects"] = service_objects
+        policy["_service_groups"] = service_groups
 
     return policies, None
 
@@ -215,9 +420,9 @@ def check_any_any_forti(policies):
         if p.get("status") == "disable":
             continue
         name = _policy_name(p)
-        src = p.get("srcaddr", [])
-        dst = p.get("dstaddr", [])
-        if p.get("action") == "accept" and "all" in src and "all" in dst:
+        src = _expanded_srcaddr(p)
+        dst = _expanded_dstaddr(p)
+        if p.get("action") == "accept" and _is_broad(src) and _is_broad(dst):
             findings.append(
                 _f(
                     "HIGH",
@@ -291,8 +496,8 @@ def check_missing_logging_forti(policies):
 def check_deny_all_forti(policies):
     has_deny_all = any(
         p.get("action") == "deny"
-        and "all" in p.get("srcaddr", [])
-        and "all" in p.get("dstaddr", [])
+        and _is_broad(_expanded_srcaddr(p))
+        and _is_broad(_expanded_dstaddr(p))
         for p in policies
     )
     if has_deny_all:
@@ -336,9 +541,9 @@ def check_redundant_rules_forti(policies):
         sig = (
             tuple(sorted(p.get("srcintf", []))),
             tuple(sorted(p.get("dstintf", []))),
-            tuple(sorted(p.get("srcaddr", []))),
-            tuple(sorted(p.get("dstaddr", []))),
-            tuple(sorted(p.get("service", []))),
+            tuple(sorted(_expanded_srcaddr(p))),
+            tuple(sorted(_expanded_dstaddr(p))),
+            tuple(sorted(_expanded_service(p))),
             p.get("action", ""),
             p.get("schedule", ""),
             p.get("nat", ""),
@@ -417,8 +622,8 @@ def check_any_service_forti(policies):
             continue
         name = _policy_name(p)
         action = p.get("action", "")
-        service = p.get("service", [])
-        if action == "accept" and "ALL" in [s.upper() for s in service]:
+        service = _expanded_service(p)
+        if action == "accept" and _is_broad(service):
             src = ",".join(p.get("srcaddr", []))
             dst = ",".join(p.get("dstaddr", []))
             findings.append(
@@ -458,8 +663,10 @@ def check_insecure_services_forti(policies):
             continue
         name = _policy_name(p)
         action = p.get("action", "")
-        service = {s.upper() for s in p.get("service", [])}
+        service = {s.upper() for s in _expanded_service(p)}
         bad = service & _INSECURE_SERVICES
+        if "TCP/23" in service:
+            bad.add("TELNET")
         if action == "accept" and bad:
             findings.append(
                 _f(
