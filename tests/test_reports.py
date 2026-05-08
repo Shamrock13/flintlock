@@ -473,6 +473,24 @@ class TestModalMarkup(unittest.TestCase):
             css,
         )
 
+    def test_sidebar_vendor_coverage_matches_supported_engines(self):
+        body = self._index_template()
+        start = body.index("<h3>Vendor coverage")
+        sidebar = body[
+            start : body.index(
+                '<div class="side-block">\n            <h3>Shortcuts', start
+            )
+        ]
+
+        self.assertIn("11 engines", sidebar)
+        self.assertNotIn("Check Point", sidebar)
+        self.assertIn("Cisco ASA", sidebar)
+        self.assertIn("PAN-OS", sidebar)
+        self.assertIn("FortiGate", sidebar)
+        self.assertIn("Juniper SRX", sidebar)
+        self.assertIn("pfSense", sidebar)
+        self.assertIn("Cloud &amp; Linux firewalls", sidebar)
+
     def test_bulk_results_use_modal_actions_not_details(self):
         body = self._index_template()
         bulk_fn = body[

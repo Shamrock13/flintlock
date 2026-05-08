@@ -307,43 +307,55 @@ def check_shadow_rules_asa(parse, vendor: str = "asa"):
     """
     findings = []
     acl_rules: dict = {}
+    from .audit_engine import (
+        _asa_acl_entries,
+        _asa_scope_is_any,
+        parse_asa_object_context,
+    )
 
-    for obj in parse.find_objects(
-        r"^access-list\s+\S+\s+(?:extended\s+)?(?:permit|deny)"
-    ):
-        parsed = _parse_asa_rule(obj.text)
-        if parsed:
-            acl_rules.setdefault(parsed["acl"], []).append(parsed)
+    context = parse_asa_object_context(parse)
+    for parsed in _asa_acl_entries(parse, context):
+        acl_rules.setdefault(parsed["acl_name"], []).append(parsed)
 
     for acl_name, rules in acl_rules.items():
         for i, rule in enumerate(rules):
-            if rule["src_any"] and rule["dst_any"] and rule["proto"] in ("ip", "any"):
+            if (
+                _asa_scope_is_any(rule["expanded_source"])
+                and _asa_scope_is_any(rule["expanded_destination"])
+                and rule["protocol"] in ("ip", "any")
+            ):
                 # Every entry after position i in this ACL is unreachable
                 for shadowed in rules[i + 1 :]:
                     findings.append(
                         _f(
                             "HIGH",
                             "redundancy",
-                            f"[HIGH] ACL '{acl_name}': rule '{shadowed['raw']}' is unreachable — "
-                            f"shadowed by earlier '{rule['action']} {rule['proto']} any any'",
-                            f"The '{rule['action']} {rule['proto']} any any' entry in ACL "
+                            f"[HIGH] ACL '{acl_name}': rule '{shadowed['acl_line']}' is unreachable — "
+                            f"shadowed by earlier '{rule['action']} {rule['protocol']} any any'",
+                            f"The '{rule['action']} {rule['protocol']} any any' entry in ACL "
                             f"'{acl_name}' matches all traffic, making every subsequent entry "
                             f"unreachable. Move specific rules above the broad any-any entry, "
                             f"or remove them if they are no longer needed.",
                             id=f"CASHEL-{vendor.upper()}-REDUNDANCY-002",
                             vendor=vendor,
                             title="ACL rule is shadowed by earlier any-any rule",
-                            evidence=f"{rule['raw']} -> {shadowed['raw']}",
+                            evidence=f"{rule['acl_line']} -> {shadowed['acl_line']}",
                             affected_object=acl_name,
-                            rule_name=shadowed["raw"],
+                            rule_name=shadowed["acl_line"],
                             confidence="high",
                             verification="Review ACL order and hit counts, then re-run the audit after moving, narrowing, or removing unreachable rules.",
                             metadata=_shadow_metadata(
-                                shadowed["raw"],
-                                rule["raw"],
+                                shadowed["acl_line"],
+                                rule["acl_line"],
                                 acl=acl_name,
                                 shadowing_action=rule["action"],
-                                shadowing_protocol=rule["proto"],
+                                shadowing_protocol=rule["protocol"],
+                                raw_source=shadowed["raw_source"],
+                                raw_destination=shadowed["raw_destination"],
+                                raw_service=shadowed["raw_service"],
+                                expanded_source=shadowed["expanded_source"],
+                                expanded_destination=shadowed["expanded_destination"],
+                                expanded_service=shadowed["expanded_service"],
                             ),
                         )
                     )
