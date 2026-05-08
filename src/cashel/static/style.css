@@ -219,9 +219,25 @@ button { cursor: pointer; border: 0; background: transparent; }
 .finding.med .tag  { background: color-mix(in oklab, var(--med) 22%, transparent); color: var(--med); }
 .finding .body { color: var(--ink); }
 .finding .fix { color: var(--ink-3); margin-top: 8px; padding-top: 8px; border-top: 1px dashed var(--line); font-family: 'Geist', sans-serif; font-size: 12.5px; }
+.finding-detailed { font-family: 'Geist', sans-serif; font-size: 13px; }
+.finding-title { font-weight: 600; color: var(--ink); }
+.finding-message { margin-top: 4px; color: var(--ink-3); font-family: 'Geist Mono', monospace; font-size: 12px; overflow-wrap: anywhere; }
+.finding-details { display: grid; gap: 8px; margin-top: 12px; padding-top: 10px; border-top: 1px dashed var(--line); }
+.finding-detail-row { display: grid; grid-template-columns: minmax(110px, 150px) minmax(0, 1fr); gap: 12px; align-items: start; }
+.finding-detail-label { color: var(--ink-3); font-size: 11px; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase; }
+.finding-detail-value { color: var(--ink-2); overflow-wrap: anywhere; }
+.finding-detail-block { align-items: stretch; }
+.finding-tech-block { position: relative; min-width: 0; border: 1px solid var(--line); border-radius: 8px; background: var(--bg); }
+.finding-tech-block pre { margin: 0; padding: 12px 58px 12px 12px; color: var(--ink); white-space: pre-wrap; overflow-wrap: anywhere; font-family: 'Geist Mono', monospace; font-size: 12px; line-height: 1.5; }
+.finding-copy-btn { position: absolute; top: 8px; right: 8px; min-height: 24px; padding: 0 8px; border: 1px solid var(--line); border-radius: 999px; color: var(--ink-3); background: var(--surface); font-size: 11px; }
+.finding-copy-btn:hover { color: var(--ink); border-color: var(--ink-2); }
+.finding-compact-meta { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 4px; color: var(--ink-3); font-family: 'Geist', sans-serif; font-size: 11px; }
+.finding-compact-meta span { overflow-wrap: anywhere; }
 .finding-pass, .finding-info { border-left-color: var(--ok); background: color-mix(in oklab, var(--ok) 7%, var(--surface)); color: var(--ink-2); }
 .findings-compact .finding { padding: 10px 14px; font-size: 12px; }
 .findings-compact .finding .fix { display: none; }
+.findings-compact .finding .tag { margin-bottom: 4px; }
+.findings-compact .finding-details, .findings-compact .finding-message { display: none; }
 .stat[data-filter] { cursor: pointer; transition: background .15s; }
 .stat[data-filter]:hover, .stat.filter-active { background: var(--tint); }
 

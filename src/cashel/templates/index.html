@@ -2775,7 +2775,7 @@
     document.querySelectorAll("#summaryGrid .stat").forEach(b => b.classList.remove("filter-active"));
     document.getElementById("summaryGrid").innerHTML = buildSummaryHTML(data.summary);
 
-    allFindings = data.enriched_findings || data.findings.map(f => ({ message: f, category: null, remediation: null }));
+    allFindings = normalizeFindingsPayload(data);
     renderFindingsUI();
 
     const pdfRow = document.getElementById("pdfRow");
@@ -3572,8 +3572,101 @@
     ).join("")}</div>`;
   }
 
+  function normalizeFindingsPayload(data) {
+    if (Array.isArray(data.enriched_findings)) return data.enriched_findings;
+    if (Array.isArray(data.findings)) return data.findings;
+    return [];
+  }
+
+  function displayValue(value) {
+    if (value === null || value === undefined || value === "") return "";
+    if (Array.isArray(value)) return value.filter(v => v !== null && v !== undefined && v !== "").join(", ");
+    if (typeof value === "object") return Object.values(value).filter(Boolean).join(", ");
+    return String(value);
+  }
+
+  function findingText(f) {
+    if (typeof f !== "object" || f === null) return String(f || "");
+    return displayValue(f.message || f.title || f.id || "Finding");
+  }
+
+  function findingSeverity(f, cls) {
+    if (typeof f === "object" && f !== null && f.severity) {
+      const sev = String(f.severity).toLowerCase();
+      return sev.charAt(0).toUpperCase() + sev.slice(1);
+    }
+    return cls === "crit" ? "Critical" : cls === "high" ? "High" : cls === "med" ? "Medium" : cls === "low" ? "Low" : "";
+  }
+
+  function findingPrimaryTitle(f) {
+    if (typeof f !== "object" || f === null) return findingText(f);
+    return displayValue(f.title || f.message || f.id || "Finding");
+  }
+
+  function findingAffected(f) {
+    if (typeof f !== "object" || f === null) return "";
+    return displayValue(f.affected_object || f.rule_name || f.object_name || f.name);
+  }
+
+  function findingCommands(f) {
+    if (typeof f !== "object" || f === null) return "";
+    return displayValue(f.suggested_commands || f.suggested_guidance || f.guidance);
+  }
+
+  const METADATA_LABELS = [
+    ["raw_source", "Raw source"],
+    ["raw_srcaddr", "Raw source"],
+    ["raw_source_addresses", "Raw source"],
+    ["expanded_source", "Expanded source"],
+    ["expanded_srcaddr", "Expanded source"],
+    ["expanded_source_addresses", "Expanded source"],
+    ["raw_destination", "Raw destination"],
+    ["raw_dstaddr", "Raw destination"],
+    ["raw_destination_addresses", "Raw destination"],
+    ["expanded_destination", "Expanded destination"],
+    ["expanded_dstaddr", "Expanded destination"],
+    ["expanded_destination_addresses", "Expanded destination"],
+    ["raw_service", "Raw service"],
+    ["raw_application", "Raw application"],
+    ["raw_port", "Raw port"],
+    ["expanded_service", "Expanded service"],
+    ["expanded_application", "Expanded application"],
+    ["expanded_port", "Expanded port"],
+    ["interface", "Interface"],
+    ["from_zone", "From zone"],
+    ["to_zone", "To zone"],
+    ["source_zone", "Source zone"],
+    ["destination_zone", "Destination zone"],
+  ];
+
+  function findingMetadataRows(f) {
+    if (typeof f !== "object" || f === null || !f.metadata || typeof f.metadata !== "object") return [];
+    const seen = new Set();
+    return METADATA_LABELS.map(([key, label]) => {
+      const value = displayValue(f.metadata[key]);
+      if (!value || seen.has(label + value)) return null;
+      seen.add(label + value);
+      return { label, value };
+    }).filter(Boolean);
+  }
+
+  function detailRow(label, value, opts = {}) {
+    const text = displayValue(value);
+    if (!text) return "";
+    if (opts.copyable) {
+      return `<div class="finding-detail-row finding-detail-block">
+        <div class="finding-detail-label">${escHtml(label)}</div>
+        <div class="finding-tech-block">
+          <button type="button" class="finding-copy-btn" data-copy-block>Copy</button>
+          <pre class="copy-source">${escHtml(text)}</pre>
+        </div>
+      </div>`;
+    }
+    return `<div class="finding-detail-row"><div class="finding-detail-label">${escHtml(label)}</div><div class="finding-detail-value">${escHtml(text)}</div></div>`;
+  }
+
   function findingClass(f) {
-    const msg = typeof f === "object" ? f.message : f;
+    const msg = findingText(f);
     if (msg.includes("[CRITICAL]") && !msg.match(/PCI-|CIS-|NIST-|HIPAA-|SOC2-|STIG-/)) return "crit";
     if (msg.includes("[HIGH]")   && !msg.match(/PCI-|CIS-|NIST-|HIPAA-|SOC2-|STIG-/)) return "high";
     if (msg.includes("[MEDIUM]") && !msg.match(/PCI-|CIS-|NIST-|HIPAA-|SOC2-|STIG-/)) return "med";
@@ -3592,19 +3685,52 @@
   };
 
   function buildFindingHTML(f) {
-    const msg        = typeof f === "object" ? f.message      : f;
-    const category   = typeof f === "object" ? f.category     : null;
-    const remediation= typeof f === "object" ? f.remediation  : null;
+    const isObj      = typeof f === "object" && f !== null;
+    const msg        = findingText(f);
+    const title      = findingPrimaryTitle(f);
+    const category   = isObj ? f.category : null;
+    const remediation= isObj ? f.remediation : null;
+    const findingId  = isObj ? displayValue(f.id || f.finding_id) : "";
+    const affected   = findingAffected(f);
     const cls        = findingClass(f);
     const catInfo    = category ? (CATEGORY_LABELS[category] || { label: category, cls: "cat-hygiene" }) : null;
-    const severity   = cls === "crit" ? "Critical" : cls === "high" ? "High" : cls === "med" ? "Medium" : cls === "low" ? "Low" : "";
+    const severity   = findingSeverity(f, cls);
     const tagText    = [catInfo?.label, severity].filter(Boolean).join(" · ");
     const tagSpan    = tagText ? `<span class="tag ${catInfo ? escHtml(catInfo.cls) : ""}">${escHtml(tagText)}</span>` : "";
-    const fixDiv     = (!compactView && remediation)
-      ? `<div class="fix">&#8618; ${escHtml(remediation)}</div>`
-      : "";
-    return `<div class="finding${cls ? " " + cls : ""}">${tagSpan}<div class="body">${escHtml(msg)}</div>${fixDiv}</div>`;
+    const metaRows   = findingMetadataRows(f);
+    if (compactView) {
+      const compactTagSpan = severity ? `<span class="tag">${escHtml(severity)}</span>` : "";
+      const compactMeta = [affected, findingId].filter(Boolean).map(v => `<span>${escHtml(v)}</span>`).join("");
+      return `<div class="finding${cls ? " " + cls : ""}">${compactTagSpan}<div class="body">${escHtml(title || msg)}</div>${compactMeta ? `<div class="finding-compact-meta">${compactMeta}</div>` : ""}</div>`;
+    }
+    const detailRows = [
+      detailRow("Finding ID", findingId),
+      detailRow("Severity", severity),
+      detailRow("Category", catInfo?.label || category),
+      detailRow("Affected", affected),
+      detailRow("Evidence", isObj ? f.evidence : "", { copyable: true }),
+      detailRow("Remediation", remediation),
+      detailRow("Verification", isObj ? f.verification : ""),
+      detailRow("Rollback", isObj ? f.rollback : ""),
+      detailRow("Suggested commands", findingCommands(f), { copyable: true }),
+      ...metaRows.map(row => detailRow(row.label, row.value)),
+    ].filter(Boolean).join("");
+    return `<div class="finding finding-detailed${cls ? " " + cls : ""}">${tagSpan}<div class="body finding-title">${escHtml(title)}</div>${msg && msg !== title ? `<div class="finding-message">${escHtml(msg)}</div>` : ""}${detailRows ? `<div class="finding-details">${detailRows}</div>` : ""}</div>`;
   }
+
+  document.getElementById("findingsList")?.addEventListener("click", async function (e) {
+    const btn = e.target.closest("[data-copy-block]");
+    if (!btn) return;
+    const block = btn.closest(".finding-tech-block")?.querySelector(".copy-source");
+    const text = block ? block.textContent : "";
+    if (!text) return;
+    try {
+      await navigator.clipboard.writeText(text);
+      const old = btn.textContent;
+      btn.textContent = "Copied";
+      setTimeout(() => { btn.textContent = old; }, 1200);
+    } catch (_) {}
+  });
 
   function setLoading(btnId, textId, spinnerId, label, loading) {
     const btn = document.getElementById(btnId);

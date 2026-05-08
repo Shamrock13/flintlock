@@ -273,7 +273,9 @@ class TestReportViewer(unittest.TestCase):
         self.assertIn("51", body)
         self.assertIn("permit ip any any", body)
         self.assertIn("CASHEL-ASA-EXPOSURE-001", body)
+        self.assertIn("OUTSIDE_IN", body)
         self.assertIn("Re-run the audit after replacing the rule.", body)
+        self.assertIn("Restore the prior ACL line from backup.", body)
         self.assertIn("no access-list", body)
         self.assertIn("csh_test_123", body)
 
@@ -398,6 +400,62 @@ class TestModalMarkup(unittest.TestCase):
             "const warnings = [data.license_warning, data.report_warning].filter(Boolean);",
             body,
         )
+
+    def test_audit_results_render_enriched_finding_detail_fields(self):
+        body = self._index_template()
+
+        for expected in (
+            "normalizeFindingsPayload(data)",
+            "findingPrimaryTitle(f)",
+            "findingAffected(f)",
+            'detailRow("Finding ID", findingId)',
+            'detailRow("Evidence", isObj ? f.evidence : "", { copyable: true })',
+            'detailRow("Verification", isObj ? f.verification : "")',
+            'detailRow("Rollback", isObj ? f.rollback : "")',
+            'detailRow("Suggested commands", findingCommands(f), { copyable: true })',
+            "findingMetadataRows(f)",
+        ):
+            self.assertIn(expected, body)
+
+    def test_audit_results_keep_compact_and_legacy_fallbacks(self):
+        body = self._index_template()
+
+        self.assertIn(
+            "if (Array.isArray(data.enriched_findings)) return data.enriched_findings;",
+            body,
+        )
+        self.assertIn("if (Array.isArray(data.findings)) return data.findings;", body)
+        self.assertIn(
+            'if (typeof f !== "object" || f === null) return String(f || "");', body
+        )
+        self.assertIn("if (compactView) {", body)
+        self.assertIn("finding-compact-meta", body)
+
+    def test_audit_results_include_copy_controls_for_technical_blocks(self):
+        body = self._index_template()
+
+        self.assertIn('class="finding-copy-btn" data-copy-block', body)
+        self.assertIn("navigator.clipboard.writeText(text)", body)
+        self.assertIn('btn.textContent = "Copied";', body)
+
+    def test_audit_results_filter_common_metadata_without_raw_dump(self):
+        body = self._index_template()
+
+        for expected in (
+            '["raw_source", "Raw source"]',
+            '["expanded_source", "Expanded source"]',
+            '["raw_destination", "Raw destination"]',
+            '["expanded_destination", "Expanded destination"]',
+            '["raw_service", "Raw service"]',
+            '["expanded_service", "Expanded service"]',
+            '["interface", "Interface"]',
+            '["from_zone", "From zone"]',
+            '["to_zone", "To zone"]',
+            '["source_zone", "Source zone"]',
+            '["destination_zone", "Destination zone"]',
+        ):
+            self.assertIn(expected, body)
+        self.assertNotIn("JSON.stringify(f.metadata", body)
 
     def test_download_menu_flows_right_from_pill(self):
         style_path = os.path.join(
