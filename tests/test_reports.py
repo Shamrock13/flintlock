@@ -429,7 +429,53 @@ class TestModalMarkup(unittest.TestCase):
 
         self.assertIn("data.report_warning", body)
         self.assertIn(
-            "const warnings = [data.license_warning, data.report_warning].filter(Boolean);",
+            "const warnings = [(DEMO_MODE ? null : data.license_warning), data.report_warning].filter(Boolean);",
+            body,
+        )
+
+    def test_static_assets_use_cache_busting_helper(self):
+        body = self._index_template()
+
+        self.assertIn("{{ static_asset('favicon.svg') }}", body)
+        self.assertIn("{{ static_asset('style.css') }}", body)
+        self.assertNotIn("url_for('static', filename='style.css')", body)
+
+    def test_demo_banner_is_public_and_glyph_free(self):
+        body = self._index_template()
+        style_path = os.path.join(
+            os.path.dirname(__file__), "..", "src", "cashel", "static", "style.css"
+        )
+        with open(style_path, encoding="utf-8") as fh:
+            css = fh.read()
+
+        demo_banner = body[
+            body.index("{% if demo_mode %}") : body.index(
+                "{% if not demo_mode and not current_user %}"
+            )
+        ]
+        self.assertIn("<strong>Live Demo</strong>", demo_banner)
+        self.assertIn(
+            "Sample configs are processed in memory and never stored.", demo_banner
+        )
+        self.assertIn(">Sample Report<", demo_banner)
+        self.assertIn(">Get Cashel &rarr;<", demo_banner)
+        self.assertNotIn("&#128196;", demo_banner)
+        self.assertNotIn("Licensed", demo_banner)
+        self.assertIn(".demo-banner {", css)
+        self.assertIn("flex-wrap: wrap", css)
+        self.assertIn(".demo-banner-link", css)
+
+    def test_demo_mode_hides_settings_and_license_affordances(self):
+        body = self._index_template()
+
+        self.assertIn('{% if not demo_mode %}\n      <span class="license-chip', body)
+        self.assertIn(
+            "{% if not demo_mode and (not current_user or current_user.role == 'admin') %}",
+            body,
+        )
+        self.assertIn("if (!DEMO_MODE && userRole === 'admin') loadSettings();", body)
+        self.assertIn(
+            "{% if demo_mode %}Sample compliance checks can be included in demo runs.",
             body,
         )
 
