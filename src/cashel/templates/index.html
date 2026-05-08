@@ -2767,7 +2767,8 @@
     }
 
     const warn = document.getElementById("licenseWarning");
-    if (data.license_warning) { warn.textContent = data.license_warning; warn.classList.remove("hidden"); }
+    const warnings = [data.license_warning, data.report_warning].filter(Boolean);
+    if (warnings.length) { warn.textContent = warnings.join(" "); warn.classList.remove("hidden"); }
     else { warn.classList.add("hidden"); }
 
     activeFilter = null; currentPage = 1;

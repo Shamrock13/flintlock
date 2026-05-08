@@ -390,6 +390,15 @@ class TestModalMarkup(unittest.TestCase):
             body,
         )
 
+    def test_audit_report_warning_is_rendered_with_result_warnings(self):
+        body = self._index_template()
+
+        self.assertIn("data.report_warning", body)
+        self.assertIn(
+            "const warnings = [data.license_warning, data.report_warning].filter(Boolean);",
+            body,
+        )
+
     def test_download_menu_flows_right_from_pill(self):
         style_path = os.path.join(
             os.path.dirname(__file__), "..", "src", "cashel", "static", "style.css"

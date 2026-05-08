@@ -10,7 +10,12 @@ services:
       - cashel_data:/data
     environment:
       - CASHEL_SECRET=${CASHEL_SECRET:?Set CASHEL_SECRET to a strong random string}
+      - PLAYWRIGHT_BROWSERS_PATH=/ms-playwright
+      - UPLOAD_FOLDER=/data/uploads
+      - REPORTS_FOLDER=/data/reports
+      - LICENSE_PATH=/data/.cashel_license
       - CASHEL_KEY_FILE=/data/cashel.key
+      - CASHEL_DB=/data/cashel.db
     restart: unless-stopped
 
 volumes:

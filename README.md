@@ -190,6 +190,14 @@ Recommended `.env` value:
 CASHEL_SECRET=replace-with-a-long-random-secret
 ```
 
+For Render Docker deployments, mount a persistent disk at `/data` and set
+`UPLOAD_FOLDER=/data/uploads`, `REPORTS_FOLDER=/data/reports`,
+`LICENSE_PATH=/data/.cashel_license`, `CASHEL_KEY_FILE=/data/cashel.key`, and
+`PLAYWRIGHT_BROWSERS_PATH=/ms-playwright`. Without persistent `/data`, setup,
+history, schedules, reports, and license state reset when the container is
+replaced. The first Docker build can take longer because Chromium is installed
+for PDF generation.
+
 Stop the app:
 
 ```bash

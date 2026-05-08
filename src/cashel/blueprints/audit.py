@@ -2,6 +2,7 @@
 
 import os
 import uuid
+import logging
 from pathlib import Path
 
 from flask import Blueprint, jsonify, request, send_file
@@ -18,6 +19,7 @@ from cashel._helpers import (
     _err,
     _make_temp_path,
     _MAX_FILE_BYTES,
+    MAX_FILE_LIMIT_MESSAGE,
     _require_role,
     UPLOAD_FOLDER,
 )
@@ -43,6 +45,7 @@ from cashel.reporter import generate_report, write_report_sidecar
 from cashel.settings import get_settings
 
 REPORTS_FOLDER = os.environ.get("REPORTS_FOLDER", "/tmp/cashel_reports")
+logger = logging.getLogger(__name__)
 
 audit_bp = Blueprint("audit", __name__)
 
@@ -179,6 +182,20 @@ def get_demo_index_data() -> tuple[list, list]:
         for k, v in _DEMO_COMPARISON_PAIRS.items()
     ]
     return configs, comparisons
+
+
+def _safe_exception_detail(exc: Exception) -> str:
+    """Return a client-safe exception summary for non-fatal warnings."""
+    if get_settings().get("error_detail") == "full" or DEMO_MODE:
+        return str(exc)
+    return exc.__class__.__name__
+
+
+def _report_warning(exc: Exception) -> str:
+    return (
+        "Audit completed, but PDF report generation failed: "
+        f"{_safe_exception_detail(exc)}"
+    )
 
 
 @audit_bp.route("/demo/configs")
@@ -369,7 +386,7 @@ def run_audit():
     upload = request.files["config"]
     upload.seek(0, 2)
     if upload.tell() > _MAX_FILE_BYTES:
-        return jsonify({"error": "File exceeds the 5 MB per-file limit."}), 413
+        return jsonify({"error": MAX_FILE_LIMIT_MESSAGE}), 413
     upload.seek(0)
     suffix = Path(upload.filename).suffix or ".txt"
     temp_path = _make_temp_path(suffix)
@@ -427,26 +444,31 @@ def run_audit():
         summary = _build_summary(findings)
 
         report_filename = None
+        report_warning = None
         if generate_pdf:
             report_name = f"cashel_report_{uuid.uuid4().hex[:8]}.pdf"
             report_path = os.path.join(REPORTS_FOLDER, report_name)
-            generate_report(
-                findings,
-                upload.filename,
-                vendor,
-                compliance,
-                output_path=report_path,
-                summary=summary,
-            )
-            write_report_sidecar(
-                report_path,
-                findings=findings,
-                filename=upload.filename,
-                vendor=vendor,
-                compliance=compliance,
-                summary=summary,
-            )
-            report_filename = report_name
+            try:
+                generate_report(
+                    findings,
+                    upload.filename,
+                    vendor,
+                    compliance,
+                    output_path=report_path,
+                    summary=summary,
+                )
+                write_report_sidecar(
+                    report_path,
+                    findings=findings,
+                    filename=upload.filename,
+                    vendor=vendor,
+                    compliance=compliance,
+                    summary=summary,
+                )
+                report_filename = report_name
+            except Exception as exc:
+                logger.exception("PDF report generation failed for %s", upload.filename)
+                report_warning = _report_warning(exc)
 
         # Optional archive save — skipped in demo mode
         archive_id = None
@@ -480,6 +502,7 @@ def run_audit():
                 "enriched_findings": findings,
                 "summary": summary,
                 "report": report_filename,
+                "report_warning": report_warning,
                 "license_warning": license_warning,
                 "detected_vendor": vendor,
                 "detected_hostname": detected_hostname,
@@ -488,6 +511,12 @@ def run_audit():
         )
 
     except Exception as e:
+        logger.exception(
+            "File audit failed for %s (%s): %s",
+            upload.filename,
+            e.__class__.__name__,
+            e,
+        )
         if not DEMO_MODE:
             log_activity(
                 ACTION_FILE_AUDIT,
@@ -495,6 +524,7 @@ def run_audit():
                 vendor=vendor or "unknown",
                 success=False,
                 error=str(e),
+                details={"exception_type": e.__class__.__name__},
             )
         return jsonify(
             {

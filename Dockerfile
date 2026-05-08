@@ -6,9 +6,12 @@ RUN apt-get update && apt-get install -y --no-install-recommends curl \
 
 WORKDIR /app
 
+ENV PLAYWRIGHT_BROWSERS_PATH=/ms-playwright
+
 # Install dependencies first (layer caching)
 COPY requirements.txt .
-RUN pip install -r requirements.txt \
+RUN mkdir -p /ms-playwright \
+    && pip install -r requirements.txt \
     && python -m playwright install --with-deps chromium
 
 # Copy source
@@ -18,7 +21,9 @@ COPY . .
 RUN mkdir -p /data/uploads /data/reports
 
 # Create non-root user and set ownership
-RUN useradd -m -u 1000 cashel && chown -R cashel:cashel /app /data
+RUN useradd -m -u 1000 cashel \
+    && chown -R cashel:cashel /app /data /ms-playwright \
+    && chmod -R a+rX /ms-playwright
 USER cashel
 
 # Environment defaults (overridable via docker-compose or -e flags)
