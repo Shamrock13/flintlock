@@ -4,7 +4,7 @@ import os
 import secrets
 import time
 
-from flask import Flask, g, jsonify, render_template, request
+from flask import Flask, g, jsonify, render_template, request, url_for
 from flasgger import Swagger
 
 from .extensions import csrf, limiter
@@ -91,6 +91,41 @@ _swagger = Swagger(
 )
 
 _start_time = time.time()
+
+
+_asset_build_id = (
+    os.environ.get("CASHEL_ASSET_VERSION")
+    or os.environ.get("RENDER_GIT_COMMIT")
+    or os.environ.get("SOURCE_VERSION")
+    or ""
+).strip()
+
+
+def _static_asset_version(filename: str) -> str:
+    version_parts = []
+    if _asset_build_id:
+        version_parts.append(_asset_build_id[:12])
+    try:
+        static_folder = app.static_folder
+        if static_folder:
+            static_path = os.path.join(static_folder, filename)
+            version_parts.append(str(int(os.path.getmtime(static_path))))
+    except OSError:
+        pass
+    if version_parts:
+        return "-".join(version_parts)
+    try:
+        return importlib.metadata.version("cashel")
+    except importlib.metadata.PackageNotFoundError:
+        return "dev"
+
+
+@app.context_processor
+def _static_asset_helpers():
+    def static_asset(filename: str) -> str:
+        return url_for("static", filename=filename, v=_static_asset_version(filename))
+
+    return {"static_asset": static_asset}
 
 
 @app.before_request

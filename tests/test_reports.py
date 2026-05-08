@@ -365,6 +365,31 @@ class TestDemoSampleReport(unittest.TestCase):
         resp = self.client.get("/demo/sample-report.pdf")
         self.assertTrue(resp.data[:4] == b"%PDF")
 
+    def test_sample_report_uses_versioned_modern_cache_and_sidecar(self):
+        stale_pdf = os.path.join(self.tmp_dir, "demo_sample_report.pdf")
+        with open(stale_pdf, "wb") as fh:
+            fh.write(b"%PDF stale legacy sample")
+
+        resp = self.client.get("/demo/sample-report.pdf")
+
+        self.assertEqual(resp.status_code, 200)
+        self.assertFalse(os.path.exists(stale_pdf))
+        cached = [
+            name
+            for name in os.listdir(self.tmp_dir)
+            if name.startswith("demo_sample_report_") and name.endswith(".pdf")
+        ]
+        self.assertEqual(len(cached), 1)
+        self.assertNotEqual(cached[0], "demo_sample_report.pdf")
+
+        sidecar = os.path.join(self.tmp_dir, cached[0].replace(".pdf", ".json"))
+        self.assertTrue(os.path.exists(sidecar))
+        with open(sidecar, encoding="utf-8") as fh:
+            metadata = fh.read()
+        self.assertIn("demo-sample-", metadata)
+        self.assertIn("CASHEL-ASA-ACL-001", metadata)
+        self.assertIn("evidence", metadata)
+
 
 class TestModalMarkup(unittest.TestCase):
     def _index_template(self):
@@ -429,9 +454,80 @@ class TestModalMarkup(unittest.TestCase):
 
         self.assertIn("data.report_warning", body)
         self.assertIn(
-            "const warnings = [data.license_warning, data.report_warning].filter(Boolean);",
+            "const warnings = [(DEMO_MODE ? null : data.license_warning), data.report_warning].filter(Boolean);",
             body,
         )
+
+    def test_static_assets_use_cache_busting_helper(self):
+        body = self._index_template()
+
+        self.assertIn("{{ static_asset('favicon.svg') }}", body)
+        self.assertIn("{{ static_asset('style.css') }}", body)
+        self.assertNotIn("url_for('static', filename='style.css')", body)
+
+    def test_demo_banner_is_public_and_glyph_free(self):
+        body = self._index_template()
+        style_path = os.path.join(
+            os.path.dirname(__file__), "..", "src", "cashel", "static", "style.css"
+        )
+        with open(style_path, encoding="utf-8") as fh:
+            css = fh.read()
+
+        demo_banner = body[
+            body.index("{% if demo_mode %}") : body.index(
+                "{% if not demo_mode and not current_user %}"
+            )
+        ]
+        self.assertIn("<strong>Live Demo</strong>", demo_banner)
+        self.assertIn(
+            "Sample configs are processed in memory and never stored.", demo_banner
+        )
+        self.assertIn(">Sample Report<", demo_banner)
+        self.assertIn(">Get Cashel &rarr;<", demo_banner)
+        self.assertNotIn("&#128196;", demo_banner)
+        self.assertNotIn("Licensed", demo_banner)
+        self.assertIn(".demo-banner {", css)
+        self.assertIn("flex-wrap: wrap", css)
+        self.assertIn(".demo-banner-link", css)
+
+    def test_demo_mode_hides_settings_and_license_affordances(self):
+        body = self._index_template()
+
+        self.assertIn('{% if not demo_mode %}\n      <span class="license-chip', body)
+        self.assertIn(
+            "{% if not demo_mode and (not current_user or current_user.role == 'admin') %}",
+            body,
+        )
+        self.assertIn("if (!DEMO_MODE && userRole === 'admin') loadSettings();", body)
+        self.assertIn(
+            "{% if demo_mode %}Sample compliance checks can be included in demo runs.",
+            body,
+        )
+
+    def test_modern_report_templates_have_no_paid_license_language(self):
+        root = os.path.join(os.path.dirname(__file__), "..", "src", "cashel")
+        template_paths = [
+            os.path.join(root, "templates", "audit_report_pdf.html"),
+            os.path.join(root, "templates", "remediation_report_pdf.html"),
+            os.path.join(root, "templates", "bundle_cover_pdf.html"),
+            os.path.join(root, "templates", "report_view.html"),
+            os.path.join(root, "templates", "_modern_report_pdf_styles.html"),
+        ]
+        banned = [
+            "Cashel Pro",
+            "Buy a license",
+            "Gumroad",
+            "license unlocks",
+            "watermark",
+            "Compliance unlock",
+            "Bootstrap",
+            "blue header",
+        ]
+        for path in template_paths:
+            with open(path, encoding="utf-8") as fh:
+                body = fh.read()
+            for phrase in banned:
+                self.assertNotIn(phrase, body, path)
 
     def test_audit_results_render_enriched_finding_detail_fields(self):
         body = self._index_template()
@@ -703,16 +799,17 @@ class TestModalMarkup(unittest.TestCase):
 
     def test_template_versions_are_platform_200(self):
         body = self._index_template()
-        report_template_path = os.path.join(
-            os.path.dirname(__file__), "..", "src", "cashel", "report_template.html"
+        legacy_report_template_path = os.path.join(
+            os.path.dirname(__file__),
+            "..",
+            "src",
+            "cashel",
+            "report_template.html",
         )
-        with open(report_template_path, encoding="utf-8") as fh:
-            report_template = fh.read()
 
         self.assertIn("Cashel v2.0.0", body)
-        self.assertIn("Generated by Cashel v2.0.0", report_template)
+        self.assertFalse(os.path.exists(legacy_report_template_path))
         self.assertNotIn("1.5.1", body)
-        self.assertNotIn("1.5.1", report_template)
 
     def test_bulk_mode_has_own_section_without_single_header_overlap(self):
         body = self._index_template()
