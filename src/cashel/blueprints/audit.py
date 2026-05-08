@@ -425,16 +425,16 @@ def run_audit():
     try:
         findings, parse, extra_data = run_vendor_audit(vendor, temp_path)
 
-        # Compliance checks (license-gated; not applicable for AWS/Azure)
+        # TODO: Remove or refactor this legacy compliance access gate.
+        # Compliance should become data-driven evidence mapping, not a paid unlock.
         license_warning = None
         if compliance and vendor not in ("aws", "azure", "gcp", "iptables", "nftables"):
             licensed, _ = check_license()
             if not licensed:
                 license_warning = (
-                    "Compliance checks require a valid license. "
-                    'Purchase one at <a href="https://shamrock13.gumroad.com/l/cashel" '
-                    'target="_blank" rel="noopener">shamrock13.gumroad.com/l/cashel</a>. '
-                    "Once purchased, enter your key in Settings → Licensing."
+                    "Compliance checks are currently behind a deprecated legacy "
+                    "access gate and may be skipped until that gate is removed "
+                    "or refactored."
                 )
             else:
                 raw = run_compliance_checks(vendor, compliance, parse, extra_data)
@@ -693,6 +693,7 @@ def live_connect():
     try:
         findings, parse, extra_data = run_vendor_audit(vendor, temp_path)
 
+        # TODO: Remove or refactor this legacy compliance access gate.
         if compliance and vendor not in ("aws", "azure", "gcp", "iptables", "nftables"):
             licensed, _ = check_license()
             if licensed:
@@ -832,6 +833,7 @@ def bulk_audit():
 
             findings, parse, extra_data = run_vendor_audit(vendor, temp_path)
 
+            # TODO: Remove or refactor this legacy compliance access gate.
             if compliance and vendor not in (
                 "aws",
                 "azure",

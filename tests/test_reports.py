@@ -639,7 +639,7 @@ class TestModalMarkup(unittest.TestCase):
         ):
             self.assertIn(selector, css)
 
-    def test_license_purchase_and_activate_button_are_polished(self):
+    def test_legacy_compliance_access_actions_are_polished(self):
         body = self._index_template()
         style_path = os.path.join(
             os.path.dirname(__file__), "..", "src", "cashel", "static", "style.css"
@@ -647,10 +647,15 @@ class TestModalMarkup(unittest.TestCase):
         with open(style_path, encoding="utf-8") as fh:
             css = fh.read()
 
-        self.assertIn('href="https://shamrock13.gumroad.com/l/cashel"', body)
+        self.assertIn(
+            'href="https://github.com/Shamrock13/cashel/blob/main/docs/product-contract.md"',
+            body,
+        )
         self.assertIn('class="btn-outline action-pill-control license-buy-link"', body)
         self.assertIn("support@cashel.app", body)
         self.assertNotIn("support@cashel.dev", body)
+        self.assertIn("paid compliance licensing is deprecated", body)
+        self.assertNotIn("Buy a license", body)
         self.assertIn(
             'class="btn-primary action-pill-control btn-activate-license" id="activateLicenseBtn">Activate</button>',
             body,

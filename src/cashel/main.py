@@ -1,5 +1,4 @@
 import typer
-from rich.console import Console
 from .license import activate_license, check_license, deactivate_license
 from .reporter import generate_report
 from .audit_engine import (
@@ -9,7 +8,6 @@ from .audit_engine import (
     run_vendor_audit,
 )
 
-_console = Console()
 app = typer.Typer()
 
 _VALID_VENDORS = [
@@ -87,15 +85,12 @@ def audit(
         typer.echo("[PASS] No issues found")
 
     if compliance:
+        # TODO: Remove or refactor this legacy compliance access gate.
         licensed, message = check_license()
         if not licensed:
-            typer.echo("\n⚠️  Compliance checks require a valid license.")
-            _console.print(
-                "   Purchase a license at: [link=https://shamrock13.gumroad.com/l/cashel]"
-                "https://shamrock13.gumroad.com/l/cashel[/link]"
-            )
+            typer.echo("\nCompliance checks are behind a deprecated legacy gate.")
             typer.echo(
-                "   Once purchased, activate your key: cashel --activate YOUR-LICENSE-KEY"
+                "This behavior is under review; hygiene checks still run without a key."
             )
             raise typer.Exit()
         typer.echo(f"\n--- {compliance.upper()} Compliance Checks ---")
