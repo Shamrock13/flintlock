@@ -1,20 +1,27 @@
 """Reports blueprint — /reports/* and /remediation-plan."""
 
 import io
+import json
 import logging
 import os
 import uuid
 import zipfile
 from datetime import datetime, timezone
 
-from flask import Blueprint, jsonify, request, send_file
+from flask import Blueprint, jsonify, render_template, request, send_file
 
 from cashel._helpers import _require_role
 from cashel.archive import get_entry
 from cashel.export import to_csv, to_json, to_sarif
 from cashel.extensions import limiter
 from cashel.remediation import generate_plan, plan_to_markdown, plan_to_pdf
-from cashel.reporter import generate_cover_pdf, generate_report
+from cashel.reporter import (
+    VENDOR_DISPLAY,
+    finding_rows,
+    generate_cover_pdf,
+    generate_report,
+    report_sidecar_path,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -31,6 +38,88 @@ def _safe_report_path(filename):
     if not os.path.exists(path):
         return None
     return path
+
+
+def _load_report_metadata(path):
+    sidecar = report_sidecar_path(path)
+    if not os.path.exists(sidecar):
+        return None
+    try:
+        with open(sidecar, encoding="utf-8") as fh:
+            return json.load(fh)
+    except (OSError, json.JSONDecodeError):
+        logger.warning("Could not load report sidecar: %s", sidecar)
+        return None
+
+
+def _fmt_generated(value, fallback_ts):
+    if value:
+        try:
+            dt = datetime.fromisoformat(str(value).replace("Z", "+00:00"))
+        except ValueError:
+            dt = None
+        if dt:
+            if dt.tzinfo:
+                dt = dt.astimezone(timezone.utc)
+            return (
+                dt.strftime("%B %d, %Y").replace(" 0", " "),
+                dt.strftime("%H:%M:%S UTC"),
+            )
+    dt = datetime.fromtimestamp(fallback_ts, timezone.utc)
+    return dt.strftime("%B %d, %Y").replace(" 0", " "), dt.strftime("%H:%M:%S UTC")
+
+
+def _compliance_label(value):
+    if not value:
+        return "Basic hygiene"
+    labels = {
+        "cis": "CIS Benchmark",
+        "stig": "DISA STIG",
+        "hipaa": "HIPAA Security Rule",
+        "nist": "NIST SP 800-41",
+        "pci": "PCI-DSS",
+        "soc2": "SOC2",
+    }
+    return labels.get(str(value).lower(), str(value))
+
+
+def _viewer_context(path, filename):
+    metadata = _load_report_metadata(path) or {}
+    fallback = not bool(metadata)
+    summary = metadata.get("summary") or {}
+    findings = metadata.get("findings") or []
+    rows = finding_rows(findings)
+    total = summary.get("total", len(rows))
+    critical = summary.get("critical", 0)
+    high = summary.get("high", 0)
+    medium = summary.get("medium", 0)
+    low = summary.get("low", 0)
+    score = summary.get("score")
+    generated_date, generated_time = _fmt_generated(
+        metadata.get("generated_at"), os.path.getmtime(path)
+    )
+    vendor = metadata.get("vendor") or "unknown"
+    compliance = _compliance_label(metadata.get("compliance"))
+    return {
+        "fallback": fallback,
+        "pdf_filename": filename,
+        "report_id": metadata.get("report_id") or os.path.splitext(filename)[0],
+        "audit_filename": metadata.get("filename") or filename,
+        "vendor": vendor,
+        "vendor_label": VENDOR_DISPLAY.get(vendor, vendor.upper()),
+        "compliance": compliance,
+        "summary": {
+            "critical": critical,
+            "high": high,
+            "medium": medium,
+            "low": low,
+            "total": total,
+            "score": score,
+        },
+        "generated_date": generated_date,
+        "generated_time": generated_time,
+        "findings": rows,
+    }
 
 
 @reports_bp.route("/reports", methods=["GET"])
@@ -60,11 +149,11 @@ def download_report(filename):
 
 @reports_bp.route("/reports/<filename>/view")
 def view_report(filename):
-    """Serve PDF inline for in-browser viewing."""
+    """Render a polished HTML report viewer for a generated PDF report."""
     path = _safe_report_path(filename)
     if not path:
         return "Not found", 404
-    return send_file(path, as_attachment=False, mimetype="application/pdf")
+    return render_template("report_view.html", report=_viewer_context(path, filename))
 
 
 @reports_bp.route("/remediation-plan", methods=["POST"])

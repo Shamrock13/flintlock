@@ -24,9 +24,18 @@ ENTRY_ENRICHED = {
     "summary": {"high": 2, "medium": 1, "low": 0, "total": 3},
     "findings": [
         {
+            "id": "CASHEL-ASA-EXPOSURE-001",
+            "vendor": "asa",
+            "title": "Overly permissive any-any ACL rule",
             "severity": "HIGH",
             "category": "exposure",
             "message": "[HIGH] Permit any any rule found — remove or restrict.",
+            "evidence": "access-list OUTSIDE_IN permit ip any any",
+            "affected_object": "OUTSIDE_IN",
+            "rule_name": "OUTSIDE_IN",
+            "confidence": "high",
+            "verification": "Confirm the rule is replaced with scoped objects.",
+            "rollback": "Restore the prior ACL entry from backup.",
             "remediation": "no access-list OUTSIDE_IN permit ip any any",
         },
         {
@@ -96,6 +105,8 @@ def test_json_structure_enriched():
     """JSON output must contain all required top-level keys."""
     out = json.loads(to_json(ENTRY_ENRICHED))
     assert out["tool"] == "Cashel"
+    assert out["version"] == "2.0.0"
+    assert TOOL_VERSION == "2.0.0"
     assert out["vendor"] == "asa"
     assert out["filename"] == "asa-lab.cfg"
     assert out["summary"]["total"] == 3
@@ -103,6 +114,8 @@ def test_json_structure_enriched():
     first = out["findings"][0]
     assert first["severity"] == "HIGH"
     assert first["category"] == "exposure"
+    assert first["id"] == "CASHEL-ASA-EXPOSURE-001"
+    assert first["evidence"] == "access-list OUTSIDE_IN permit ip any any"
     assert "remediation" in first
 
 
@@ -130,10 +143,25 @@ def _parse_csv(text: str) -> list[dict]:
 
 
 def test_csv_columns_enriched():
-    """CSV must have the four standard columns and correct row count."""
+    """CSV must include enriched columns and preserve standard fields."""
     rows = _parse_csv(to_csv(ENTRY_ENRICHED))
     assert len(rows) == 3
-    assert set(rows[0].keys()) == {"severity", "category", "message", "remediation"}
+    assert set(rows[0].keys()) == {
+        "id",
+        "vendor",
+        "severity",
+        "category",
+        "title",
+        "message",
+        "remediation",
+        "evidence",
+        "affected_object",
+        "rule_name",
+        "confidence",
+    }
+    assert rows[0]["id"] == "CASHEL-ASA-EXPOSURE-001"
+    assert rows[0]["vendor"] == "asa"
+    assert rows[0]["affected_object"] == "OUTSIDE_IN"
 
 
 def test_csv_severity_values_enriched():
@@ -192,9 +220,34 @@ def test_sarif_rule_deduplication():
     rule_ids = [r["id"] for r in rules]
     # exposure, management, logging — each category appears exactly once
     assert len(rule_ids) == len(set(rule_ids))
-    assert "FLK-EXPOSURE" in rule_ids
+    assert "CASHEL-ASA-EXPOSURE-001" in rule_ids
     assert "FLK-MANAGEMENT" in rule_ids
     assert "FLK-LOGGING" in rule_ids
+
+
+def test_sarif_uses_stable_finding_id():
+    out = json.loads(to_sarif(ENTRY_ENRICHED))
+    result = out["runs"][0]["results"][0]
+    rules = out["runs"][0]["tool"]["driver"]["rules"]
+    assert result["ruleId"] == "CASHEL-ASA-EXPOSURE-001"
+    assert rules[0]["id"] == "CASHEL-ASA-EXPOSURE-001"
+
+
+def test_sarif_preserves_enriched_properties():
+    out = json.loads(to_sarif(ENTRY_ENRICHED))
+    properties = out["runs"][0]["results"][0]["properties"]
+
+    assert properties["vendor"] == "asa"
+    assert properties["category"] == "exposure"
+    assert properties["evidence"] == "access-list OUTSIDE_IN permit ip any any"
+    assert properties["affected_object"] == "OUTSIDE_IN"
+    assert properties["rule_name"] == "OUTSIDE_IN"
+    assert properties["confidence"] == "high"
+    assert (
+        properties["verification"]
+        == "Confirm the rule is replaced with scoped objects."
+    )
+    assert properties["rollback"] == "Restore the prior ACL entry from backup."
 
 
 def test_sarif_fixes_present():

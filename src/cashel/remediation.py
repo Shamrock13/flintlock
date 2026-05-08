@@ -313,6 +313,67 @@ def _consolidate_findings(findings: list[dict]) -> list[dict]:
     return consolidated
 
 
+def _commands_from_finding(finding: dict) -> str | None:
+    commands = finding.get("suggested_commands")
+    if isinstance(commands, list):
+        return "\n".join(str(cmd) for cmd in commands if cmd)
+    if commands:
+        return str(commands)
+    return None
+
+
+def _command_kind(vendor: str, commands: str | None) -> str:
+    if not commands:
+        return ""
+    text = str(commands).lower()
+    if vendor == "pfsense" or "pfsense ui:" in text:
+        return "guidance"
+    return "cli"
+
+
+def _build_step(
+    finding: dict,
+    step_num: int,
+    cli_gen,
+    has_cli: bool,
+    vendor: str,
+) -> dict[str, Any]:
+    step: dict[str, Any] = {
+        "step": step_num,
+        "severity": finding["severity"],
+        "category": finding.get("category", ""),
+        "effort": _estimate_effort(finding.get("remediation", "")),
+        "title": finding.get("title") or finding.get("message", ""),
+        "description": finding["message"],
+        "guidance": finding.get("remediation", ""),
+    }
+
+    for key in (
+        "id",
+        "evidence",
+        "impact",
+        "verification",
+        "rollback",
+        "affected_object",
+        "rule_name",
+    ):
+        if finding.get(key):
+            step[key] = finding[key]
+
+    cmd = _commands_from_finding(finding)
+    if not cmd and has_cli and cli_gen:
+        cmd = cli_gen(finding)
+    if cmd:
+        step["suggested_commands"] = cmd
+        step["command_kind"] = _command_kind(vendor, cmd)
+
+    if finding.get("_consolidated_count"):
+        step["consolidated_count"] = finding["_consolidated_count"]
+        step["consolidated_items"] = finding["_consolidated_items"]
+
+    return step
+
+
 def generate_plan(
     findings: list[dict],
     vendor: str,
@@ -373,28 +434,7 @@ def generate_plan(
         steps = []
         for f in group:
             step_num += 1
-            effort = _estimate_effort(f.get("remediation", ""))
-
-            step: dict[str, Any] = {
-                "step": step_num,
-                "severity": f["severity"],
-                "effort": effort,
-                "description": f["message"],
-                "guidance": f.get("remediation", ""),
-            }
-
-            # Generate CLI commands if available
-            if has_cli and cli_gen:
-                cmd = cli_gen(f)
-                if cmd:
-                    step["suggested_commands"] = cmd
-
-            # Include consolidated details if applicable
-            if f.get("_consolidated_count"):
-                step["consolidated_count"] = f["_consolidated_count"]
-                step["consolidated_items"] = f["_consolidated_items"]
-
-            steps.append(step)
+            steps.append(_build_step(f, step_num, cli_gen, has_cli, vendor))
 
         phases.append(
             {
@@ -409,19 +449,7 @@ def generate_plan(
         steps = []
         for f in group:
             step_num += 1
-            effort = _estimate_effort(f.get("remediation", ""))
-            step = {
-                "step": step_num,
-                "severity": f["severity"],
-                "effort": effort,
-                "description": f["message"],
-                "guidance": f.get("remediation", ""),
-            }
-            if has_cli and cli_gen:
-                cmd = cli_gen(f)
-                if cmd:
-                    step["suggested_commands"] = cmd
-            steps.append(step)
+            steps.append(_build_step(f, step_num, cli_gen, has_cli, vendor))
 
         phases.append(
             {
@@ -442,8 +470,8 @@ def generate_plan(
         "total_steps": step_num,
         "phases": phases,
         "disclaimer": (
-            "Commands are SUGGESTED and must be reviewed by a qualified engineer "
-            "before applying to production devices. Test in a maintenance window."
+            "Suggested commands and procedural guidance must be reviewed by a qualified "
+            "engineer before applying to production devices. Test in a maintenance window."
         )
         if has_commands
         else "",
@@ -515,6 +543,27 @@ def plan_to_markdown(plan: dict) -> str:
             lines.append(f"**Finding**: {step['description']}")
             lines.append("")
 
+            if step.get("id"):
+                lines.append(f"**Finding ID**: `{step['id']}`")
+                lines.append("")
+
+            if step.get("category"):
+                lines.append(f"**Category**: {str(step['category']).title()}")
+                lines.append("")
+
+            affected = step.get("affected_object") or step.get("rule_name")
+            if affected:
+                lines.append(f"**Affected**: {affected}")
+                lines.append("")
+
+            if step.get("evidence"):
+                lines.append(f"**Evidence**: `{step['evidence']}`")
+                lines.append("")
+
+            if step.get("impact"):
+                lines.append(f"**Impact**: {step['impact']}")
+                lines.append("")
+
             if step.get("consolidated_count"):
                 lines.append(
                     f"*This step covers {step['consolidated_count']} related findings:*"
@@ -528,11 +577,25 @@ def plan_to_markdown(plan: dict) -> str:
             lines.append(f"**Guidance**: {step['guidance']}")
             lines.append("")
 
+            if step.get("verification"):
+                lines.append(f"**Verification**: {step['verification']}")
+                lines.append("")
+
+            if step.get("rollback"):
+                lines.append(f"**Rollback**: {step['rollback']}")
+                lines.append("")
+
             if step.get("suggested_commands"):
-                lines.append("**Suggested Commands**:")
-                lines.append("```")
-                lines.append(step["suggested_commands"])
-                lines.append("```")
+                if step.get("command_kind") == "guidance":
+                    lines.append("**Suggested Procedure**:")
+                    for item in str(step["suggested_commands"]).splitlines():
+                        if item.strip():
+                            lines.append(f"- {item.strip()}")
+                else:
+                    lines.append("**Suggested Commands**:")
+                    lines.append("```")
+                    lines.append(step["suggested_commands"])
+                    lines.append("```")
                 lines.append("")
 
     return "\n".join(lines)
@@ -542,216 +605,99 @@ def plan_to_markdown(plan: dict) -> str:
 
 
 def plan_to_pdf(plan: dict, output_path: str) -> str:
-    """Render a remediation plan as a branded PDF.
+    """Render a remediation plan as a modern HTML-rendered PDF."""
+    from .export import TOOL_VERSION
+    from .html_pdf import render_template_to_pdf
+    from .reporter import VENDOR_DISPLAY, compliance_label
 
-    Reuses the CashelReport class from reporter.py for consistent branding.
-    """
-    from .reporter import (
-        CashelReport,
-        _sanitize,
-        _draw_summary_boxes,
-        _section_header,
-        VENDOR_DISPLAY,
-        _NAVY,
-        _WHITE,
-        _LIGHT_BG,
-        _BORDER,
-        _TEXT,
-        _MUTED,
-        _HIGH,
-        _HIGH_BG,
-        _MEDIUM,
-        _MEDIUM_BG,
-        _COMP,
-        _PASS,
-    )
-
-    _EFFORT_COLORS = {
-        "quick-fix": (26, 128, 85),  # green
-        "moderate": (153, 102, 0),  # amber
-        "change-window": (204, 34, 0),  # red
-    }
-
-    _CATEGORY_BAR_COLORS = {
-        "exposure": _HIGH,
-        "protocol": (170, 68, 255),
-        "logging": _MEDIUM,
-        "hygiene": _COMP,
-        "redundancy": _MUTED,
-        "compliance": _COMP,
-    }
-
-    class RemediationReport(CashelReport):
-        def header(self):
-            self.set_fill_color(*_NAVY)
-            self.rect(0, 0, 210, 30, "F")
-            self.set_text_color(*_WHITE)
-            self.set_font("Helvetica", "B", 17)
-            self.set_xy(12, 8)
-            self.cell(120, 9, "Cashel")
-            self.set_font("Helvetica", "", 8)
-            self.set_text_color(180, 200, 235)
-            self.set_xy(12, 19)
-            self.cell(120, 6, "Remediation Plan")
-            self.set_xy(0, 19)
-            self.cell(
-                198,
-                6,
-                f"Generated: {plan.get('generated', '')}",
-                align="R",
-            )
-            self.set_fill_color(126, 174, 255)  # blue accent for remediation
-            self.rect(0, 29.5, 210, 0.6, "F")
-            self.set_y(36)
-
-    pdf = RemediationReport()
-    pdf.set_auto_page_break(auto=True, margin=18)
-    pdf.add_page()
-
-    # Meta bar
-    vendor_name = VENDOR_DISPLAY.get(plan["vendor"], plan["vendor"].upper())
-    framework = plan["compliance"].upper() if plan.get("compliance") else "None"
-    pdf.set_fill_color(*_LIGHT_BG)
-    y = pdf.get_y()
-    pdf.rect(10, y, 190, 10, "F")
-    meta = f"Device: {plan.get('filename', 'N/A')}   |   Vendor: {vendor_name}   |   Framework: {framework}   |   Steps: {plan['total_steps']}"
-    pdf.set_font("Helvetica", "", 8)
-    pdf.set_text_color(*_MUTED)
-    pdf.set_xy(13, y + 2)
-    pdf.cell(184, 6, _sanitize(meta))
-    pdf.set_y(y + 13)
-
-    # Summary boxes
-    summary = plan.get("summary", {})
-    if summary:
-        _draw_summary_boxes(
-            pdf,
-            summary.get("high", 0),
-            summary.get("medium", 0),
-            summary.get("total", 0),
-            score=summary.get("score"),
-        )
-
-    # Disclaimer
-    if plan.get("disclaimer"):
-        pdf.set_fill_color(255, 248, 230)
-        pdf.set_draw_color(*_MEDIUM)
-        y = pdf.get_y()
-        pdf.set_line_width(0.4)
-        pdf.rect(10, y, 190, 12, "FD")
-        pdf.set_font("Helvetica", "B", 7)
-        pdf.set_text_color(*_MEDIUM)
-        pdf.set_xy(13, y + 2)
-        pdf.multi_cell(184, 4, _sanitize(plan["disclaimer"]))
-        pdf.set_y(y + 15)
-
-    # Divider
-    pdf.set_draw_color(*_BORDER)
-    pdf.set_line_width(0.3)
-    pdf.line(10, pdf.get_y(), 200, pdf.get_y())
-    pdf.ln(6)
-
-    if not plan.get("phases"):
-        pdf.set_font("Helvetica", "B", 10)
-        pdf.set_text_color(*_PASS)
-        pdf.cell(0, 8, "No remediation steps required — all checks passed.", align="C")
-    else:
-        for phase in plan["phases"]:
-            bar_color = _CATEGORY_BAR_COLORS.get(phase["category"], _COMP)
-            _section_header(pdf, phase["phase"], bar_color)
-
-            for step in phase["steps"]:
-                if step["severity"] == "CRITICAL":
-                    sev_color = (153, 0, 0)
-                    bg = (255, 230, 230)
-                elif step["severity"] == "HIGH":
-                    sev_color = _HIGH
-                    bg = _HIGH_BG
-                else:
-                    sev_color = _MEDIUM
-                    bg = _MEDIUM_BG
-                effort_color = _EFFORT_COLORS.get(step["effort"], _MUTED)
-
-                # Estimate row height
-                desc = step["description"]
-                guidance = step.get("guidance", "")
-                cmds = step.get("suggested_commands", "")
-                char_w = 2.3
-                inner_w = 183
-                desc_lines = max(
-                    1, (len(desc) + int(inner_w / char_w) - 1) // int(inner_w / char_w)
+    def _fmt_generated(value: str) -> tuple[str, str]:
+        if value:
+            try:
+                dt = datetime.fromisoformat(value.replace("Z", "+00:00"))
+                if dt.tzinfo:
+                    dt = dt.astimezone(timezone.utc)
+                return (
+                    dt.strftime("%B %d, %Y").replace(" 0", " "),
+                    dt.strftime("%H:%M:%S UTC"),
                 )
-                row_h: float = 14 + desc_lines * 4
-                if guidance:
-                    g_lines = max(
-                        1,
-                        (len(guidance) + int(inner_w / 2.0) - 1) // int(inner_w / 2.0),
-                    )
-                    row_h += g_lines * 3.8 + 2
-                if cmds:
-                    c_lines = cmds.count("\n") + 1
-                    row_h += c_lines * 3.5 + 6
+            except ValueError:
+                pass
+        dt = datetime.now(timezone.utc)
+        return dt.strftime("%B %d, %Y").replace(" 0", " "), dt.strftime("%H:%M:%S UTC")
 
-                y = pdf.get_y()
-                if y + row_h > 272:
-                    pdf.add_page()
-                    y = pdf.get_y()
+    def _all_steps() -> list[dict]:
+        return [s for phase in plan.get("phases", []) for s in phase.get("steps", [])]
 
-                # Step header bar
-                pdf.set_fill_color(*bar_color)
-                pdf.rect(10, y, 3, row_h, "F")
-                pdf.set_fill_color(*bg)
-                pdf.rect(13, y, 187, row_h, "F")
+    def _summary() -> dict:
+        steps = _all_steps()
+        counts = {"CRITICAL": 0, "HIGH": 0, "MEDIUM": 0, "LOW": 0}
+        for step in steps:
+            sev = str(step.get("severity", "MEDIUM")).upper()
+            if sev in counts:
+                counts[sev] += 1
+        source = plan.get("summary", {}) or {}
+        total = int(source.get("total", sum(counts.values())) or sum(counts.values()))
+        score = source.get("score")
+        if score is None:
+            score = max(
+                0,
+                100
+                - counts["CRITICAL"] * 20
+                - counts["HIGH"] * 10
+                - counts["MEDIUM"] * 3
+                - counts["LOW"],
+            )
+        return {
+            "critical": int(source.get("critical", counts["CRITICAL"]) or 0),
+            "high": int(source.get("high", counts["HIGH"]) or 0),
+            "medium": int(source.get("medium", counts["MEDIUM"]) or 0),
+            "low": int(source.get("low", counts["LOW"]) or 0),
+            "total": total,
+            "score": score,
+        }
 
-                cur_y = y + 2
+    def _step_title(step: dict) -> str:
+        if step.get("title"):
+            return str(step["title"])
+        desc = re.sub(r"^\[[A-Z]+\]\s*", "", str(step.get("description", ""))).strip()
+        if ":" in desc:
+            left, right = desc.split(":", 1)
+            return left.strip() if len(left) < 86 else right.strip()
+        return desc or "Remediation step"
 
-                # Step number + severity + effort badges
-                pdf.set_font("Helvetica", "B", 8)
-                pdf.set_text_color(*sev_color)
-                pdf.set_xy(15, cur_y)
-                pdf.cell(20, 5, f"Step {step['step']}")
+    generated_date, generated_time = _fmt_generated(plan.get("generated", ""))
+    vendor = plan.get("vendor", "unknown")
+    phases = []
+    for phase in plan.get("phases", []):
+        steps = []
+        for step in phase.get("steps", []):
+            sev = str(step.get("severity", "MEDIUM")).upper()
+            steps.append(
+                {
+                    **step,
+                    "title": _step_title(step),
+                    "severity": sev.title(),
+                    "severity_key": sev.lower(),
+                    "effort_label": _EFFORT_ICONS.get(
+                        step.get("effort", ""), step.get("effort", "")
+                    ),
+                }
+            )
+        phases.append({**phase, "steps": steps})
 
-                pdf.set_font("Helvetica", "B", 6.5)
-                pdf.set_xy(35, cur_y)
-                pdf.cell(15, 5, f"[{step['severity']}]")
-
-                pdf.set_text_color(*effort_color)
-                pdf.set_font("Helvetica", "", 6.5)
-                pdf.set_xy(50, cur_y)
-                effort_label = _EFFORT_ICONS.get(step["effort"], step["effort"])
-                pdf.cell(30, 5, effort_label)
-                cur_y += 7
-
-                # Finding description
-                pdf.set_text_color(*_TEXT)
-                pdf.set_font("Courier", "", 7)
-                pdf.set_xy(15, cur_y)
-                pdf.multi_cell(inner_w, 4, _sanitize(desc))
-                cur_y = pdf.get_y() + 1
-
-                # Guidance
-                if guidance:
-                    pdf.set_text_color(*_MUTED)
-                    pdf.set_font("Helvetica", "", 6.5)
-                    pdf.set_xy(17, cur_y)
-                    pdf.multi_cell(inner_w - 4, 3.8, _sanitize("-> " + guidance))
-                    cur_y = pdf.get_y() + 1
-
-                # CLI commands
-                if cmds:
-                    pdf.set_fill_color(240, 240, 248)
-                    cmd_y = cur_y
-                    cmd_lines = cmds.count("\n") + 1
-                    cmd_h = cmd_lines * 3.5 + 3
-                    pdf.rect(17, cmd_y, inner_w - 4, cmd_h, "F")
-                    pdf.set_text_color(60, 60, 100)
-                    pdf.set_font("Courier", "", 6.5)
-                    pdf.set_xy(19, cmd_y + 1.5)
-                    pdf.multi_cell(inner_w - 8, 3.5, _sanitize(cmds))
-
-                pdf.set_y(y + row_h + 2)
-
-            pdf.ln(3)
-
-    pdf.output(output_path)
-    return output_path
+    context = {
+        "filename": plan.get("filename") or "Firewall audit",
+        "vendor": vendor,
+        "vendor_label": VENDOR_DISPLAY.get(vendor, vendor.upper()),
+        "compliance": compliance_label(plan.get("compliance")),
+        "generated_date": generated_date,
+        "generated_time": generated_time,
+        "summary": _summary(),
+        "total_steps": plan.get("total_steps", 0),
+        "phases": phases,
+        "disclaimer": plan.get("disclaimer", ""),
+        "tool_version": TOOL_VERSION,
+    }
+    return render_template_to_pdf(
+        "remediation_report_pdf.html", output_path, report=context
+    )

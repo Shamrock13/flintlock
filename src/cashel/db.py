@@ -71,6 +71,7 @@ def init_db() -> None:
             minute                  INTEGER NOT NULL DEFAULT 0,
             day_of_week             TEXT NOT NULL DEFAULT 'mon',
             enabled                 INTEGER NOT NULL DEFAULT 1,
+            notify_on_critical      INTEGER NOT NULL DEFAULT 0,
             notify_on_finding       INTEGER NOT NULL DEFAULT 0,
             notify_on_error         INTEGER NOT NULL DEFAULT 0,
             notify_slack_webhook    TEXT NOT NULL DEFAULT '',
@@ -143,8 +144,20 @@ def init_db() -> None:
             created_at  TEXT NOT NULL
         );
     """)
+    _ensure_schedule_columns(conn)
     conn.commit()
     _migrate_json_to_sqlite()
+
+
+def _ensure_schedule_columns(conn: sqlite3.Connection) -> None:
+    """Apply tiny additive schedule migrations for existing SQLite files."""
+    columns = {
+        row["name"] for row in conn.execute("PRAGMA table_info(schedules)").fetchall()
+    }
+    if "notify_on_critical" not in columns:
+        conn.execute(
+            "ALTER TABLE schedules ADD COLUMN notify_on_critical INTEGER NOT NULL DEFAULT 0"
+        )
 
 
 # ── JSON → SQLite auto-migration ──────────────────────────────────────────────
@@ -215,6 +228,9 @@ def _map_schedule_row(data: dict) -> dict:
         "minute": data.get("minute", 0),
         "day_of_week": data.get("day_of_week", "mon"),
         "enabled": 1 if data.get("enabled", True) else 0,
+        "notify_on_critical": 1
+        if data.get("notify_on_critical", data.get("notify_on_finding", False))
+        else 0,
         "notify_on_finding": 1 if data.get("notify_on_finding", False) else 0,
         "notify_on_error": 1 if data.get("notify_on_error", False) else 0,
         "notify_slack_webhook": data.get("notify_slack_webhook", ""),

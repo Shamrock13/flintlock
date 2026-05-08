@@ -17,7 +17,9 @@ from .settings import get_settings
 
 _logger = _logging.getLogger(__name__)
 
-_MAX_FILE_BYTES = 5 * 1024 * 1024  # 5 MB per-file limit enforced in routes
+MAX_FILE_MB = 25
+_MAX_FILE_BYTES = MAX_FILE_MB * 1024 * 1024
+MAX_FILE_LIMIT_MESSAGE = f"File exceeds the {MAX_FILE_MB} MB per-file limit."
 
 UPLOAD_FOLDER = os.environ.get("UPLOAD_FOLDER", "/tmp/cashel_uploads")
 

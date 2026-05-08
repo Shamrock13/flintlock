@@ -1,0 +1,73 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<title>Cashel - Evidence Bundle - {{ cover.filename }}</title>
+{% include "_modern_report_pdf_styles.html" %}
+</head>
+<body>
+<main class="paper">
+  <header class="masthead">
+    <div>
+      <div class="brand">
+        <svg viewBox="0 0 120 120" width="18" height="18" xmlns="http://www.w3.org/2000/svg" aria-label="Cashel">
+          <rect x="0" y="0" width="120" height="120" rx="22" fill="var(--ink)" />
+          <path d="M24 86 V42 H38 V58 H52 V42 H68 V58 H82 V42 H96 V86 Z" fill="var(--acc)" />
+        </svg>
+        <span>Cashel</span>
+        <span class="sep">/</span>
+        <span class="kind">Evidence bundle</span>
+      </div>
+      <h1>{{ cover.filename }}<br /><span>Audit evidence</span></h1>
+      <div class="subtitle">Compliance evidence bundle for {{ cover.vendor_label }} audit artifacts.</div>
+    </div>
+    <div class="meta-right">
+      <div class="grp"><b>Generated</b><div class="val">{{ cover.generated_date }}</div><div>{{ cover.generated_time }}</div></div>
+      <div class="grp"><b>Bundle ID</b><div class="mono">{{ cover.bundle_id }}</div></div>
+      <div class="grp"><b>Framework</b><div class="val">{{ cover.compliance }}</div></div>
+    </div>
+  </header>
+
+  <div class="section-lbl"><h2>Executive summary</h2><span class="idx">01</span></div>
+  <section class="exec">
+    <div class="score-block">
+      <div>
+        <div class="tiny-label">Security score</div>
+        <div><span class="score-big">{{ cover.summary.score if cover.summary.score is not none else 'N/A' }}</span>{% if cover.summary.score is not none %}<span class="score-over"> / 100</span>{% endif %}</div>
+        <div class="grade">Critical {{ cover.summary.critical }} / High {{ cover.summary.high }} / Medium {{ cover.summary.medium }}</div>
+      </div>
+    </div>
+    <div>
+      <div class="tiny-label">Finding breakdown</div>
+      <div class="exec-breakdown">
+        {% set total = cover.summary.total if cover.summary.total else 0 %}
+        <div class="band-row c"><span class="dot"></span><div><div class="name">Critical</div><div class="bar"><i style="width: {{ (cover.summary.critical / total * 100) if total else 0 }}%"></i></div></div><span class="val">{{ cover.summary.critical }}</span></div>
+        <div class="band-row h"><span class="dot"></span><div><div class="name">High</div><div class="bar"><i style="width: {{ (cover.summary.high / total * 100) if total else 0 }}%"></i></div></div><span class="val">{{ cover.summary.high }}</span></div>
+        <div class="band-row m"><span class="dot"></span><div><div class="name">Medium</div><div class="bar"><i style="width: {{ (cover.summary.medium / total * 100) if total else 0 }}%"></i></div></div><span class="val">{{ cover.summary.medium }}</span></div>
+        <div class="band-row l"><span class="dot"></span><div><div class="name">Low</div><div class="bar"><i style="width: {{ (cover.summary.low / total * 100) if total else 0 }}%"></i></div></div><span class="val">{{ cover.summary.low }}</span></div>
+      </div>
+    </div>
+  </section>
+
+  <div class="section-lbl"><h2>Scope &amp; metadata</h2><span class="idx">02</span></div>
+  <table class="meta-table">
+    <tr><td>Device / file</td><td class="mono">{{ cover.filename }}</td></tr>
+    <tr><td>Vendor / syntax</td><td>{{ cover.vendor_label }}</td></tr>
+    <tr><td>Framework</td><td>{{ cover.compliance }}</td></tr>
+    <tr><td>Engine</td><td>Cashel {{ cover.tool_version }} - deterministic, offline</td></tr>
+  </table>
+
+  <div class="section-lbl"><h2>Bundle contents</h2><span class="idx">03</span></div>
+  <table class="meta-table">
+    {% for item in cover["items"] %}
+    <tr><td>Artifact</td><td class="mono">{{ item }}</td></tr>
+    {% endfor %}
+  </table>
+
+  <footer class="doc-foot">
+    <div>Cashel {{ cover.tool_version }} / {{ cover.bundle_id }}</div>
+    <div>Confidential - internal use only</div>
+  </footer>
+</main>
+</body>
+</html>
