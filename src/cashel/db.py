@@ -151,7 +151,9 @@ def init_db() -> None:
 
 def _ensure_schedule_columns(conn: sqlite3.Connection) -> None:
     """Apply tiny additive schedule migrations for existing SQLite files."""
-    columns = {row["name"] for row in conn.execute("PRAGMA table_info(schedules)").fetchall()}
+    columns = {
+        row["name"] for row in conn.execute("PRAGMA table_info(schedules)").fetchall()
+    }
     if "notify_on_critical" not in columns:
         conn.execute(
             "ALTER TABLE schedules ADD COLUMN notify_on_critical INTEGER NOT NULL DEFAULT 0"

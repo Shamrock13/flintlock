@@ -154,6 +154,7 @@ def compare_entries(id_a, id_b):
         )
 
     s_a, s_b = entry_a["summary"], entry_b["summary"]
+
     def _finding_key(finding):
         if isinstance(finding, dict):
             return finding.get("message") or json.dumps(finding, sort_keys=True)
