@@ -11,7 +11,12 @@ from flask import Blueprint, jsonify, request
 
 from cashel.extensions import limiter, csrf
 from cashel._vendor_helpers import ALL_VENDORS, detect_vendor, extract_hostname
-from cashel._helpers import _err, _make_temp_path, _MAX_FILE_BYTES
+from cashel._helpers import (
+    _err,
+    _make_temp_path,
+    _MAX_FILE_BYTES,
+    MAX_FILE_LIMIT_MESSAGE,
+)
 from cashel.ftd import is_ftd_config
 from cashel.archive import save_audit, get_entry, list_archive
 from cashel.audit_engine import (
@@ -121,7 +126,7 @@ def api_audit():
       401:
         description: Authentication required.
       413:
-        description: File exceeds the 5 MB limit.
+        description: File exceeds the 25 MB limit.
       429:
         description: Rate limit exceeded (30 requests/minute).
     """
@@ -144,7 +149,7 @@ def api_audit():
     upload = request.files["config"]
     upload.seek(0, 2)
     if upload.tell() > _MAX_FILE_BYTES:
-        return _api_err("File exceeds the 5 MB per-file limit.", 413)
+        return _api_err(MAX_FILE_LIMIT_MESSAGE, 413)
     upload.seek(0)
 
     suffix = Path(upload.filename).suffix or ".txt"

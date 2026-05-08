@@ -286,6 +286,67 @@ def test_generate_plan_findings_without_remediation_skipped():
     assert plan["total_steps"] == 0
 
 
+def test_generate_plan_prefers_structured_suggested_commands():
+    finding = {
+        "id": "CASHEL-ASA-LOGGING-001",
+        "severity": "MEDIUM",
+        "category": "logging",
+        "title": "Structured logging fix",
+        "message": "[MEDIUM] Missing logging on rule: permit ip any any",
+        "remediation": "Enable logging.",
+        "evidence": "access-list OUTSIDE_IN permit ip any any",
+        "verification": "Confirm syslog receives hits.",
+        "rollback": "Remove the log keyword if needed.",
+        "suggested_commands": ["structured command wins"],
+    }
+
+    plan = generate_plan([finding], "asa")
+    step = plan["phases"][0]["steps"][0]
+    assert step["title"] == "Structured logging fix"
+    assert step["suggested_commands"] == "structured command wins"
+    assert step["evidence"] == "access-list OUTSIDE_IN permit ip any any"
+    assert step["verification"] == "Confirm syslog receives hits."
+    assert step["rollback"] == "Remove the log keyword if needed."
+
+
+def test_generate_plan_preserves_enriched_remediation_fields():
+    finding = {
+        "id": "CASHEL-ASA-EXPOSURE-001",
+        "severity": "CRITICAL",
+        "category": "exposure",
+        "title": "Overly permissive any-any ACL rule",
+        "message": "[CRITICAL] permit ip any any",
+        "affected_object": "OUTSIDE_IN",
+        "rule_name": "OUTSIDE_IN",
+        "evidence": "access-list OUTSIDE_IN permit ip any any",
+        "impact": "The rule may allow traffic from any source to any destination.",
+        "remediation": "Replace with scoped ACL entries.",
+        "verification": "Re-run the audit.",
+        "rollback": "Restore the prior ACL line from backup.",
+        "suggested_commands": ["no access-list <ACL_NAME> permit ip any any"],
+    }
+
+    plan = generate_plan([finding], "asa")
+    step = plan["phases"][0]["steps"][0]
+
+    assert step["id"] == "CASHEL-ASA-EXPOSURE-001"
+    assert step["title"] == "Overly permissive any-any ACL rule"
+    assert step["severity"] == "CRITICAL"
+    assert step["category"] == "exposure"
+    assert step["affected_object"] == "OUTSIDE_IN"
+    assert step["rule_name"] == "OUTSIDE_IN"
+    assert step["evidence"] == "access-list OUTSIDE_IN permit ip any any"
+    assert (
+        step["impact"]
+        == "The rule may allow traffic from any source to any destination."
+    )
+    assert step["guidance"] == "Replace with scoped ACL entries."
+    assert step["verification"] == "Re-run the audit."
+    assert step["rollback"] == "Restore the prior ACL line from backup."
+    assert step["suggested_commands"] == "no access-list <ACL_NAME> permit ip any any"
+    assert step["command_kind"] == "cli"
+
+
 # ── Markdown export ──────────────────────────────────────────────────────────
 
 
@@ -303,6 +364,26 @@ def test_plan_to_markdown_empty():
     md = plan_to_markdown(plan)
     assert "# Remediation Plan" in md
     assert "Step 1" not in md  # No numbered steps in empty plan
+
+
+def test_plan_to_markdown_renders_pfsense_guidance_as_procedure_not_cli():
+    finding = {
+        "severity": "MEDIUM",
+        "category": "logging",
+        "message": "[MEDIUM] pfSense rule missing logging.",
+        "remediation": "Enable logging in the pfSense UI.",
+        "suggested_commands": [
+            "pfSense UI: Firewall > Rules > WAN > edit rule Allow Web",
+            "Enable Log packets that are handled by this rule",
+        ],
+    }
+
+    plan = generate_plan([finding], "pfsense")
+    md = plan_to_markdown(plan)
+
+    assert "**Suggested Procedure**:" in md
+    assert "- pfSense UI: Firewall > Rules > WAN > edit rule Allow Web" in md
+    assert "```" not in md
 
 
 # ── Vendor CLI generators ────────────────────────────────────────────────────

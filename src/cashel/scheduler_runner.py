@@ -157,7 +157,10 @@ def _run_scheduled_audit(schedule_id: str):
                 "check_thresholds failed for schedule %s: %s", schedule_id, _ae
             )
 
-        if schedule.get("notify_on_finding") and summary.get("high", 0) > 0:
+        should_notify_findings = (
+            schedule.get("notify_on_critical") and summary.get("critical", 0) > 0
+        ) or (schedule.get("notify_on_finding") and summary.get("high", 0) > 0)
+        if should_notify_findings:
             send_slack(
                 schedule.get("notify_slack_webhook", ""),
                 schedule,

@@ -62,7 +62,7 @@ def audit(
         raise typer.Exit()
 
     if not file or not vendor:
-        typer.echo("Cashel v1.5.1")
+        typer.echo("Cashel v2.0.0")
         typer.echo("Usage: python3 src/cashel/main.py --file config.txt --vendor asa")
         raise typer.Exit()
 
@@ -76,7 +76,7 @@ def audit(
         )
         raise typer.Exit(1)
 
-    typer.echo(f"\nCashel v1.5.1 — Starting audit of {file} ({vendor})\n")
+    typer.echo(f"\nCashel v2.0.0 — Starting audit of {file} ({vendor})\n")
 
     findings, parse, extra_data = run_vendor_audit(vendor, file)
 

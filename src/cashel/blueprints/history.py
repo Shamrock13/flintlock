@@ -27,6 +27,40 @@ REPORTS_FOLDER = os.environ.get("REPORTS_FOLDER", "/tmp/cashel_reports")
 history_bp = Blueprint("history", __name__)
 
 
+def _archive_findings_for_remediation(findings):
+    """Return enriched findings so old string-only archives still produce a plan."""
+    enriched = []
+    for finding in findings or []:
+        if isinstance(finding, dict):
+            enriched.append(finding)
+            continue
+        msg = str(finding)
+        upper = msg.upper()
+        severity = (
+            "CRITICAL"
+            if "[CRITICAL]" in upper or "CRITICAL" in upper
+            else "HIGH"
+            if "[HIGH]" in upper or "HIGH" in upper
+            else "MEDIUM"
+            if "[MEDIUM]" in upper or "MEDIUM" in upper
+            else "LOW"
+            if "[LOW]" in upper or "LOW" in upper
+            else "MEDIUM"
+        )
+        enriched.append(
+            {
+                "severity": severity,
+                "category": "hygiene",
+                "message": msg,
+                "remediation": (
+                    "Review this archived finding against the source firewall "
+                    "configuration and apply the least-privilege corrective action."
+                ),
+            }
+        )
+    return enriched
+
+
 @history_bp.route("/archive", methods=["GET"])
 def archive_list():
     return jsonify(list_archive())
@@ -151,7 +185,7 @@ def archive_remediation_plan(entry_id):
         return jsonify({"error": "Not found"}), 404
 
     # Archived findings may be strings or enriched dicts
-    findings = entry.get("findings", [])
+    findings = _archive_findings_for_remediation(entry.get("findings", []))
     vendor = entry.get("vendor", "unknown")
     filename = entry.get("filename", "")
     summary = entry.get("summary")

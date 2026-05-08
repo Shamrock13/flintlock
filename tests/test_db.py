@@ -193,6 +193,8 @@ _BASE_SCHEDULE = {
     "minute": 0,
     "day_of_week": "mon",
     "enabled": True,
+    "notify_on_critical": True,
+    "notify_on_finding": True,
 }
 
 
@@ -206,6 +208,8 @@ class TestScheduleStore(unittest.TestCase):
         self.assertEqual(fetched["id"], entry_id)
         self.assertEqual(fetched["vendor"], "asa")
         self.assertEqual(fetched["host"], "192.0.2.1")
+        self.assertTrue(fetched["notify_on_critical"])
+        self.assertTrue(fetched["notify_on_finding"])
         self.assertNotIn("password_enc", fetched)
         self.assertIn("has_password", fetched)
         self.assertTrue(fetched["has_password"])
@@ -230,8 +234,13 @@ class TestScheduleStore(unittest.TestCase):
     def test_update_schedule_partial(self):
         created = schedule_store.create_schedule(_BASE_SCHEDULE)
         entry_id = created["id"]
-        updated = schedule_store.update_schedule(entry_id, {"host": "10.0.0.1"})
+        updated = schedule_store.update_schedule(
+            entry_id,
+            {"host": "10.0.0.1", "username": "audit", "notify_on_critical": False},
+        )
         self.assertEqual(updated["host"], "10.0.0.1")
+        self.assertEqual(updated["username"], "audit")
+        self.assertFalse(updated["notify_on_critical"])
         self.assertEqual(updated["vendor"], "asa")  # unchanged
 
     @_tmp_db

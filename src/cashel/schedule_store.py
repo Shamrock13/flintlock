@@ -112,6 +112,7 @@ def _row_to_dict(row) -> dict:
     """Convert a sqlite3.Row to a plain dict, restoring Python types."""
     d = dict(row)
     d["enabled"] = bool(d["enabled"])
+    d["notify_on_critical"] = bool(d.get("notify_on_critical", False))
     d["notify_on_finding"] = bool(d["notify_on_finding"])
     d["notify_on_error"] = bool(d["notify_on_error"])
     return d
@@ -160,6 +161,9 @@ def create_schedule(data: dict) -> dict:
         "minute": validated["minute"],
         "day_of_week": validated["day_of_week"],
         "enabled": bool(data.get("enabled", True)),
+        "notify_on_critical": bool(
+            data.get("notify_on_critical", data.get("notify_on_finding", False))
+        ),
         "notify_on_finding": bool(data.get("notify_on_finding", False)),
         "notify_on_error": bool(data.get("notify_on_error", False)),
         "notify_slack_webhook": str(data.get("notify_slack_webhook", ""))[:512],
@@ -176,13 +180,14 @@ def create_schedule(data: dict) -> dict:
         """
         INSERT INTO schedules (
             id, name, vendor, host, port, username, password_enc, tag, compliance,
-            frequency, hour, minute, day_of_week, enabled, notify_on_finding,
-            notify_on_error, notify_slack_webhook, notify_teams_webhook, notify_email,
-            last_run, last_status, last_error, created_at
+            frequency, hour, minute, day_of_week, enabled, notify_on_critical,
+            notify_on_finding, notify_on_error, notify_slack_webhook,
+            notify_teams_webhook, notify_email, last_run, last_status, last_error,
+            created_at
         ) VALUES (
             :id, :name, :vendor, :host, :port, :username, :password_enc, :tag,
             :compliance, :frequency, :hour, :minute, :day_of_week,
-            :enabled, :notify_on_finding, :notify_on_error,
+            :enabled, :notify_on_critical, :notify_on_finding, :notify_on_error,
             :notify_slack_webhook, :notify_teams_webhook, :notify_email,
             :last_run, :last_status, :last_error, :created_at
         )
@@ -190,6 +195,7 @@ def create_schedule(data: dict) -> dict:
         {
             **schedule,
             "enabled": 1 if schedule["enabled"] else 0,
+            "notify_on_critical": 1 if schedule["notify_on_critical"] else 0,
             "notify_on_finding": 1 if schedule["notify_on_finding"] else 0,
             "notify_on_error": 1 if schedule["notify_on_error"] else 0,
         },
@@ -211,7 +217,9 @@ def update_schedule(entry_id: str, data: dict) -> dict | None:
     for key in (
         "name",
         "host",
+        "username",
         "tag",
+        "notify_on_critical",
         "notify_on_finding",
         "notify_on_error",
         "notify_slack_webhook",
@@ -242,6 +250,7 @@ def update_schedule(entry_id: str, data: dict) -> dict | None:
             username=:username, password_enc=:password_enc, tag=:tag,
             compliance=:compliance, frequency=:frequency, hour=:hour,
             minute=:minute, day_of_week=:day_of_week, enabled=:enabled,
+            notify_on_critical=:notify_on_critical,
             notify_on_finding=:notify_on_finding, notify_on_error=:notify_on_error,
             notify_slack_webhook=:notify_slack_webhook,
             notify_teams_webhook=:notify_teams_webhook, notify_email=:notify_email
@@ -250,6 +259,7 @@ def update_schedule(entry_id: str, data: dict) -> dict | None:
         {
             **schedule,
             "enabled": 1 if schedule["enabled"] else 0,
+            "notify_on_critical": 1 if schedule["notify_on_critical"] else 0,
             "notify_on_finding": 1 if schedule["notify_on_finding"] else 0,
             "notify_on_error": 1 if schedule["notify_on_error"] else 0,
         },

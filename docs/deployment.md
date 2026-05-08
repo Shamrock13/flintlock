@@ -11,6 +11,7 @@ This guide covers deploying Cashel behind a TLS-terminating reverse proxy. The a
 - [Prerequisites](#prerequisites)
 - [Environment variables](#environment-variables)
 - [Docker Compose with nginx (primary)](#docker-compose-with-nginx)
+- [Render Docker deployment](#render-docker-deployment)
 - [Docker Compose with Caddy (alternative)](#docker-compose-with-caddy)
 - [First-run admin setup](#first-run-admin-setup)
 - [Persistent volumes](#persistent-volumes)
@@ -26,6 +27,19 @@ This guide covers deploying Cashel behind a TLS-terminating reverse proxy. The a
 - A domain name with DNS pointed at your server (for TLS)
 - Ports 80 and 443 open on the host firewall
 
+Cashel generates audit reports, remediation reports, and evidence bundle covers
+from HTML/CSS using Playwright Chromium. The official Docker image installs
+Chromium's headless shell during build into `/ms-playwright`, which is readable
+by the non-root runtime user. First builds can take longer while the browser is
+downloaded. For non-Docker deployments, install Python dependencies and then run:
+
+```bash
+python -m playwright install chromium
+```
+
+Set `CASHEL_PDF_PAGE_FORMAT` to override the default `Letter` page size, or
+`CASHEL_PDF_TIMEOUT_MS` to tune the render timeout.
+
 ---
 
 ## Environment Variables
@@ -35,6 +49,10 @@ This guide covers deploying Cashel behind a TLS-terminating reverse proxy. The a
 | `CASHEL_SECRET` | **Yes** | — | Flask `SECRET_KEY`. Generate with `openssl rand -hex 32`. Sessions survive restarts only when this is set. |
 | `CASHEL_KEY_FILE` | **Yes** | `~/.config/cashel/cashel.key` | Path to the Fernet encryption key used to encrypt stored SSH passwords and API keys. Must persist across restarts. |
 | `CASHEL_DB` | No | `/data/cashel.db` | SQLite database path. |
+| `UPLOAD_FOLDER` | No | `/tmp/cashel_uploads` | Temporary uploaded config storage. Use `/data/uploads` in Docker/Render so the path is writable. |
+| `REPORTS_FOLDER` | No | `/tmp/cashel_reports` | Generated report storage. Use `/data/reports` in Docker/Render. |
+| `LICENSE_PATH` | No | platform config path | License file path. Use `/data/.cashel_license` in Docker/Render so license state persists. |
+| `PLAYWRIGHT_BROWSERS_PATH` | No | Playwright default | Browser install path. Docker images set this to `/ms-playwright` for non-root PDF rendering. |
 | `CASHEL_SECURE_COOKIES` | No | `false` | Set to `true` when serving over HTTPS. Marks session cookie with `Secure` flag. |
 | `WEB_CONCURRENCY` | No | `1` | Gunicorn worker count. Keep at `1` on single-CPU hosts to avoid OOM. |
 | `PORT` | No | `5000` | Internal port Gunicorn binds to (do not expose directly). |
@@ -165,6 +183,33 @@ python3 -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().
 
 docker compose up -d
 ```
+
+---
+
+## Render Docker deployment
+
+For Render Docker services, add a persistent disk mounted at `/data`. Without a
+persistent `/data` mount, the setup page, audit history, schedules, license
+state, reports, uploads, and encryption key can reset when Render replaces the
+container.
+
+Recommended Render environment:
+
+```bash
+CASHEL_SECRET=<strong-random-secret>
+PLAYWRIGHT_BROWSERS_PATH=/ms-playwright
+UPLOAD_FOLDER=/data/uploads
+REPORTS_FOLDER=/data/reports
+LICENSE_PATH=/data/.cashel_license
+CASHEL_KEY_FILE=/data/cashel.key
+CASHEL_DB=/data/cashel.db
+WEB_CONCURRENCY=1
+```
+
+The Docker build installs Playwright Chromium headless shell with system
+dependencies. The first build can be slow because the browser is downloaded
+during image creation, but runtime PDF generation should use the shared
+`/ms-playwright` browser path as the non-root `cashel` user.
 
 ---
 

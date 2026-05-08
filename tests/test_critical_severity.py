@@ -14,7 +14,9 @@ from ciscoconfparse import CiscoConfParse
 from cashel.audit_engine import (
     _build_summary,
     _sort_findings,
+    _f as audit_finding,
     _check_any_any,
+    _check_missing_logging,
     _check_telnet_asa,
 )
 from cashel.ftd import (
@@ -120,6 +122,31 @@ def test_asa_any_any_is_critical():
     assert len(findings) == 1
     assert findings[0]["severity"] == "CRITICAL"
     assert "[CRITICAL]" in findings[0]["message"]
+    assert findings[0]["id"] == "CASHEL-ASA-EXPOSURE-001"
+    assert findings[0]["title"] == "Overly permissive any-any ACL rule"
+    assert findings[0]["evidence"] == "access-list OUTSIDE_IN permit ip any any"
+    assert findings[0]["category"] == "exposure"
+    assert findings[0]["remediation"]
+
+
+def test_asa_missing_logging_has_evidence():
+    parse = _asa_parse("access-list OUTSIDE_IN permit tcp any host 10.0.0.1 eq 443\n")
+    findings = _check_missing_logging(parse)
+    assert len(findings) == 1
+    assert findings[0]["id"] == "CASHEL-ASA-LOGGING-001"
+    assert findings[0]["evidence"] == (
+        "access-list OUTSIDE_IN permit tcp any host 10.0.0.1 eq 443"
+    )
+    assert findings[0]["severity"] == "MEDIUM"
+    assert findings[0]["category"] == "logging"
+
+
+def test_audit_finding_helper_preserves_legacy_call_shape():
+    finding = audit_finding("LOW", "hygiene", "[LOW] Legacy call", "Fix it.")
+    assert finding["severity"] == "LOW"
+    assert finding["category"] == "hygiene"
+    assert finding["message"] == "[LOW] Legacy call"
+    assert finding["remediation"] == "Fix it."
 
 
 def test_asa_telnet_is_critical():

@@ -13,7 +13,7 @@ from .archive import list_archive
 from .settings import get_settings
 from .scheduler_runner import start_scheduler, stop_scheduler, scheduler_available
 from .syslog_handler import configure_syslog
-from ._helpers import UPLOAD_FOLDER, _require_auth_impl
+from ._helpers import MAX_FILE_MB, UPLOAD_FOLDER, _require_auth_impl
 
 REPORTS_FOLDER = os.environ.get("REPORTS_FOLDER", "/tmp/cashel_reports")
 ARCHIVE_FOLDER = os.environ.get("ARCHIVE_FOLDER", "/tmp/cashel_archive")
@@ -133,7 +133,7 @@ def _add_security_headers(response):
 @app.errorhandler(413)
 def request_too_large(_e):
     return jsonify(
-        {"error": "Upload too large. Maximum file size is 5 MB per file."}
+        {"error": f"Upload too large. Maximum file size is {MAX_FILE_MB} MB per file."}
     ), 413
 
 
@@ -190,6 +190,7 @@ def index():
         demo_mode=DEMO_MODE,
         demo_configs=demo_configs,
         demo_comparisons=demo_comparisons,
+        engine_started_at_ms=round(_start_time * 1000),
         current_user=getattr(g, "current_user", None),
     )
 

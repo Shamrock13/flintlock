@@ -365,6 +365,68 @@ class TestWebAuth(unittest.TestCase):
         finally:
             self._teardown(tmp, orig, orig_conn)
 
+    def test_schedule_routes_create_update_run_delete(self):
+        client, tmp, orig, orig_conn = self._setup()
+        try:
+            us.create_user("scheduler", "supersecretpass1", "auditor")
+            users = us.list_users()
+            api_key = us.generate_api_key(users[0]["id"])
+            from cashel.settings import save_settings, get_settings
+            import cashel.blueprints.schedules as schedules_bp
+
+            save_settings({**get_settings(), "auth_enabled": True})
+            orig_run_now = schedules_bp.scheduler_run_now
+            schedules_bp.scheduler_run_now = lambda schedule_id: None
+            try:
+                payload = {
+                    "name": "Daily ASA",
+                    "vendor": "asa",
+                    "host": "192.0.2.10",
+                    "port": 22,
+                    "username": "audit",
+                    "frequency": "daily",
+                    "hour": 2,
+                    "minute": 0,
+                    "enabled": True,
+                    "notify_on_critical": True,
+                    "notify_on_finding": True,
+                    "notify_on_error": True,
+                }
+                created = client.post(
+                    "/schedules",
+                    headers={"X-API-Key": api_key},
+                    json=payload,
+                )
+                self.assertEqual(created.status_code, 201)
+                schedule_id = created.get_json()["id"]
+
+                updated = client.put(
+                    f"/schedules/{schedule_id}",
+                    headers={"X-API-Key": api_key},
+                    json={"enabled": False, "notify_on_critical": False},
+                )
+                self.assertEqual(updated.status_code, 200)
+                self.assertFalse(updated.get_json()["enabled"])
+                self.assertFalse(updated.get_json()["notify_on_critical"])
+
+                run = client.post(
+                    f"/schedules/{schedule_id}/run",
+                    headers={"X-API-Key": api_key},
+                )
+                self.assertEqual(run.status_code, 200)
+                self.assertTrue(run.get_json()["queued"])
+
+                deleted = client.delete(
+                    f"/schedules/{schedule_id}",
+                    headers={"X-API-Key": api_key},
+                )
+                self.assertEqual(deleted.status_code, 200)
+                self.assertTrue(deleted.get_json()["deleted"])
+            finally:
+                schedules_bp.scheduler_run_now = orig_run_now
+        finally:
+            self._teardown(tmp, orig, orig_conn)
+
     def test_viewer_cannot_run_audit(self):
         client, tmp, orig, orig_conn = self._setup()
         try:

@@ -18,9 +18,19 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "src"))
 
 SAMPLE_FINDINGS = [
     {
+        "id": "CASHEL-ASA-EXPOSURE-001",
+        "vendor": "asa",
+        "title": "Overly permissive any-any ACL rule",
         "severity": "HIGH",
         "category": "exposure",
         "message": "[HIGH] Permit any any rule found — remove or restrict.",
+        "evidence": "access-list OUTSIDE_IN permit ip any any",
+        "affected_object": "OUTSIDE_IN",
+        "rule_name": "OUTSIDE_IN",
+        "confidence": "high",
+        "impact": "The rule may allow traffic from any source to any destination.",
+        "verification": "Confirm the ACL no longer permits any-any.",
+        "rollback": "Restore the prior ACL line from backup.",
         "remediation": "no access-list OUTSIDE_IN permit ip any any",
     },
     {
@@ -185,6 +195,19 @@ class TestEvidenceBundle(unittest.TestCase):
         self.assertEqual(data["tool"], "Cashel")
         self.assertEqual(data["vendor"], "asa")
         self.assertEqual(len(data["findings"]), 3)
+        self.assertEqual(data["findings"][0]["id"], "CASHEL-ASA-EXPOSURE-001")
+        self.assertEqual(
+            data["findings"][0]["evidence"],
+            "access-list OUTSIDE_IN permit ip any any",
+        )
+        self.assertEqual(
+            data["findings"][0]["impact"],
+            "The rule may allow traffic from any source to any destination.",
+        )
+        self.assertEqual(
+            data["findings"][0]["verification"],
+            "Confirm the ACL no longer permits any-any.",
+        )
 
     def test_bundle_findings_csv_has_header(self):
         """findings.csv must start with the standard 4-column header."""
@@ -194,7 +217,19 @@ class TestEvidenceBundle(unittest.TestCase):
         zf = zipfile.ZipFile(io.BytesIO(resp.data))
         csv_text = zf.read("findings.csv").decode("utf-8")
         first_line = csv_text.splitlines()[0]
-        for col in ("severity", "category", "message", "remediation"):
+        for col in (
+            "id",
+            "vendor",
+            "severity",
+            "category",
+            "title",
+            "message",
+            "remediation",
+            "evidence",
+            "affected_object",
+            "rule_name",
+            "confidence",
+        ):
             self.assertIn(col, first_line)
 
     def test_bundle_sarif_is_valid(self):
@@ -206,6 +241,17 @@ class TestEvidenceBundle(unittest.TestCase):
         sarif = json.loads(zf.read("findings.sarif"))
         self.assertEqual(sarif["version"], "2.1.0")
         self.assertEqual(sarif["runs"][0]["tool"]["driver"]["name"], "Cashel")
+        result = sarif["runs"][0]["results"][0]
+        self.assertEqual(result["ruleId"], "CASHEL-ASA-EXPOSURE-001")
+        self.assertEqual(result["properties"]["vendor"], "asa")
+        self.assertEqual(
+            result["properties"]["evidence"],
+            "access-list OUTSIDE_IN permit ip any any",
+        )
+        self.assertEqual(
+            result["properties"]["rollback"],
+            "Restore the prior ACL line from backup.",
+        )
 
     def test_bundle_pdfs_are_nonempty_and_valid(self):
         """audit_report.pdf and cover.pdf must be non-empty valid PDF bytes."""

@@ -1,0 +1,124 @@
+<?xml version="1.0"?>
+<config>
+  <devices>
+    <entry>
+      <vsys>
+        <entry>
+          <address>
+            <entry name="HR-NET"><ip-netmask>10.20.10.0/24</ip-netmask></entry>
+            <entry name="WEB-SERVER"><ip-netmask>10.30.20.50/32</ip-netmask></entry>
+            <entry name="APP-FQDN"><fqdn>app.example.com</fqdn></entry>
+            <entry name="RANGE-OBJ"><ip-range>10.40.1.10-10.40.1.20</ip-range></entry>
+          </address>
+          <address-group>
+            <entry name="INTERNAL-USERS">
+              <static>
+                <member>HR-NET</member>
+                <member>VPN-USERS</member>
+              </static>
+            </entry>
+            <entry name="INTERNAL-USERS-ALIAS">
+              <static>
+                <member>VPN-USERS</member>
+                <member>HR-NET</member>
+              </static>
+            </entry>
+            <entry name="NESTED-USERS">
+              <static>
+                <member>INTERNAL-USERS</member>
+                <member>WEB-SERVER</member>
+              </static>
+            </entry>
+            <entry name="BROAD-USERS"><static><member>any</member></static></entry>
+            <entry name="ADDR-CYCLE-A"><static><member>ADDR-CYCLE-B</member></static></entry>
+            <entry name="ADDR-CYCLE-B"><static><member>ADDR-CYCLE-A</member></static></entry>
+          </address-group>
+          <service>
+            <entry name="TCP-8443"><protocol><tcp><port>8443</port></tcp></protocol></entry>
+            <entry name="UDP-5353"><protocol><udp><port>5353</port></udp></protocol></entry>
+            <entry name="LEGACY-TELNET"><protocol><tcp><port>23</port></tcp></protocol></entry>
+          </service>
+          <service-group>
+            <entry name="APP-SERVICES">
+              <members>
+                <member>service-http</member>
+                <member>TCP-8443</member>
+              </members>
+            </entry>
+            <entry name="APP-SERVICES-ALIAS">
+              <members>
+                <member>TCP-8443</member>
+                <member>service-http</member>
+              </members>
+            </entry>
+            <entry name="NESTED-SERVICES">
+              <members>
+                <member>APP-SERVICES</member>
+                <member>UDP-5353</member>
+              </members>
+            </entry>
+            <entry name="BROAD-SERVICES"><members><member>any</member></members></entry>
+            <entry name="SVC-CYCLE-A"><members><member>SVC-CYCLE-B</member></members></entry>
+            <entry name="SVC-CYCLE-B"><members><member>SVC-CYCLE-A</member></members></entry>
+          </service-group>
+          <application-group>
+            <entry name="RISKY-APPS">
+              <members>
+                <member>ssl</member>
+                <member>web-browsing</member>
+              </members>
+            </entry>
+            <entry name="RISKY-APPS-ALIAS">
+              <members>
+                <member>web-browsing</member>
+                <member>ssl</member>
+              </members>
+            </entry>
+            <entry name="NESTED-APPS">
+              <members>
+                <member>RISKY-APPS</member>
+                <member>dns</member>
+              </members>
+            </entry>
+            <entry name="BROAD-APPS"><members><member>any</member></members></entry>
+            <entry name="APP-CYCLE-A"><members><member>APP-CYCLE-B</member></members></entry>
+            <entry name="APP-CYCLE-B"><members><member>APP-CYCLE-A</member></members></entry>
+          </application-group>
+          <security>
+            <rules>
+              <entry name="Group-Any-Any">
+                <from><member>trust</member></from>
+                <to><member>untrust</member></to>
+                <source><member>BROAD-USERS</member></source>
+                <destination><member>any</member></destination>
+                <application><member>BROAD-APPS</member></application>
+                <service><member>BROAD-SERVICES</member></service>
+                <action>allow</action>
+              </entry>
+              <entry name="Duplicate-Expanded-A">
+                <from><member>trust</member></from>
+                <to><member>dmz</member></to>
+                <source><member>INTERNAL-USERS</member></source>
+                <destination><member>WEB-SERVER</member></destination>
+                <application><member>RISKY-APPS</member></application>
+                <service><member>APP-SERVICES</member></service>
+                <action>allow</action>
+                <log-end>yes</log-end>
+              </entry>
+              <entry name="Duplicate-Expanded-B">
+                <from><member>trust</member></from>
+                <to><member>dmz</member></to>
+                <source><member>INTERNAL-USERS-ALIAS</member></source>
+                <destination><member>WEB-SERVER</member></destination>
+                <application><member>RISKY-APPS-ALIAS</member></application>
+                <service><member>APP-SERVICES-ALIAS</member></service>
+                <action>allow</action>
+                <log-end>yes</log-end>
+              </entry>
+            </rules>
+          </security>
+        </entry>
+      </vsys>
+    </entry>
+  </devices>
+</config>
