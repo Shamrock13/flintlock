@@ -10,9 +10,11 @@ ENV PLAYWRIGHT_BROWSERS_PATH=/ms-playwright
 
 # Install dependencies first (layer caching)
 COPY requirements.txt .
+# PDF generation only needs Chromium's headless shell; --only-shell keeps
+# the image smaller while preserving Playwright's bundled browser runtime.
 RUN mkdir -p /ms-playwright \
     && pip install -r requirements.txt \
-    && python -m playwright install --with-deps chromium
+    && python -m playwright install --with-deps --only-shell chromium
 
 # Copy source
 COPY . .

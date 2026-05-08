@@ -28,6 +28,7 @@ SAMPLE_FINDINGS = [
         "affected_object": "OUTSIDE_IN",
         "rule_name": "OUTSIDE_IN",
         "confidence": "high",
+        "impact": "The rule may allow traffic from any source to any destination.",
         "verification": "Confirm the ACL no longer permits any-any.",
         "rollback": "Restore the prior ACL line from backup.",
         "remediation": "no access-list OUTSIDE_IN permit ip any any",
@@ -199,6 +200,14 @@ class TestEvidenceBundle(unittest.TestCase):
             data["findings"][0]["evidence"],
             "access-list OUTSIDE_IN permit ip any any",
         )
+        self.assertEqual(
+            data["findings"][0]["impact"],
+            "The rule may allow traffic from any source to any destination.",
+        )
+        self.assertEqual(
+            data["findings"][0]["verification"],
+            "Confirm the ACL no longer permits any-any.",
+        )
 
     def test_bundle_findings_csv_has_header(self):
         """findings.csv must start with the standard 4-column header."""
@@ -238,6 +247,10 @@ class TestEvidenceBundle(unittest.TestCase):
         self.assertEqual(
             result["properties"]["evidence"],
             "access-list OUTSIDE_IN permit ip any any",
+        )
+        self.assertEqual(
+            result["properties"]["rollback"],
+            "Restore the prior ACL line from backup.",
         )
 
     def test_bundle_pdfs_are_nonempty_and_valid(self):

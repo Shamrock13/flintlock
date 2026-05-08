@@ -322,22 +322,41 @@ def _commands_from_finding(finding: dict) -> str | None:
     return None
 
 
+def _command_kind(vendor: str, commands: str | None) -> str:
+    if not commands:
+        return ""
+    text = str(commands).lower()
+    if vendor == "pfsense" or "pfsense ui:" in text:
+        return "guidance"
+    return "cli"
+
+
 def _build_step(
     finding: dict,
     step_num: int,
     cli_gen,
     has_cli: bool,
+    vendor: str,
 ) -> dict[str, Any]:
     step: dict[str, Any] = {
         "step": step_num,
         "severity": finding["severity"],
+        "category": finding.get("category", ""),
         "effort": _estimate_effort(finding.get("remediation", "")),
         "title": finding.get("title") or finding.get("message", ""),
         "description": finding["message"],
         "guidance": finding.get("remediation", ""),
     }
 
-    for key in ("id", "evidence", "verification", "rollback", "affected_object"):
+    for key in (
+        "id",
+        "evidence",
+        "impact",
+        "verification",
+        "rollback",
+        "affected_object",
+        "rule_name",
+    ):
         if finding.get(key):
             step[key] = finding[key]
 
@@ -346,6 +365,7 @@ def _build_step(
         cmd = cli_gen(finding)
     if cmd:
         step["suggested_commands"] = cmd
+        step["command_kind"] = _command_kind(vendor, cmd)
 
     if finding.get("_consolidated_count"):
         step["consolidated_count"] = finding["_consolidated_count"]
@@ -414,7 +434,7 @@ def generate_plan(
         steps = []
         for f in group:
             step_num += 1
-            steps.append(_build_step(f, step_num, cli_gen, has_cli))
+            steps.append(_build_step(f, step_num, cli_gen, has_cli, vendor))
 
         phases.append(
             {
@@ -429,7 +449,7 @@ def generate_plan(
         steps = []
         for f in group:
             step_num += 1
-            steps.append(_build_step(f, step_num, cli_gen, has_cli))
+            steps.append(_build_step(f, step_num, cli_gen, has_cli, vendor))
 
         phases.append(
             {
@@ -450,8 +470,8 @@ def generate_plan(
         "total_steps": step_num,
         "phases": phases,
         "disclaimer": (
-            "Commands are SUGGESTED and must be reviewed by a qualified engineer "
-            "before applying to production devices. Test in a maintenance window."
+            "Suggested commands and procedural guidance must be reviewed by a qualified "
+            "engineer before applying to production devices. Test in a maintenance window."
         )
         if has_commands
         else "",
@@ -523,8 +543,25 @@ def plan_to_markdown(plan: dict) -> str:
             lines.append(f"**Finding**: {step['description']}")
             lines.append("")
 
+            if step.get("id"):
+                lines.append(f"**Finding ID**: `{step['id']}`")
+                lines.append("")
+
+            if step.get("category"):
+                lines.append(f"**Category**: {str(step['category']).title()}")
+                lines.append("")
+
+            affected = step.get("affected_object") or step.get("rule_name")
+            if affected:
+                lines.append(f"**Affected**: {affected}")
+                lines.append("")
+
             if step.get("evidence"):
                 lines.append(f"**Evidence**: `{step['evidence']}`")
+                lines.append("")
+
+            if step.get("impact"):
+                lines.append(f"**Impact**: {step['impact']}")
                 lines.append("")
 
             if step.get("consolidated_count"):
@@ -549,10 +586,16 @@ def plan_to_markdown(plan: dict) -> str:
                 lines.append("")
 
             if step.get("suggested_commands"):
-                lines.append("**Suggested Commands**:")
-                lines.append("```")
-                lines.append(step["suggested_commands"])
-                lines.append("```")
+                if step.get("command_kind") == "guidance":
+                    lines.append("**Suggested Procedure**:")
+                    for item in str(step["suggested_commands"]).splitlines():
+                        if item.strip():
+                            lines.append(f"- {item.strip()}")
+                else:
+                    lines.append("**Suggested Commands**:")
+                    lines.append("```")
+                    lines.append(step["suggested_commands"])
+                    lines.append("```")
                 lines.append("")
 
     return "\n".join(lines)

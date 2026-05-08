@@ -276,6 +276,7 @@ body {
         {% if finding.category %}<div class="kv-row"><span class="k">Category</span><span class="v">{{ finding.category }}</span></div>{% endif %}
         {% if finding.evidence %}<div class="kv-row"><span class="k">Evidence</span><span class="v command-block">{{ finding.evidence }}</span></div>{% endif %}
         {% if finding.affected_object or finding.rule_name %}<div class="kv-row"><span class="k">Affected</span><span class="v">{{ finding.affected_object or finding.rule_name }}</span></div>{% endif %}
+        {% if finding.impact %}<div class="kv-row"><span class="k">Impact</span><span class="v">{{ finding.impact }}</span></div>{% endif %}
         {% if finding.remediation %}<div class="kv-row"><span class="k">Fix</span><span class="v">{{ finding.remediation }}</span></div>{% endif %}
         {% if finding.verification %}<div class="kv-row"><span class="k">Verification</span><span class="v">{{ finding.verification }}</span></div>{% endif %}
         {% if finding.rollback %}<div class="kv-row"><span class="k">Rollback</span><span class="v">{{ finding.rollback }}</span></div>{% endif %}

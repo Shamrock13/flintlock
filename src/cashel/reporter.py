@@ -152,6 +152,9 @@ def finding_rows(findings) -> list[dict[str, Any]]:
                 "confidence": (
                     finding.get("confidence", "") if isinstance(finding, dict) else ""
                 ),
+                "impact": finding.get("impact", "")
+                if isinstance(finding, dict)
+                else "",
                 "verification": (
                     finding.get("verification", "") if isinstance(finding, dict) else ""
                 ),

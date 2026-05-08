@@ -41,6 +41,7 @@ SAMPLE_PAYLOAD = {
             "evidence": "access-list OUTSIDE_IN permit ip any any",
             "affected_object": "OUTSIDE_IN",
             "confidence": "high",
+            "impact": "The rule may allow traffic from any source to any destination.",
             "verification": "Re-run the audit after replacing the rule.",
             "rollback": "Restore the prior ACL line from backup.",
             "suggested_commands": ["no access-list <ACL_NAME> permit ip any any"],
@@ -175,6 +176,34 @@ class TestRemediationPdfInline(unittest.TestCase):
         self.assertIn("Remediation report", html)
         self.assertIn("2.0.0", html)
 
+    def test_remediation_pdf_template_renders_enriched_step_fields(self):
+        from cashel.html_pdf import render_report_html
+        from cashel.remediation import generate_plan
+
+        plan = generate_plan(SAMPLE_PAYLOAD["findings"], "asa", filename="test.txt")
+        step = plan["phases"][0]["steps"][0]
+        html = render_report_html(
+            "remediation_report_pdf.html",
+            report={
+                "filename": "test.txt",
+                "vendor_label": "Cisco",
+                "compliance": "Basic hygiene",
+                "generated_date": "May 1, 2026",
+                "generated_time": "12:00:00 UTC",
+                "summary": SAMPLE_SUMMARY,
+                "total_steps": 1,
+                "phases": [{"phase": "Exposure", "steps": [step]}],
+                "disclaimer": plan["disclaimer"],
+                "tool_version": "2.0.0",
+            },
+        )
+
+        self.assertIn("CASHEL-ASA-EXPOSURE-001", html)
+        self.assertIn("OUTSIDE_IN", html)
+        self.assertIn("exposure", html)
+        self.assertIn("The rule may allow traffic from any source", html)
+        self.assertIn("no access-list &lt;ACL_NAME&gt; permit ip any any", html)
+
 
 class TestReportViewer(unittest.TestCase):
     def setUp(self):
@@ -274,6 +303,9 @@ class TestReportViewer(unittest.TestCase):
         self.assertIn("permit ip any any", body)
         self.assertIn("CASHEL-ASA-EXPOSURE-001", body)
         self.assertIn("OUTSIDE_IN", body)
+        self.assertIn(
+            "The rule may allow traffic from any source to any destination.", body
+        )
         self.assertIn("Re-run the audit after replacing the rule.", body)
         self.assertIn("Restore the prior ACL line from backup.", body)
         self.assertIn("no access-list", body)

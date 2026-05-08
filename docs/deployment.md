@@ -29,9 +29,9 @@ This guide covers deploying Cashel behind a TLS-terminating reverse proxy. The a
 
 Cashel generates audit reports, remediation reports, and evidence bundle covers
 from HTML/CSS using Playwright Chromium. The official Docker image installs
-Chromium during build into `/ms-playwright`, which is readable by the non-root
-runtime user. First builds can take longer while Chromium is downloaded. For
-non-Docker deployments, install Python dependencies and then run:
+Chromium's headless shell during build into `/ms-playwright`, which is readable
+by the non-root runtime user. First builds can take longer while the browser is
+downloaded. For non-Docker deployments, install Python dependencies and then run:
 
 ```bash
 python -m playwright install chromium
@@ -206,10 +206,10 @@ CASHEL_DB=/data/cashel.db
 WEB_CONCURRENCY=1
 ```
 
-The Docker build installs Playwright Chromium with system dependencies. The
-first build can be slow because Chromium is downloaded during image creation,
-but runtime PDF generation should use the shared `/ms-playwright` browser path
-as the non-root `cashel` user.
+The Docker build installs Playwright Chromium headless shell with system
+dependencies. The first build can be slow because the browser is downloaded
+during image creation, but runtime PDF generation should use the shared
+`/ms-playwright` browser path as the non-root `cashel` user.
 
 ---
 

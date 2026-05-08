@@ -1,5 +1,6 @@
 import os
 import sys
+from pathlib import Path
 
 import pytest
 
@@ -43,6 +44,19 @@ def test_renderer_raises_clear_error_when_chromium_fails(monkeypatch, tmp_path):
     monkeypatch.setattr(sync_api, "sync_playwright", lambda: FakeContext())
 
     with pytest.raises(html_pdf.PdfRendererUnavailable) as exc:
-        html_pdf.render_html_to_pdf("<html><body>Cashel</body></html>", str(tmp_path / "x.pdf"))
+        html_pdf.render_html_to_pdf(
+            "<html><body>Cashel</body></html>", str(tmp_path / "x.pdf")
+        )
 
     assert "python -m playwright install chromium" in str(exc.value)
+
+
+def test_dockerfile_uses_preinstalled_playwright_headless_shell():
+    dockerfile = Path(__file__).resolve().parents[1] / "Dockerfile"
+    body = dockerfile.read_text(encoding="utf-8")
+
+    assert "ENV PLAYWRIGHT_BROWSERS_PATH=/ms-playwright" in body
+    assert "python -m playwright install --with-deps --only-shell chromium" in body
+    assert "chown -R cashel:cashel /app /data /ms-playwright" in body
+    assert "chmod -R a+rX /ms-playwright" in body
+    assert "runtime" in body and "headless shell" in body

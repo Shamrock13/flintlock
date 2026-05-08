@@ -79,12 +79,16 @@
         </div>
         <div class="step-body">
           <div class="kv-row"><span class="k">Finding</span><span class="v mono-line">{{ step.description }}</span></div>
+          {% if step.id %}<div class="kv-row"><span class="k">ID</span><span class="v mono-line">{{ step.id }}</span></div>{% endif %}
+          {% if step.category %}<div class="kv-row"><span class="k">Category</span><span class="v">{{ step.category }}</span></div>{% endif %}
+          {% if step.affected_object or step.rule_name %}<div class="kv-row"><span class="k">Affected</span><span class="v">{{ step.affected_object or step.rule_name }}</span></div>{% endif %}
           {% if step.evidence %}<div class="kv-row"><span class="k">Evidence</span><span class="v command-block">{{ step.evidence }}</span></div>{% endif %}
+          {% if step.impact %}<div class="kv-row"><span class="k">Impact</span><span class="v">{{ step.impact }}</span></div>{% endif %}
           {% if step.guidance %}<div class="kv-row"><span class="k">Guidance</span><span class="v">{{ step.guidance }}</span></div>{% endif %}
           {% if step.verification %}<div class="kv-row"><span class="k">Verification</span><span class="v">{{ step.verification }}</span></div>{% endif %}
           {% if step.rollback %}<div class="kv-row"><span class="k">Rollback</span><span class="v">{{ step.rollback }}</span></div>{% endif %}
           {% if step.consolidated_count %}<div class="kv-row"><span class="k">Coverage</span><span class="v">Covers {{ step.consolidated_count }} related findings.</span></div>{% endif %}
-          {% if step.suggested_commands %}<div class="kv-row"><span class="k">Commands</span><span class="v command-block">{{ step.suggested_commands }}</span></div>{% endif %}
+          {% if step.suggested_commands %}<div class="kv-row"><span class="k">{{ 'Procedure' if step.command_kind == 'guidance' else 'Commands' }}</span><span class="v {{ '' if step.command_kind == 'guidance' else 'command-block' }}">{{ step.suggested_commands }}</span></div>{% endif %}
         </div>
       </article>
       {% endfor %}
