@@ -107,6 +107,30 @@ def test_flask_app_starts_and_serves_health(ci_client):
     assert "uptime_seconds" in data
 
 
+def test_demo_homepage_uses_versioned_assets_and_hides_license_ui(monkeypatch):
+    import cashel.license as license_mod
+    import cashel.web as web_mod
+
+    monkeypatch.setattr(web_mod, "DEMO_MODE", True)
+    monkeypatch.setattr(license_mod, "DEMO_MODE", True)
+    web_mod.app.config["TESTING"] = True
+    web_mod.app.config["WTF_CSRF_ENABLED"] = False
+    web_mod.app.config["WTF_CSRF_CHECK_DEFAULT"] = False
+    web_mod.app.config["RATELIMIT_ENABLED"] = False
+
+    resp = web_mod.app.test_client().get("/")
+
+    assert resp.status_code == 200
+    body = resp.get_data(as_text=True)
+    assert "Live Demo" in body
+    assert "/static/style.css?v=" in body
+    assert "/static/favicon.svg?v=" in body
+    assert "licenseChip" not in body
+    assert 'data-tab="settings"' not in body
+    assert "click to activate a license" not in body
+    assert "Buy a license" not in body
+
+
 def test_single_file_audit_smoke(ci_client):
     resp = _post_single_audit(ci_client, archive="1")
 
