@@ -6,7 +6,7 @@
 PYTHONPATH=src python -m cashel.main --file config.txt --vendor asa
 ```
 
-## With compliance checks (license required)
+## With compliance checks (legacy gate under review)
 
 ```bash
 PYTHONPATH=src python -m cashel.main --file config.txt --vendor asa --compliance pci
@@ -48,8 +48,13 @@ Omit `--vendor` to use auto-detection.
 
 ## License activation
 
+The legacy compliance gate still exists in some code paths, but paid compliance
+licensing is deprecated and under review. These commands are retained for
+compatibility while compliance is refactored toward data-driven evidence
+mapping.
+
 ```bash
-# Activate
+# Activate a legacy local key
 PYTHONPATH=src python -m cashel.main --activate YOUR-LICENSE-KEY
 
 # Deactivate

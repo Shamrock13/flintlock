@@ -1,8 +1,10 @@
 """Audit blueprint — /audit, /bulk_audit, /diff, /connect, /demo/*."""
 
+import logging
+import hashlib
+import json
 import os
 import uuid
-import logging
 from pathlib import Path
 
 from flask import Blueprint, jsonify, request, send_file
@@ -104,46 +106,126 @@ _DEMO_COMPARISON_PAIRS = {
 # Pre-canned demo SSH audit result (Cisco ASA scenario).
 _DEMO_SSH_FINDINGS = [
     {
+        "id": "CASHEL-ASA-MGMT-001",
+        "vendor": "asa",
         "severity": "CRITICAL",
         "category": "exposure",
+        "title": "Telnet management enabled",
         "message": "[CRITICAL] Telnet enabled on inside interface — transmits credentials in plaintext",
+        "evidence": "telnet 10.0.0.0 255.255.255.0 inside",
+        "affected_object": "management access",
+        "confidence": "high",
+        "impact": "Interactive firewall administration can expose credentials and session content to anyone able to observe the management path.",
         "remediation": "Disable Telnet with 'no telnet' and enforce SSH for all remote management access.",
+        "verification": "Run 'show running-config telnet' and confirm no Telnet management entries remain.",
+        "rollback": "Restore the prior Telnet line only if emergency console access is unavailable.",
+        "suggested_commands": ["no telnet 10.0.0.0 255.255.255.0 inside"],
     },
     {
+        "id": "CASHEL-ASA-SNMP-001",
+        "vendor": "asa",
         "severity": "HIGH",
         "category": "protocol",
+        "title": "SNMPv2 community string in use",
         "message": "[HIGH] SNMPv2 community string 'public' configured — no per-user auth, plaintext on wire",
+        "evidence": "snmp-server community public",
+        "affected_object": "SNMP service",
+        "confidence": "high",
+        "impact": "Shared SNMPv2 communities make attribution difficult and can expose monitoring data without strong authentication.",
         "remediation": "Migrate to SNMPv3 with authPriv. Remove all SNMPv2 community strings.",
+        "verification": "Run 'show running-config snmp-server' and confirm only approved SNMPv3 users remain.",
+        "rollback": "Re-add the prior community only for a time-boxed monitoring rollback.",
+        "suggested_commands": ["no snmp-server community public"],
     },
     {
+        "id": "CASHEL-ASA-ACL-001",
+        "vendor": "asa",
         "severity": "HIGH",
         "category": "exposure",
+        "title": "Unrestricted inbound ACL permit",
         "message": "[HIGH] ACL OUTSIDE_IN contains 'permit ip any any' — unrestricted inbound traffic",
+        "evidence": "access-list OUTSIDE_IN extended permit ip any any",
+        "affected_object": "OUTSIDE_IN",
+        "rule_name": "permit ip any any",
+        "confidence": "high",
+        "impact": "A broad inbound permit can expose internal services and bypass the intended policy boundary.",
         "remediation": "Replace with explicit permit rules scoped to required sources, destinations, and services. Ensure a deny-all terminator exists.",
+        "verification": "Run the audit again and confirm the broad permit finding is resolved while approved traffic still passes.",
+        "rollback": "Restore the prior ACL from change backup if required services fail unexpectedly.",
+        "suggested_commands": ["no access-list OUTSIDE_IN extended permit ip any any"],
     },
     {
+        "id": "CASHEL-ASA-MGMT-002",
+        "vendor": "asa",
         "severity": "HIGH",
         "category": "exposure",
+        "title": "ASDM exposed to the internet",
         "message": "[HIGH] ASDM HTTP server accessible from 0.0.0.0/0 on outside interface",
+        "evidence": "http 0.0.0.0 0.0.0.0 outside",
+        "affected_object": "ASDM / HTTP management",
+        "confidence": "high",
+        "impact": "Exposing management UI to all internet sources increases brute-force and vulnerability exposure risk.",
         "remediation": "Restrict HTTP server to management subnets only: 'http <mgmt-subnet> <mask> inside'. Remove the 0.0.0.0/0 outside entry.",
+        "verification": "Run 'show running-config http' and confirm outside interface access is limited to approved management subnets.",
+        "rollback": "Reapply the prior HTTP rule only during an approved emergency access window.",
+        "suggested_commands": ["no http 0.0.0.0 0.0.0.0 outside"],
     },
     {
+        "id": "CASHEL-ASA-ACL-002",
+        "vendor": "asa",
         "severity": "MEDIUM",
         "category": "hygiene",
+        "title": "Duplicate ACL entry",
         "message": "[MEDIUM] Duplicate ACL rule — 'permit tcp any host 172.16.0.10 eq 80' appears twice in OUTSIDE_IN",
+        "evidence": "access-list OUTSIDE_IN extended permit tcp any host 172.16.0.10 eq 80",
+        "affected_object": "OUTSIDE_IN",
+        "rule_name": "permit tcp any host 172.16.0.10 eq 80",
+        "confidence": "medium",
+        "impact": "Duplicate rules increase policy review effort and can obscure which rule actually carries traffic.",
         "remediation": "Remove the duplicate entry. Use 'show access-list' hit counts to identify and consolidate redundant rules.",
+        "verification": "Run 'show access-list OUTSIDE_IN' and confirm only one approved HTTP permit remains.",
+        "rollback": "Restore the duplicate entry from backup if removal changes hit-count behavior unexpectedly.",
+        "suggested_commands": [
+            "show access-list OUTSIDE_IN",
+            "no access-list OUTSIDE_IN extended permit tcp any host 172.16.0.10 eq 80",
+        ],
     },
     {
+        "id": "CASHEL-ASA-HYGIENE-001",
+        "vendor": "asa",
         "severity": "MEDIUM",
         "category": "hygiene",
+        "title": "NTP is not configured",
         "message": "[MEDIUM] NTP not configured — log timestamps will be unreliable",
+        "evidence": "No ntp server entries detected",
+        "affected_object": "system clock",
+        "confidence": "medium",
+        "impact": "Unreliable timestamps reduce incident response quality and make audit correlation harder.",
         "remediation": "Configure at least two NTP servers: 'ntp server <ip> prefer'. Ensure NTP traffic is permitted by the management ACL.",
+        "verification": "Run 'show ntp status' and confirm the firewall is synchronized to approved time sources.",
+        "rollback": "Remove the new NTP servers if they are unreachable or not approved for the environment.",
+        "suggested_commands": [
+            "ntp server 10.10.10.10 prefer",
+            "ntp server 10.10.10.11",
+        ],
     },
     {
+        "id": "CASHEL-ASA-COMPLIANCE-001",
+        "vendor": "asa",
         "severity": "LOW",
         "category": "compliance",
+        "title": "Login banner missing",
         "message": "[LOW] No login banner configured — required by CIS and STIG for legal notice",
+        "evidence": "No banner login or banner motd statement detected",
+        "affected_object": "login banner",
+        "confidence": "medium",
+        "impact": "Missing legal notice banners can weaken administrative access policy enforcement.",
         "remediation": "Add 'banner login' or 'banner motd' with an authorised-use warning.",
+        "verification": "Open a new administrative session and confirm the approved banner is displayed before login.",
+        "rollback": "Remove or replace the banner text if legal/compliance teams reject the wording.",
+        "suggested_commands": [
+            "banner login Authorized access only. Activity may be monitored."
+        ],
     },
 ]
 
@@ -156,6 +238,40 @@ _DEMO_SSH_SUMMARY = {
     "low": 1,
     "info": 0,
 }
+
+_DEMO_SAMPLE_REPORT_VERSION = "modern-audit-pdf-v2"
+
+
+def _demo_sample_report_cache_key() -> str:
+    """Fingerprint demo report inputs and templates so persistent caches refresh."""
+    h = hashlib.sha256()
+    h.update(_DEMO_SAMPLE_REPORT_VERSION.encode("utf-8"))
+    h.update(json.dumps(_DEMO_SSH_FINDINGS, sort_keys=True).encode("utf-8"))
+    h.update(json.dumps(_DEMO_SSH_SUMMARY, sort_keys=True).encode("utf-8"))
+    for rel in (
+        "templates/audit_report_pdf.html",
+        "templates/_modern_report_pdf_styles.html",
+    ):
+        path = Path(__file__).resolve().parent.parent / rel
+        try:
+            h.update(path.read_bytes())
+        except OSError:
+            h.update(rel.encode("utf-8"))
+    return h.hexdigest()[:12]
+
+
+def _cleanup_stale_demo_report_cache(current_path: str) -> None:
+    """Remove old demo sample PDFs so Render volumes do not keep stale visuals."""
+    reports_dir = Path(REPORTS_FOLDER)
+    for path in reports_dir.glob("demo_sample_report*.pdf"):
+        if str(path) != current_path:
+            try:
+                path.unlink()
+                sidecar = path.with_suffix(".json")
+                if sidecar.exists():
+                    sidecar.unlink()
+            except OSError:
+                logger.warning("Could not remove stale demo report cache: %s", path)
 
 
 def get_demo_index_data() -> tuple[list, list]:
@@ -295,22 +411,32 @@ def demo_sample_report():
     """Serve a sample audit report PDF for marketing preview.
 
     Public — no authentication required (matches other /demo/* routes).
-    Renders from pre-canned Cisco ASA findings; result is cached on disk
-    so repeat requests are fast (re-generated if the file is missing).
+    Renders from pre-canned Cisco ASA findings through the same modern audit
+    PDF path as live reports. The cache filename is content/template-versioned
+    so persistent Render volumes do not serve stale legacy PDFs after deploys.
     """
     os.makedirs(REPORTS_FOLDER, exist_ok=True)
-    cached_path = os.path.join(REPORTS_FOLDER, "demo_sample_report.pdf")
+    cache_key = _demo_sample_report_cache_key()
+    cached_path = os.path.join(REPORTS_FOLDER, f"demo_sample_report_{cache_key}.pdf")
+    _cleanup_stale_demo_report_cache(cached_path)
     if not os.path.exists(cached_path):
-        # NOTE: cached indefinitely — delete demo_sample_report.pdf manually
-        # if _DEMO_SSH_FINDINGS or _DEMO_SSH_SUMMARY change in a future release.
         try:
             generate_report(
                 _DEMO_SSH_FINDINGS,
-                "cisco_asa_demo.txt",
+                "cisco_asa_demo_edge.txt",
                 "asa",
                 compliance="cis",
                 output_path=cached_path,
                 summary=_DEMO_SSH_SUMMARY,
+            )
+            write_report_sidecar(
+                cached_path,
+                findings=_DEMO_SSH_FINDINGS,
+                filename="cisco_asa_demo_edge.txt",
+                vendor="asa",
+                compliance="cis",
+                summary=_DEMO_SSH_SUMMARY,
+                report_id=f"demo-sample-{cache_key}",
             )
         except Exception as exc:
             return jsonify({"error": f"Could not generate sample report: {exc}"}), 500
@@ -425,16 +551,16 @@ def run_audit():
     try:
         findings, parse, extra_data = run_vendor_audit(vendor, temp_path)
 
-        # Compliance checks (license-gated; not applicable for AWS/Azure)
+        # TODO: Remove or refactor this legacy compliance access gate.
+        # Compliance should become data-driven evidence mapping, not a paid unlock.
         license_warning = None
         if compliance and vendor not in ("aws", "azure", "gcp", "iptables", "nftables"):
             licensed, _ = check_license()
             if not licensed:
                 license_warning = (
-                    "Compliance checks require a valid license. "
-                    'Purchase one at <a href="https://shamrock13.gumroad.com/l/cashel" '
-                    'target="_blank" rel="noopener">shamrock13.gumroad.com/l/cashel</a>. '
-                    "Once purchased, enter your key in Settings → Licensing."
+                    "Compliance checks are currently behind a deprecated legacy "
+                    "access gate and may be skipped until that gate is removed "
+                    "or refactored."
                 )
             else:
                 raw = run_compliance_checks(vendor, compliance, parse, extra_data)
@@ -693,6 +819,7 @@ def live_connect():
     try:
         findings, parse, extra_data = run_vendor_audit(vendor, temp_path)
 
+        # TODO: Remove or refactor this legacy compliance access gate.
         if compliance and vendor not in ("aws", "azure", "gcp", "iptables", "nftables"):
             licensed, _ = check_license()
             if licensed:
@@ -832,6 +959,7 @@ def bulk_audit():
 
             findings, parse, extra_data = run_vendor_audit(vendor, temp_path)
 
+            # TODO: Remove or refactor this legacy compliance access gate.
             if compliance and vendor not in (
                 "aws",
                 "azure",

@@ -21,6 +21,7 @@ __pycache__/
 *.crt
 *.pfx
 secrets.*
+!docs/secrets.md
 config.local.*
 settings.local.*
 

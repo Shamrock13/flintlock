@@ -60,3 +60,83 @@ def test_dockerfile_uses_preinstalled_playwright_headless_shell():
     assert "chown -R cashel:cashel /app /data /ms-playwright" in body
     assert "chmod -R a+rX /ms-playwright" in body
     assert "runtime" in body and "headless shell" in body
+
+
+def test_modern_report_templates_render_html():
+    from cashel.html_pdf import render_report_html
+    from cashel.remediation import generate_plan
+    from cashel.reporter import build_audit_report_context
+
+    findings = [
+        {
+            "id": "CASHEL-ASA-ACL-001",
+            "vendor": "asa",
+            "severity": "HIGH",
+            "category": "exposure",
+            "title": "Unrestricted inbound ACL permit",
+            "message": "[HIGH] permit ip any any",
+            "evidence": "access-list OUTSIDE_IN extended permit ip any any",
+            "affected_object": "OUTSIDE_IN",
+            "impact": "Broad inbound exposure.",
+            "remediation": "Replace with scoped permits.",
+            "verification": "Re-run the audit.",
+        }
+    ]
+    summary = {"critical": 0, "high": 1, "medium": 0, "low": 0, "total": 1, "score": 90}
+    audit_context = build_audit_report_context(
+        findings=findings,
+        filename="edge.cfg",
+        vendor="asa",
+        compliance="cis",
+        summary=summary,
+    )
+    plan = generate_plan(findings, "asa", "edge.cfg", "cis", summary)
+    remediation_context = {
+        "filename": plan["filename"],
+        "vendor": plan["vendor"],
+        "vendor_label": "Cisco",
+        "compliance": "CIS Benchmark",
+        "generated_date": "May 8, 2026",
+        "generated_time": "12:00:00 UTC",
+        "summary": summary,
+        "total_steps": plan["total_steps"],
+        "phases": [
+            {
+                **phase,
+                "steps": [
+                    {
+                        **step,
+                        "title": step.get("title") or "Remediation step",
+                        "severity": str(step.get("severity", "HIGH")).title(),
+                        "severity_key": str(step.get("severity", "HIGH")).lower(),
+                        "effort_label": step.get("effort", "medium"),
+                    }
+                    for step in phase.get("steps", [])
+                ],
+            }
+            for phase in plan["phases"]
+        ],
+        "disclaimer": plan.get("disclaimer", ""),
+        "tool_version": "2.0.0",
+    }
+    cover_context = {
+        "filename": "edge.cfg",
+        "vendor": "asa",
+        "vendor_label": "Cisco",
+        "compliance": "CIS Benchmark",
+        "summary": summary,
+        "generated_date": "May 8, 2026",
+        "generated_time": "12:00:00 UTC",
+        "bundle_id": "bundle-test",
+        "tool_version": "2.0.0",
+        "items": ["audit_report.pdf - Full PDF audit report"],
+    }
+
+    rendered = [
+        render_report_html("audit_report_pdf.html", report=audit_context),
+        render_report_html("remediation_report_pdf.html", report=remediation_context),
+        render_report_html("bundle_cover_pdf.html", cover=cover_context),
+    ]
+
+    assert all('<main class="paper">' in html for html in rendered)
+    assert all("Cashel" in html for html in rendered)
