@@ -51,7 +51,7 @@ Set `CASHEL_PDF_PAGE_FORMAT` to override the default `Letter` page size, or
 | `CASHEL_DB` | No | `/data/cashel.db` | SQLite database path. |
 | `UPLOAD_FOLDER` | No | `/tmp/cashel_uploads` | Temporary uploaded config storage. Use `/data/uploads` in Docker/Render so the path is writable. |
 | `REPORTS_FOLDER` | No | `/tmp/cashel_reports` | Generated report storage. Use `/data/reports` in Docker/Render. |
-| `LICENSE_PATH` | No | platform config path | License file path. Use `/data/.cashel_license` in Docker/Render so license state persists. |
+| `LICENSE_PATH` | No | platform config path | Legacy compliance access file path. This gate is deprecated and under review; use `/data/.cashel_license` only if you must preserve current compatibility behavior. |
 | `PLAYWRIGHT_BROWSERS_PATH` | No | Playwright default | Browser install path. Docker images set this to `/ms-playwright` for non-root PDF rendering. |
 | `CASHEL_SECURE_COOKIES` | No | `false` | Set to `true` when serving over HTTPS. Marks session cookie with `Secure` flag. |
 | `WEB_CONCURRENCY` | No | `1` | Gunicorn worker count. Keep at `1` on single-CPU hosts to avoid OOM. |
@@ -189,9 +189,9 @@ docker compose up -d
 ## Render Docker deployment
 
 For Render Docker services, add a persistent disk mounted at `/data`. Without a
-persistent `/data` mount, the setup page, audit history, schedules, license
-state, reports, uploads, and encryption key can reset when Render replaces the
-container.
+persistent `/data` mount, the setup page, audit history, schedules, legacy
+compliance access state, reports, uploads, and encryption key can reset when
+Render replaces the container.
 
 Recommended Render environment:
 
@@ -200,7 +200,7 @@ CASHEL_SECRET=<strong-random-secret>
 PLAYWRIGHT_BROWSERS_PATH=/ms-playwright
 UPLOAD_FOLDER=/data/uploads
 REPORTS_FOLDER=/data/reports
-LICENSE_PATH=/data/.cashel_license
+LICENSE_PATH=/data/.cashel_license  # legacy compatibility only
 CASHEL_KEY_FILE=/data/cashel.key
 CASHEL_DB=/data/cashel.db
 WEB_CONCURRENCY=1

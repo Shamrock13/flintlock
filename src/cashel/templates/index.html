@@ -101,9 +101,9 @@
           <path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/>
         </svg>
       </button>
-      <span class="license-chip{% if not licensed %} unlicensed{% endif %}" id="licenseChip" role="button" tabindex="0" title="{% if licensed %}Open Licensing settings{% else %}Compliance checks disabled — click to activate a license{% endif %}">
+      <span class="license-chip{% if not licensed %} unlicensed{% endif %}" id="licenseChip" role="button" tabindex="0" title="{% if licensed %}Open compliance access settings{% else %}Legacy compliance access inactive — click for status{% endif %}">
         <span class="dot" id="licDot"></span>
-        <span id="licenseText">{% if licensed %}Licensed{% else %}Unlicensed{% endif %}</span>
+        <span id="licenseText">{% if licensed %}Compliance on{% else %}Compliance off{% endif %}</span>
         {% if not licensed %}
         <svg class="arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
         {% endif %}
@@ -689,7 +689,7 @@
             <div class="field">
               <div>
                 <div class="label">Scope</div>
-                <div class="help">Compliance checks are license-gated and run after the hygiene audit.</div>
+                <div class="help">Compliance checks currently use legacy access gating and run after the hygiene audit.</div>
               </div>
               <div class="ctrl">
                 <select class="select" id="connCompliance" name="compliance" {% if demo_mode %}disabled{% endif %}>
@@ -1188,7 +1188,7 @@
 
           <a data-pane="licensing" href="#">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 12l2 2 4-4"/><circle cx="12" cy="12" r="9"/></svg>
-            Licensing
+            Compliance Access
           </a>
 
           <a data-pane="webhooks" href="#">
@@ -1656,36 +1656,36 @@
             </div>
           </div>
 
-          <!-- Licensing pane -->
+          <!-- Compliance access pane -->
           <div class="settings-pane" id="spane-licensing">
-            <h2>Licensing</h2>
-            <p class="section-desc">Cashel runs a free hygiene engine out of the box. A license unlocks compliance frameworks (HIPAA, CIS Benchmark v8, NIST 800-53, PCI-DSS 4.0) and removes the per-run watermark on PDF reports.</p>
+            <h2>Compliance Access</h2>
+            <p class="section-desc">Cashel's hygiene engine runs without a license. The older compliance gate is still present for compatibility, but paid compliance licensing is deprecated and under review.</p>
 
-            <div class="sub-head">Current license</div>
+            <div class="sub-head">Current access state</div>
             <div class="lic-card">
               <div class="lic-card-row">
                 <div>
                   <div class="lic-status{% if licensed %} ok{% endif %}" id="licStatusBlock">
                     <span class="lic-status-dot"></span>
-                    <span class="lic-status-text">{% if licensed %}Cashel Pro &middot; active{% else %}No active license{% endif %}</span>
+                    <span class="lic-status-text">{% if licensed %}Legacy compliance access active{% else %}Legacy compliance access inactive{% endif %}</span>
                   </div>
-                  <div class="lic-status-help" id="licStatusHelp">{% if licensed %}All compliance frameworks unlocked. Renewal and seat usage shown to the right.{% else %}Compliance checks require a valid key. Hygiene scanning continues to work without one.{% endif %}</div>
+                  <div class="lic-status-help" id="licStatusHelp">{% if licensed %}Compliance checks currently run for supported frameworks. This gate is deprecated and may be removed or refactored.{% else %}Compliance checks may be skipped until the legacy gate is removed. Hygiene scanning continues to work.{% endif %}</div>
                 </div>
                 <div class="lic-meta" id="licMetaBlock"{% if not licensed %} style="display:none"{% endif %}>
-                  <div class="lic-meta-row"><span class="lab">Plan</span><span class="val">Cashel Pro</span></div>
-                  <div class="lic-meta-row"><span class="lab">Seats</span><span class="val">5 engines</span></div>
-                  <div class="lic-meta-row"><span class="lab">Renews</span><span class="val">Mar 14, 2027</span></div>
+                  <div class="lic-meta-row"><span class="lab">Mode</span><span class="val">Legacy compatibility</span></div>
+                  <div class="lic-meta-row"><span class="lab">Status</span><span class="val">Deprecated</span></div>
+                  <div class="lic-meta-row"><span class="lab">Direction</span><span class="val">Under review</span></div>
                   <div class="lic-meta-row"><span class="lab">Key</span><span class="val mono" id="licMetaKey">{{ license_info if licensed else 'CSL-••••••••-••••••••-••••••••-••••••••-••••••••' }}</span></div>
                 </div>
               </div>
             </div>
 
-            <div class="sub-head">Activate a license key</div>
+            <div class="sub-head">Legacy key activation</div>
             <div class="form">
               <div class="field split license-activation-field">
                 <div>
-                  <div class="label">License key</div>
-                  <div class="help">Paste the key from your purchase email. Activation is local — no telemetry.</div>
+                  <div class="label">Legacy access key</div>
+                  <div class="help">Activation is local and exists for compatibility while compliance gating is reviewed.</div>
                 </div>
                 <div class="ctrl">
                   <input class="input mono" id="licenseKeyInput" placeholder="CSL-XXXXXXXX-XXXXXXXX-XXXXXXXX-XXXXXXXX" autocomplete="off" />
@@ -1695,7 +1695,7 @@
               <div class="field">
                 <div>
                   <div class="label">Offline activation</div>
-                  <div class="help">Air-gapped install? Generate a request file, upload it at cashel.app/activate, then import the response.</div>
+                  <div class="help">Placeholder controls retained for compatibility. No external activation service is required for the current local key check.</div>
                 </div>
                 <div class="ctrl">
                   <div style="display:flex;gap:8px;flex-wrap:wrap;">
@@ -1706,17 +1706,17 @@
               </div>
             </div>
 
-            <div class="sub-head" style="margin-top:2rem">What a license unlocks</div>
+            <div class="sub-head" style="margin-top:2rem">Direction</div>
             <div class="lic-features">
-              <div class="lic-feat"><span class="dot"></span><div><div class="t">Compliance frameworks</div><div class="d">HIPAA Security Rule, CIS Benchmark v8, NIST 800-53, PCI-DSS 4.0.</div></div></div>
-              <div class="lic-feat"><span class="dot"></span><div><div class="t">Bulk + scheduled audits</div><div class="d">Run more than 3 configs at once and schedule recurring audits.</div></div></div>
-              <div class="lic-feat"><span class="dot"></span><div><div class="t">Branded PDF reports</div><div class="d">Remove the evaluation watermark and add your organisation lockup.</div></div></div>
-              <div class="lic-feat"><span class="dot"></span><div><div class="t">Priority support</div><div class="d">Email response within one business day, plus signed-build access.</div></div></div>
+              <div class="lic-feat"><span class="dot"></span><div><div class="t">Compliance as evidence mapping</div><div class="d">Future controls should map to stable finding IDs and normalized evidence fields.</div></div></div>
+              <div class="lic-feat"><span class="dot"></span><div><div class="t">No paid unlock assumption</div><div class="d">Paid compliance gating is deprecated unless a stronger product reason emerges.</div></div></div>
+              <div class="lic-feat"><span class="dot"></span><div><div class="t">Data-driven controls</div><div class="d">Framework mappings should move out of scattered code paths and into testable data.</div></div></div>
+              <div class="lic-feat"><span class="dot"></span><div><div class="t">Policy-as-code readiness</div><div class="d">Compliance exports should include evidence, affected object, remediation, verification, and status.</div></div></div>
             </div>
 
             <div style="padding-top:28px;display:flex;gap:8px;flex-wrap:wrap;align-items:center;">
-              <button type="button" class="btn-danger" id="deactivateLicenseBtn" style="{% if not licensed %}display:none;{% endif %}">Deactivate license</button>
-              <a href="https://shamrock13.gumroad.com/l/cashel" target="_blank" rel="noopener" class="btn-outline action-pill-control license-buy-link">Buy a license</a>
+              <button type="button" class="btn-danger" id="deactivateLicenseBtn" style="{% if not licensed %}display:none;{% endif %}">Deactivate legacy key</button>
+              <a href="https://github.com/Shamrock13/cashel/blob/main/docs/product-contract.md" target="_blank" rel="noopener" class="btn-outline action-pill-control license-buy-link">View product contract</a>
               <span style="margin-left:auto;color:var(--ink-3);font-size:13px;">Need help? <a href="mailto:support@cashel.app" class="ulink">support@cashel.app</a></span>
             </div>
 
@@ -2092,13 +2092,13 @@
     if (chip && badge) {
       if (isLicensed) {
         chip.classList.remove('unlicensed');
-        chip.title = 'Open Licensing settings';
-        badge.textContent = 'Licensed';
+        chip.title = 'Open compliance access settings';
+        badge.textContent = 'Compliance on';
         const arr = chip.querySelector('.arrow'); if (arr) arr.remove();
       } else {
         chip.classList.add('unlicensed');
-        chip.title = 'Compliance checks disabled — click to activate a license';
-        badge.textContent = 'Unlicensed';
+        chip.title = 'Legacy compliance access inactive — click for status';
+        badge.textContent = 'Compliance off';
         if (!chip.querySelector('.arrow')) {
           const arr = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
           arr.setAttribute('class', 'arrow');
@@ -2124,15 +2124,15 @@
       const t = sb.querySelector('.lic-status-text');
       if (isLicensed) {
         sb.classList.add('ok');
-        if (t) t.textContent = 'Cashel Pro · active';
-        if (sh) sh.textContent = 'All compliance frameworks unlocked. Renewal and seat usage shown to the right.';
+        if (t) t.textContent = 'Legacy compliance access active';
+        if (sh) sh.textContent = 'Compliance checks currently run for supported frameworks. This gate is deprecated and may be removed or refactored.';
         if (sm) sm.style.display = '';
         if (sk && key) sk.textContent = maskLicenseKey(key);
         if (db) db.style.display = '';
       } else {
         sb.classList.remove('ok');
-        if (t) t.textContent = 'No active license';
-        if (sh) sh.textContent = 'Compliance checks require a valid key. Hygiene scanning continues to work without one.';
+        if (t) t.textContent = 'Legacy compliance access inactive';
+        if (sh) sh.textContent = 'Compliance checks may be skipped until the legacy gate is removed. Hygiene scanning continues to work.';
         if (sm) sm.style.display = 'none';
         if (db) db.style.display = 'none';
       }
