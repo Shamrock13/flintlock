@@ -2,6 +2,8 @@
 
 Cashel's contract is simple: produce trusted, evidence-backed, reproducible firewall audit findings that engineers can verify and remediate. Vendor breadth is secondary to correctness, explainability, and operational safety.
 
+Branch guidance: [Branch strategy](branch-strategy.md).
+
 ## Current Priority Order
 
 1. Product truth / docs cleanup
@@ -89,4 +91,3 @@ Planned role mapping:
 | `CASHEL_OIDC_VIEWER_GROUPS` | `viewer` |
 
 Local auth should remain available for bootstrap/fallback, but production deployments should prefer SSO once implemented.
-
