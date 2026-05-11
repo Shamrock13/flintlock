@@ -58,5 +58,4 @@ Never commit:
 
 ## Legacy License State
 
-`LICENSE_PATH` is a legacy compliance-gating artifact. It may still affect current compliance behavior, but it is deprecated and under review. Do not build new deployment workflows around a paid license file.
-
+`LICENSE_PATH` is a legacy compliance access artifact. It may still affect current compliance behavior in workflows that check legacy license state, but this deprecated compatibility gate is under review. Do not build new deployment workflows around this file.

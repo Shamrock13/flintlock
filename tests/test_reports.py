@@ -750,7 +750,7 @@ class TestModalMarkup(unittest.TestCase):
         self.assertIn('class="btn-outline action-pill-control license-buy-link"', body)
         self.assertIn("support@cashel.app", body)
         self.assertNotIn("support@cashel.dev", body)
-        self.assertIn("paid compliance licensing is deprecated", body)
+        self.assertIn("Deprecated compatibility gate", body)
         self.assertNotIn("Buy a license", body)
         self.assertIn(
             'class="btn-primary action-pill-control btn-activate-license" id="activateLicenseBtn">Activate</button>',

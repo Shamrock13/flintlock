@@ -46,18 +46,18 @@ Omit `--vendor` to use auto-detection.
 --compliance stig    DISA STIG
 ```
 
-## License activation
+## Legacy Compliance Access
 
-The legacy compliance gate still exists in some code paths, but paid compliance
-licensing is deprecated and under review. These commands are retained for
-compatibility while compliance is refactored toward data-driven evidence
-mapping.
+Some workflows still check legacy license state before running compliance
+mapping. This deprecated compatibility gate is under review while compliance is
+being refactored toward data-driven evidence mapping. These commands are
+retained for compatibility.
 
 ```bash
-# Activate a legacy local key
+# Set a legacy local compatibility key
 PYTHONPATH=src python -m cashel.main --activate YOUR-LICENSE-KEY
 
-# Deactivate
+# Clear the legacy local compatibility key
 PYTHONPATH=src python -m cashel.main --deactivate
 ```
 

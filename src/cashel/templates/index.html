@@ -1665,7 +1665,7 @@
           <!-- Compliance access pane -->
           <div class="settings-pane" id="spane-licensing">
             <h2>Compliance Access</h2>
-            <p class="section-desc">Cashel's hygiene engine runs without a license. The older compliance gate is still present for compatibility, but paid compliance licensing is deprecated and under review.</p>
+            <p class="section-desc">Cashel's hygiene engine runs without legacy access state. The older compliance gate is retained for compatibility, deprecated, and under review while compliance mapping is being refactored.</p>
 
             <div class="sub-head">Current access state</div>
             <div class="lic-card">
@@ -1715,7 +1715,7 @@
             <div class="sub-head" style="margin-top:2rem">Direction</div>
             <div class="lic-features">
               <div class="lic-feat"><span class="dot"></span><div><div class="t">Compliance as evidence mapping</div><div class="d">Future controls should map to stable finding IDs and normalized evidence fields.</div></div></div>
-              <div class="lic-feat"><span class="dot"></span><div><div class="t">No paid unlock assumption</div><div class="d">Paid compliance gating is deprecated unless a stronger product reason emerges.</div></div></div>
+              <div class="lic-feat"><span class="dot"></span><div><div class="t">Deprecated compatibility gate</div><div class="d">Legacy compliance access is under review while mappings move toward stable finding IDs and evidence.</div></div></div>
               <div class="lic-feat"><span class="dot"></span><div><div class="t">Data-driven controls</div><div class="d">Framework mappings should move out of scattered code paths and into testable data.</div></div></div>
               <div class="lic-feat"><span class="dot"></span><div><div class="t">Policy-as-code readiness</div><div class="d">Compliance exports should include evidence, affected object, remediation, verification, and status.</div></div></div>
             </div>
@@ -2079,7 +2079,7 @@
       const d = await r.json();
       if (r.ok && d.success) {
         _syncLicenseState(true, key);
-        if (msg) { msg.textContent = '✓ License activated'; msg.style.background='color-mix(in oklab,var(--ok) 12%,var(--surface))'; msg.style.color='var(--ok)'; msg.classList.remove('hidden'); }
+        if (msg) { msg.textContent = 'Legacy compliance access updated'; msg.style.background='color-mix(in oklab,var(--ok) 12%,var(--surface))'; msg.style.color='var(--ok)'; msg.classList.remove('hidden'); }
       } else {
         if (msg) { msg.textContent = d.message || d.error || 'Activation failed'; msg.style.background='color-mix(in oklab,var(--crit) 10%,var(--surface))'; msg.style.color='var(--crit)'; msg.classList.remove('hidden'); }
       }

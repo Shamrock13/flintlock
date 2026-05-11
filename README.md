@@ -42,15 +42,15 @@ Partially implemented:
 Planned:
 
 - OIDC SSO as a first-class authentication mode
-- License-gating removal or replacement with a clearer non-paid feature model
+- Legacy compliance access removal or replacement with a clearer compatibility model
 - NormalizedRule and NormalizedFinding model completion
 - Deeper Fortinet, Palo Alto, and Cisco ASA/FTD object expansion
 - Bounded background execution for large PDFs, bulk audits, and scheduled audit queues
 
 Deprecated / under review:
 
-- The current license-gated compliance implementation
-- Legacy paid compliance messaging
+- The current deprecated compatibility gate for compliance access
+- Legacy commercial compliance messaging
 - Treating all supported vendors as equal maturity
 
 ---
@@ -75,7 +75,7 @@ Full list of current checks: [docs/checks.md](docs/checks.md)
 
 - Findings are not yet normalized everywhere. Legacy string findings remain supported and may appear in API/UI/export flows.
 - Shadow detection is useful but not fully scope-aware across every vendor abstraction, nested object group, service group, NAT rule, zone context, and CIDR interaction.
-- Compliance checks currently remain license-gated in code for some workflows. This behavior is under review and should not be treated as the long-term product model.
+- Some workflows may still check legacy license state before running compliance mappings. This deprecated compatibility gate is under review and should not be treated as the long-term product model.
 - SSO/OIDC is documented as the target model but is not implemented yet.
 - SQLite is appropriate for lightweight self-hosted deployments, but it is not a horizontally scalable database.
 - Multi-worker deployments can duplicate scheduler execution unless external locking or a single scheduler process is used.
@@ -214,22 +214,22 @@ More detail: [docs/performance.md](docs/performance.md) and [docs/operations.md]
 
 ## Licensing Direction
 
-Cashel is MIT licensed. The current code still contains a legacy license mechanism that gates compliance checks in some workflows. That implementation is deprecated and under review.
+Cashel is MIT licensed. The current code still contains a deprecated compatibility gate around compliance access in some workflows. That implementation is under review while compliance mapping is being refactored.
 
 Current behavior:
 
 - Hygiene audits run without a license.
-- Compliance checks may be skipped unless a local license key is present.
+- Compliance checks may be skipped when a workflow still checks legacy license state.
 - Demo mode bypasses licensing for hosted demo behavior.
 - The active code still exposes license activation/deactivation routes and UI copy.
 
 Preferred direction:
 
-- Remove paid compliance gating unless a strong reason remains.
-- Treat compliance as a data-quality and evidence-mapping problem, not a paid unlock.
+- Remove the deprecated compatibility gate unless a strong reason remains.
+- Treat compliance as a data-quality and evidence-mapping problem, not an unlock.
 - Make compliance controls data-driven and mapped to stable finding IDs.
 - Include evidence, affected object/rule, remediation, verification, and status in compliance exports.
-- Remove stale purchase links and paid-feature claims from product docs and UI.
+- Remove stale sales links and commercial-feature claims from product docs and UI.
 
 Tracking docs: [docs/product-contract.md](docs/product-contract.md)
 

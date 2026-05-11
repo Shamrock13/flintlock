@@ -42,9 +42,11 @@ def audit(
         help="Compliance framework: cis, pci, nist, hipaa, soc2, stig",
     ),
     report: bool = typer.Option(False, "--report", "-r", help="Export PDF report"),
-    activate: str = typer.Option(None, "--activate", help="Activate a license key"),
+    activate: str = typer.Option(
+        None, "--activate", help="Set legacy compliance access key"
+    ),
     deactivate: bool = typer.Option(
-        False, "--deactivate", help="Deactivate current license"
+        False, "--deactivate", help="Clear legacy compliance access key"
     ),
 ):
     """Cashel - Firewall configuration auditing tool"""
@@ -88,9 +90,11 @@ def audit(
         # TODO: Remove or refactor this legacy compliance access gate.
         licensed, message = check_license()
         if not licensed:
-            typer.echo("\nCompliance checks are behind a deprecated legacy gate.")
             typer.echo(
-                "This behavior is under review; hygiene checks still run without a key."
+                "\nCompliance checks are behind a deprecated compatibility gate."
+            )
+            typer.echo(
+                "This behavior is under review while compliance mapping is being refactored."
             )
             raise typer.Exit()
         typer.echo(f"\n--- {compliance.upper()} Compliance Checks ---")

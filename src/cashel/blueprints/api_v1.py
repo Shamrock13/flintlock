@@ -175,7 +175,7 @@ def api_audit():
         findings, parse, extra_data = run_vendor_audit(vendor, temp_path)
 
         # TODO: Remove or refactor this legacy compliance access gate.
-        # Compliance should become data-driven evidence mapping, not a paid unlock.
+        # Compliance should become data-driven evidence mapping, not a compatibility gate.
         if compliance and vendor not in ("aws", "azure", "gcp", "iptables", "nftables"):
             licensed, _ = check_license()
             if licensed:

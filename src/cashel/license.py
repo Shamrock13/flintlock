@@ -14,7 +14,7 @@ DEMO_MODE: bool = os.environ.get("CASHEL_DEMO_MODE", "false").lower() == "true"
 
 
 def generate_key(email: str) -> str:
-    """Generate a license key from an email address - must match the Cashel license server algorithm"""
+    """Generate a legacy compatibility key from an email address."""
     raw = f"{email.strip().lower()}:{SECRET_SALT}"
     digest = hashlib.sha256(raw.encode()).hexdigest().upper()
     # Format as CSL-XXXXXXXX-XXXXXXXX-XXXXXXXX-XXXXXXXX-XXXXXXXX (5 groups of 8)
@@ -23,7 +23,7 @@ def generate_key(email: str) -> str:
 
 
 def validate_key(key: str) -> bool:
-    """Validate a Cashel license key — format: CSL-XXXXXXXX-XXXXXXXX-XXXXXXXX-XXXXXXXX-XXXXXXXX"""
+    """Validate a legacy compatibility key."""
     if not key or len(key) != 48:
         return False
     parts = key.split("-")
@@ -35,12 +35,12 @@ def validate_key(key: str) -> bool:
 
 
 def activate_license(key: str) -> tuple:
-    """Activate and store a license key"""
+    """Store a legacy compliance access key."""
     key = key.strip().upper()
     if not validate_key(key):
         return (
             False,
-            "Invalid license key format. Keys should look like: CSL-XXXXXXXX-XXXXXXXX-XXXXXXXX-XXXXXXXX-XXXXXXXX",
+            "Invalid legacy access key format. Keys should look like: CSL-XXXXXXXX-XXXXXXXX-XXXXXXXX-XXXXXXXX-XXXXXXXX",
         )
 
     license_data = {
@@ -51,13 +51,13 @@ def activate_license(key: str) -> tuple:
     try:
         with open(LICENSE_FILE, "w") as f:
             json.dump(license_data, f)
-        return True, "License activated successfully"
+        return True, "Legacy compliance access updated"
     except Exception as e:
-        return False, f"Failed to save license: {e}"
+        return False, f"Failed to save legacy access state: {e}"
 
 
 def mask_key(key: str) -> str:
-    """Return an obfuscated version of a license key showing only the first segment."""
+    """Return an obfuscated version of a legacy key showing only the first segment."""
     parts = key.split("-")
     if len(parts) >= 2:
         masked = "-".join([parts[0], parts[1]] + ["\u2022" * len(p) for p in parts[2:]])
@@ -66,14 +66,14 @@ def mask_key(key: str) -> str:
 
 
 def check_license() -> tuple:
-    """Check if a valid license is activated.
+    """Check whether legacy compliance access is active.
     In demo mode this always returns True so compliance features are available.
     """
     if DEMO_MODE:
         return True, "DEMO-MODE-ACTIVE"
 
     if not os.path.exists(LICENSE_FILE):
-        return False, "No license found."
+        return False, "No legacy compliance access state found."
 
     try:
         with open(LICENSE_FILE, "r") as f:
@@ -84,15 +84,15 @@ def check_license() -> tuple:
         else:
             return (
                 False,
-                "Invalid license key. Please re-enter your CSL- key to reactivate.",
+                "Invalid legacy access key. Please re-enter your CSL- key to update compatibility state.",
             )
     except Exception as e:
-        return False, f"License check failed: {e}"
+        return False, f"Legacy compliance access check failed: {e}"
 
 
 def deactivate_license():
-    """Remove stored license"""
+    """Remove stored legacy compliance access state."""
     if os.path.exists(LICENSE_FILE):
         os.remove(LICENSE_FILE)
-        return True, "License deactivated"
-    return False, "No license found"
+        return True, "Legacy compliance access cleared"
+    return False, "No legacy compliance access state found"

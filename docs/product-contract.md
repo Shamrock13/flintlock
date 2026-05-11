@@ -45,8 +45,8 @@ Branch guidance: [Branch strategy](branch-strategy.md).
 | Juniper/pfSense depth | Partial | Useful audit coverage exists; not the current top depth priority. |
 | Cloud firewall depth | Experimental | AWS/Azure/GCP are useful static checks but not the current depth priority. |
 | Scope-aware shadowing | Partial | Existing shadow checks catch useful cases but are not fully context-aware. |
-| Compliance checks | Deprecated | Current implementation is license-gated in some flows and should be reworked toward data-driven mappings. |
-| License-gated compliance | Deprecated | Do not build new product direction around paid compliance gating. |
+| Compliance checks | Partial | Currently partially implemented; some workflows may still check legacy license state before running compliance mappings. |
+| Legacy compliance access gate | Deprecated | Deprecated compatibility gate under review; do not build new product direction around it. |
 | OIDC SSO | Planned | First-class target. Local auth remains bootstrap/fallback. |
 | SAML SSO | Planned | Future roadmap after OIDC. |
 | Policy-as-code / CI gates | Planned | Depends on stable IDs and normalized findings/rules. |
@@ -68,9 +68,9 @@ Branch guidance: [Branch strategy](branch-strategy.md).
 
 ## Compliance Direction
 
-Current compliance behavior is not the long-term contract. It is partially implemented and may be license-gated depending on route and deployment state.
+Current compliance behavior is not the long-term contract. Compliance checks are partially implemented, and some workflows may still check legacy license state before running compliance mappings.
 
-Future compliance should be data-driven:
+Long-term compliance should be data-driven:
 
 - Controls map to stable finding IDs.
 - Controls define required evidence fields.
