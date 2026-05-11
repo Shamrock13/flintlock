@@ -81,6 +81,70 @@ def _covers(broad, narrow):
     return n.issubset(b)
 
 
+def _forti_policy_name(policy):
+    return policy.get("name") or f"Policy ID {policy.get('id')}"
+
+
+def _forti_policy_values(policy, key):
+    values = policy.get(key, [])
+    if isinstance(values, list):
+        return values
+    if values:
+        return [values]
+    return []
+
+
+def _forti_policy_context(policy, prefix):
+    profile_fields = {
+        "utm-status": "utm_status",
+        "av-profile": "av_profile",
+        "ips-sensor": "ips_sensor",
+        "application-list": "application_list",
+        "webfilter-profile": "webfilter_profile",
+        "profile-protocol-options": "profile_protocol_options",
+    }
+    context = {
+        f"{prefix}_policy_id": str(policy.get("id") or ""),
+        f"{prefix}_policy_name": _forti_policy_name(policy),
+        f"{prefix}_srcintf": _forti_policy_values(policy, "srcintf"),
+        f"{prefix}_dstintf": _forti_policy_values(policy, "dstintf"),
+        f"{prefix}_srcaddr": _forti_policy_values(policy, "srcaddr"),
+        f"{prefix}_dstaddr": _forti_policy_values(policy, "dstaddr"),
+        f"{prefix}_service": _forti_policy_values(policy, "service"),
+        f"{prefix}_action": policy.get("action", ""),
+        f"{prefix}_logtraffic": policy.get("logtraffic", ""),
+        f"{prefix}_status": policy.get("status", ""),
+        f"{prefix}_schedule": policy.get("schedule", ""),
+        f"{prefix}_nat": policy.get("nat", ""),
+        f"{prefix}_comments": policy.get("comments", ""),
+    }
+    for raw_key, metadata_key in profile_fields.items():
+        context[f"{prefix}_{metadata_key}"] = policy.get(raw_key, "")
+    return context
+
+
+def _forti_shadow_evidence(shadowed_policy, shadowing_policy):
+    shadowed_name = _forti_policy_name(shadowed_policy)
+    shadowing_name = _forti_policy_name(shadowing_policy)
+    fields = [
+        f"shadowed_policy_id={shadowed_policy.get('id')}",
+        f"shadowed_name={shadowed_name}",
+        f"shadowed_srcaddr={','.join(_forti_policy_values(shadowed_policy, 'srcaddr')) or 'unset'}",
+        f"shadowed_dstaddr={','.join(_forti_policy_values(shadowed_policy, 'dstaddr')) or 'unset'}",
+        f"shadowed_service={','.join(_forti_policy_values(shadowed_policy, 'service')) or 'unset'}",
+        f"shadowed_action={shadowed_policy.get('action') or 'unset'}",
+        f"shadowed_logtraffic={shadowed_policy.get('logtraffic') or 'unset'}",
+        f"shadowing_policy_id={shadowing_policy.get('id')}",
+        f"shadowing_name={shadowing_name}",
+        f"shadowing_srcaddr={','.join(_forti_policy_values(shadowing_policy, 'srcaddr')) or 'unset'}",
+        f"shadowing_dstaddr={','.join(_forti_policy_values(shadowing_policy, 'dstaddr')) or 'unset'}",
+        f"shadowing_service={','.join(_forti_policy_values(shadowing_policy, 'service')) or 'unset'}",
+        f"shadowing_action={shadowing_policy.get('action') or 'unset'}",
+        f"shadowing_logtraffic={shadowing_policy.get('logtraffic') or 'unset'}",
+    ]
+    return "; ".join(fields)
+
+
 # ── Palo Alto ────────────────────────────────────────────────────────────────
 
 
@@ -153,18 +217,18 @@ def check_shadow_rules_forti(policies):
     policy covers a superset of its srcaddr, dstaddr, and service scope.
     """
     findings = []
-    active = []  # list of (name, srcaddr, dstaddr, service)
+    active = []  # list of (name, srcaddr, dstaddr, service, policy)
 
     for p in policies:
         if p.get("status") == "disable":
             continue
 
-        name = p.get("name") or f"Policy ID {p.get('id')}"
+        name = _forti_policy_name(p)
         src = p.get("srcaddr", [])
         dst = p.get("dstaddr", [])
         svc = p.get("service", [])
 
-        for e_name, e_src, e_dst, e_svc in active:
+        for e_name, e_src, e_dst, e_svc, e_policy in active:
             if _covers(e_src, src) and _covers(e_dst, dst) and _covers(e_svc, svc):
                 findings.append(
                     _f(
@@ -177,23 +241,29 @@ def check_shadow_rules_forti(policies):
                         id="CASHEL-FORTINET-REDUNDANCY-001",
                         vendor="fortinet",
                         title="Fortinet policy is shadowed",
-                        evidence=f"Policy '{e_name}' covers policy '{name}'",
+                        evidence=_forti_shadow_evidence(p, e_policy),
                         affected_object=name,
+                        rule_id=str(p.get("id") or ""),
                         rule_name=name,
                         confidence="medium",
                         verification="Review policy order and hit counts, then re-run the audit after removing, narrowing, or moving the shadowed policy.",
-                        metadata=_shadow_metadata(
-                            name,
-                            e_name,
-                            source=src,
-                            destination=dst,
-                            service=svc,
-                        ),
+                        rollback="Restore the previous policy order from configuration backup if reordering or removal affects approved traffic.",
+                        metadata={
+                            **_shadow_metadata(
+                                name,
+                                e_name,
+                                source=src,
+                                destination=dst,
+                                service=svc,
+                            ),
+                            **_forti_policy_context(p, "shadowed"),
+                            **_forti_policy_context(e_policy, "shadowing"),
+                        },
                     )
                 )
                 break
 
-        active.append((name, src, dst, svc))
+        active.append((name, src, dst, svc, p))
 
     return findings
 
