@@ -3,12 +3,15 @@
 Run with:  python3 tests/test_iptables.py
 """
 
+import json
 import os
 import sys
 import tempfile
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "src"))
 
+from cashel.audit_engine import _findings_to_strings
+from cashel.export import to_csv, to_json, to_sarif
 from cashel.iptables import (
     parse_iptables,
     check_default_policy_iptables,
@@ -26,6 +29,8 @@ from cashel.iptables import (
     check_icmp_unrestricted_nftables,
     audit_nftables,
 )
+from cashel.models.findings import validate_finding_shape
+from cashel.remediation import generate_plan
 
 # ── Test data ─────────────────────────────────────────────────────────────────
 
@@ -274,6 +279,134 @@ def test_audit_iptables_parse_error():
     findings, data = audit_iptables("/nonexistent/file.txt")
     assert len(findings) == 1
     assert data == {}
+
+
+def test_iptables_audit_preserves_count_severity_and_messages():
+    path = _write(IPTABLES_RISKY)
+    try:
+        findings, _data = audit_iptables(path)
+    finally:
+        os.unlink(path)
+
+    messages = [f["message"] for f in findings]
+
+    assert len(findings) == 8
+    assert sum(1 for f in findings if f["severity"] == "HIGH") == 5
+    assert sum(1 for f in findings if f["severity"] == "MEDIUM") == 3
+    assert (
+        "[HIGH] iptables filter chain 'INPUT' has default policy ACCEPT" in messages[0]
+    )
+    assert any("iptables INPUT rule allows ALL traffic" in msg for msg in messages)
+    assert any("SSH (TCP/22) open to 0.0.0.0/0" in msg for msg in messages)
+    assert any("RDP (TCP/3389) open to 0.0.0.0/0" in msg for msg in messages)
+    assert any("FORWARD chain has unrestricted ACCEPT" in msg for msg in messages)
+    assert any("No LOG target found in INPUT chain" in msg for msg in messages)
+    assert any("Unrestricted ICMP ACCEPT" in msg for msg in messages)
+
+
+def test_iptables_findings_are_enriched_with_ids_evidence_and_metadata():
+    path = _write(IPTABLES_RISKY)
+    try:
+        findings, _data = audit_iptables(path)
+    finally:
+        os.unlink(path)
+
+    assert all(validate_finding_shape(f) == [] for f in findings)
+    assert all(f["vendor"] == "iptables" for f in findings)
+    assert all(f["id"].startswith("CASHEL-IPTABLES-") for f in findings)
+    assert all(f.get("title") for f in findings)
+    assert all(f.get("evidence") for f in findings)
+    assert all(f.get("affected_object") or f.get("rule_name") for f in findings)
+    assert all(f.get("confidence") for f in findings)
+    assert all(f.get("verification") for f in findings)
+    assert all(f.get("metadata") for f in findings)
+
+    ssh = next(f for f in findings if "SSH (TCP/22)" in f["message"])
+    assert ssh["id"] == "CASHEL-IPTABLES-EXPOSURE-002"
+    assert ssh["evidence"] == "-A INPUT -p tcp --dport 22 -j ACCEPT"
+    assert ssh["metadata"]["chain"] == "INPUT"
+    assert ssh["metadata"]["policy"] == "ACCEPT"
+    assert ssh["metadata"]["protocol"] == "tcp"
+    assert ssh["metadata"]["source"] == "0.0.0.0/0"
+    assert ssh["metadata"]["destination"] == "0.0.0.0/0"
+    assert ssh["metadata"]["destination_port"] == "22"
+    assert ssh["metadata"]["ports"] == "22"
+    assert ssh["metadata"]["target"] == "ACCEPT"
+    assert ssh["metadata"]["raw_rule"] == ssh["evidence"]
+
+
+def test_iptables_legacy_string_consumers_still_work():
+    path = _write(IPTABLES_RISKY)
+    try:
+        findings, _data = audit_iptables(path)
+    finally:
+        os.unlink(path)
+
+    strings = _findings_to_strings(findings)
+
+    assert len(strings) == len(findings)
+    assert all(isinstance(message, str) for message in strings)
+    assert any("default policy ACCEPT" in message for message in strings)
+
+
+def test_iptables_exports_preserve_enriched_fields():
+    path = _write(IPTABLES_RISKY)
+    try:
+        findings, _data = audit_iptables(path)
+    finally:
+        os.unlink(path)
+
+    finding = next(f for f in findings if "SSH (TCP/22)" in f["message"])
+    entry = {
+        "filename": "iptables.rules",
+        "vendor": "iptables",
+        "findings": [finding],
+        "summary": {"total": 1},
+    }
+
+    json_out = json.loads(to_json(entry))
+    assert json_out["findings"][0]["id"] == "CASHEL-IPTABLES-EXPOSURE-002"
+    assert json_out["findings"][0]["evidence"] == finding["evidence"]
+    assert json_out["findings"][0]["metadata"]["destination_port"] == "22"
+
+    csv_out = to_csv(entry)
+    assert "CASHEL-IPTABLES-EXPOSURE-002" in csv_out
+    assert "-A INPUT -p tcp --dport 22 -j ACCEPT" in csv_out
+
+    sarif_out = json.loads(to_sarif(entry))
+    result = sarif_out["runs"][0]["results"][0]
+    rule = sarif_out["runs"][0]["tool"]["driver"]["rules"][0]
+    assert result["ruleId"] == "CASHEL-IPTABLES-EXPOSURE-002"
+    assert result["properties"]["evidence"] == finding["evidence"]
+    assert rule["id"] == "CASHEL-IPTABLES-EXPOSURE-002"
+
+
+def test_iptables_remediation_consumes_enriched_fields():
+    path = _write(IPTABLES_RISKY)
+    try:
+        findings, _data = audit_iptables(path)
+    finally:
+        os.unlink(path)
+
+    finding = next(f for f in findings if "default policy ACCEPT" in f["message"])
+    plan = generate_plan([finding], "iptables", filename="iptables.rules")
+    step = plan["phases"][0]["steps"][0]
+
+    assert step["id"] == "CASHEL-IPTABLES-HYGIENE-001"
+    assert step["title"] == finding["title"]
+    assert step["evidence"] == finding["evidence"]
+    assert "iptables -P INPUT DROP" in step["suggested_commands"]
+
+
+def test_safe_iptables_sample_has_no_prioritized_false_positives():
+    path = _write(IPTABLES_SECURE)
+    try:
+        findings, data = audit_iptables(path)
+    finally:
+        os.unlink(path)
+
+    assert data
+    assert findings == []
 
 
 # ══════════════════════════════════════════════════ NFTABLES PARSER ══
