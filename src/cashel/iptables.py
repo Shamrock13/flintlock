@@ -18,6 +18,8 @@ import ipaddress
 import json
 import re
 
+from .models.findings import make_finding
+
 SENSITIVE_PORTS = {
     22: "SSH",
     23: "Telnet",
@@ -42,6 +44,79 @@ def _f(severity, category, message, remediation=""):
         "category": category,
         "message": message,
         "remediation": remediation,
+    }
+
+
+def _iptables_f(
+    severity,
+    category,
+    message,
+    remediation="",
+    *,
+    id,
+    title,
+    evidence,
+    affected_object,
+    rule_name=None,
+    confidence="medium",
+    impact=None,
+    verification=None,
+    rollback=None,
+    suggested_commands=None,
+    metadata=None,
+):
+    return make_finding(
+        severity,
+        category,
+        message,
+        remediation,
+        id=id,
+        vendor="iptables",
+        title=title,
+        evidence=evidence,
+        affected_object=affected_object,
+        rule_name=rule_name or affected_object,
+        confidence=confidence,
+        impact=impact,
+        verification=verification,
+        rollback=rollback,
+        suggested_commands=suggested_commands,
+        metadata=metadata,
+    )
+
+
+def _iptables_rule_metadata(rule: dict, extra: dict | None = None) -> dict:
+    metadata = {
+        "chain": rule.get("chain", ""),
+        "policy": "",
+        "protocol": rule.get("protocol", ""),
+        "source": rule.get("src", ""),
+        "destination": rule.get("dst", ""),
+        "ports": rule.get("dport", "") or rule.get("sport", ""),
+        "source_port": rule.get("sport", ""),
+        "destination_port": rule.get("dport", ""),
+        "icmp_type": rule.get("icmp_type", ""),
+        "target": rule.get("target", ""),
+        "input_interface": rule.get("in_iface", ""),
+        "output_interface": rule.get("out_iface", ""),
+        "state": rule.get("state", ""),
+        "raw_rule": rule.get("raw", ""),
+    }
+    if extra:
+        metadata.update(extra)
+    return metadata
+
+
+def _iptables_policy_metadata(chain: str, policy: str) -> dict:
+    return {
+        "chain": chain,
+        "policy": policy,
+        "protocol": "",
+        "source": "",
+        "destination": "",
+        "ports": "",
+        "target": policy,
+        "raw_rule": "",
     }
 
 
@@ -211,12 +286,22 @@ def check_default_policy_iptables(data: dict) -> list[dict]:
         pol = policy.get(chain, "").upper()
         if pol == "ACCEPT":
             findings.append(
-                _f(
+                _iptables_f(
                     "HIGH",
                     "hygiene",
                     f"[HIGH] iptables filter chain '{chain}' has default policy ACCEPT — all unmatched traffic is permitted.",
                     f"Set a default DROP policy: 'iptables -P {chain} DROP'. "
                     "Explicit ACCEPT rules should be used only for required traffic.",
+                    id="CASHEL-IPTABLES-HYGIENE-001",
+                    title="iptables filter chain has default ACCEPT policy",
+                    evidence=f"chain={chain}; policy={pol}",
+                    affected_object=chain,
+                    confidence="high",
+                    impact="Unmatched traffic is permitted by default instead of requiring explicit allow rules.",
+                    verification=f"Run 'iptables -S {chain}' and confirm the chain policy is DROP.",
+                    rollback=f"Restore the previous default policy with 'iptables -P {chain} ACCEPT' if emergency access is disrupted.",
+                    suggested_commands=[f"iptables -P {chain} DROP"],
+                    metadata=_iptables_policy_metadata(chain, pol),
                 )
             )
     return findings
@@ -225,7 +310,9 @@ def check_default_policy_iptables(data: dict) -> list[dict]:
 def check_any_any_accept_iptables(data: dict) -> list[dict]:
     """Flag unrestricted ACCEPT rules on the INPUT chain."""
     findings = []
-    rules = data.get("tables", {}).get("filter", {}).get("rules", [])
+    filter_tbl = data.get("tables", {}).get("filter", {})
+    policy = filter_tbl.get("policy", {})
+    rules = filter_tbl.get("rules", [])
     for r in rules:
         if (
             r["chain"] == "INPUT"
@@ -243,12 +330,27 @@ def check_any_any_accept_iptables(data: dict) -> list[dict]:
             ):
                 continue
             findings.append(
-                _f(
+                _iptables_f(
                     "HIGH",
                     "exposure",
                     f"[HIGH] iptables INPUT rule allows ALL traffic from any source: {r['raw']}",
                     "Remove or replace broad ACCEPT rules with specific protocol/port/source restrictions. "
                     "Use 'iptables -A INPUT -s <trusted-cidr> -p <proto> --dport <port> -j ACCEPT'.",
+                    id="CASHEL-IPTABLES-EXPOSURE-001",
+                    title="iptables INPUT rule allows all traffic",
+                    evidence=r["raw"],
+                    affected_object="INPUT",
+                    confidence="high",
+                    impact="A broad INPUT ACCEPT rule can expose all local services to untrusted sources.",
+                    verification="Run 'iptables -S INPUT' and confirm broad ACCEPT rules are removed or scoped.",
+                    rollback="Restore the previous INPUT rule from configuration backup if approved traffic is interrupted.",
+                    suggested_commands=[
+                        f"iptables -D INPUT {r['raw'].replace('-A INPUT ', '', 1)}",
+                        "iptables -A INPUT -s <trusted-cidr> -p <proto> --dport <port> -j ACCEPT",
+                    ],
+                    metadata=_iptables_rule_metadata(
+                        r, {"policy": policy.get(r["chain"], "")}
+                    ),
                 )
             )
     return findings
@@ -257,7 +359,9 @@ def check_any_any_accept_iptables(data: dict) -> list[dict]:
 def check_internet_ingress_iptables(data: dict) -> list[dict]:
     """Flag ACCEPT rules on INPUT that expose sensitive ports to 0.0.0.0/0."""
     findings = []
-    rules = data.get("tables", {}).get("filter", {}).get("rules", [])
+    filter_tbl = data.get("tables", {}).get("filter", {})
+    policy = filter_tbl.get("policy", {})
+    rules = filter_tbl.get("rules", [])
     for r in rules:
         if r["chain"] != "INPUT" or r["target"] != "ACCEPT":
             continue
@@ -273,13 +377,34 @@ def check_internet_ingress_iptables(data: dict) -> list[dict]:
         if dport:
             for port, svc in _port_in_sensitive(dport):
                 findings.append(
-                    _f(
+                    _iptables_f(
                         "HIGH",
                         "exposure",
                         f"[HIGH] iptables: {svc} (TCP/{port}) open to 0.0.0.0/0: {r['raw']}",
                         f"Restrict '{svc}' access to known source CIDRs: "
                         f"'iptables -A INPUT -s <trusted-cidr> -p tcp --dport {port} -j ACCEPT'. "
                         "Remove or restrict the broad rule.",
+                        id="CASHEL-IPTABLES-EXPOSURE-002",
+                        title=f"iptables exposes {svc} to the internet",
+                        evidence=r["raw"],
+                        affected_object="INPUT",
+                        confidence="high",
+                        impact=f"{svc} is reachable from any source and may expose administrative or sensitive services.",
+                        verification=f"Run 'iptables -S INPUT' and confirm TCP/{port} is restricted to approved CIDRs.",
+                        rollback="Restore the previous INPUT rule from configuration backup if approved access is interrupted.",
+                        suggested_commands=[
+                            f"iptables -D INPUT {r['raw'].replace('-A INPUT ', '', 1)}",
+                            f"iptables -A INPUT -s <trusted-cidr> -p tcp --dport {port} -j ACCEPT",
+                        ],
+                        metadata=_iptables_rule_metadata(
+                            r,
+                            {
+                                "policy": policy.get(r["chain"], ""),
+                                "service": svc,
+                                "port": port,
+                                "ports": r.get("dport", ""),
+                            },
+                        ),
                     )
                 )
     return findings
@@ -288,7 +413,9 @@ def check_internet_ingress_iptables(data: dict) -> list[dict]:
 def check_forward_chain_iptables(data: dict) -> list[dict]:
     """Flag permissive ACCEPT rules on the FORWARD chain."""
     findings = []
-    rules = data.get("tables", {}).get("filter", {}).get("rules", [])
+    filter_tbl = data.get("tables", {}).get("filter", {})
+    policy = filter_tbl.get("policy", {})
+    rules = filter_tbl.get("rules", [])
     for r in rules:
         if (
             r["chain"] == "FORWARD"
@@ -302,12 +429,27 @@ def check_forward_chain_iptables(data: dict) -> list[dict]:
             ):
                 continue
             findings.append(
-                _f(
+                _iptables_f(
                     "MEDIUM",
                     "exposure",
                     f"[MEDIUM] iptables: FORWARD chain has unrestricted ACCEPT — host may be routing traffic: {r['raw']}",
                     "Restrict FORWARD rules to specific source/destination pairs. "
                     "If the host is not a router, set 'iptables -P FORWARD DROP' and remove FORWARD ACCEPT rules.",
+                    id="CASHEL-IPTABLES-EXPOSURE-003",
+                    title="iptables FORWARD chain has unrestricted ACCEPT",
+                    evidence=r["raw"],
+                    affected_object="FORWARD",
+                    confidence="medium",
+                    impact="The host may route traffic between interfaces without explicit source and destination controls.",
+                    verification="Run 'iptables -S FORWARD' and confirm forwarding is denied by default or scoped to approved paths.",
+                    rollback="Restore the previous FORWARD rule from configuration backup if approved routed traffic is interrupted.",
+                    suggested_commands=[
+                        f"iptables -D FORWARD {r['raw'].replace('-A FORWARD ', '', 1)}",
+                        "iptables -P FORWARD DROP",
+                    ],
+                    metadata=_iptables_rule_metadata(
+                        r, {"policy": policy.get(r["chain"], "")}
+                    ),
                 )
             )
     return findings
@@ -321,13 +463,37 @@ def check_missing_logging_iptables(data: dict) -> list[dict]:
     has_log = any(r["target"] == "LOG" for r in input_rules)
     if not has_log and any(r["target"] == "ACCEPT" for r in input_rules):
         return [
-            _f(
+            _iptables_f(
                 "MEDIUM",
                 "logging",
                 "[MEDIUM] iptables: No LOG target found in INPUT chain — accepted traffic is not logged.",
                 "Add LOG rules before ACCEPT targets: "
                 "'iptables -A INPUT -j LOG --log-prefix \"[ACCEPT] \" --log-level 4'. "
                 "Without logging, permitted traffic cannot be audited.",
+                id="CASHEL-IPTABLES-LOGGING-001",
+                title="iptables INPUT chain is missing logging",
+                evidence="No LOG target found before INPUT ACCEPT rules.",
+                affected_object="INPUT",
+                confidence="medium",
+                impact="Accepted traffic may be absent from host firewall logs and audit trails.",
+                verification="Run 'iptables -S INPUT' and confirm LOG rules exist before accepted traffic paths.",
+                rollback="Remove the added LOG rule if log volume causes operational issues.",
+                suggested_commands=[
+                    'iptables -A INPUT -j LOG --log-prefix "[INPUT] " --log-level 4'
+                ],
+                metadata={
+                    "chain": "INPUT",
+                    "policy": filter_tbl.get("policy", {}).get("INPUT", ""),
+                    "protocol": "",
+                    "source": "",
+                    "destination": "",
+                    "ports": "",
+                    "target": "LOG",
+                    "raw_rule": "",
+                    "accept_rule_count": sum(
+                        1 for r in input_rules if r["target"] == "ACCEPT"
+                    ),
+                },
             )
         ]
     return []
@@ -336,7 +502,9 @@ def check_missing_logging_iptables(data: dict) -> list[dict]:
 def check_icmp_unrestricted_iptables(data: dict) -> list[dict]:
     """Flag unrestricted ICMP ACCEPT on INPUT without rate-limiting."""
     findings = []
-    rules = data.get("tables", {}).get("filter", {}).get("rules", [])
+    filter_tbl = data.get("tables", {}).get("filter", {})
+    policy = filter_tbl.get("policy", {})
+    rules = filter_tbl.get("rules", [])
     for r in rules:
         if (
             r["chain"] == "INPUT"
@@ -347,13 +515,28 @@ def check_icmp_unrestricted_iptables(data: dict) -> list[dict]:
             has_limit = re.search(r"-m\s+limit|--limit\b", r["raw"])
             if not has_limit:
                 findings.append(
-                    _f(
+                    _iptables_f(
                         "MEDIUM",
                         "exposure",
                         f"[MEDIUM] iptables: Unrestricted ICMP ACCEPT from 0.0.0.0/0 with no rate-limit: {r['raw']}",
                         "Add rate-limiting: 'iptables -A INPUT -p icmp --icmp-type echo-request "
                         "-m limit --limit 10/sec -j ACCEPT'. "
                         "Unrestricted ICMP can be abused for reconnaissance or flood attacks.",
+                        id="CASHEL-IPTABLES-EXPOSURE-004",
+                        title="iptables allows unrestricted ICMP",
+                        evidence=r["raw"],
+                        affected_object="INPUT",
+                        confidence="medium",
+                        impact="Unrestricted ICMP can support reconnaissance or contribute to flood traffic.",
+                        verification="Run 'iptables -S INPUT' and confirm ICMP accepts are rate-limited or source-scoped.",
+                        rollback="Restore the previous ICMP rule from configuration backup if troubleshooting traffic is interrupted.",
+                        suggested_commands=[
+                            "iptables -A INPUT -p icmp --icmp-type echo-request -m limit --limit 10/sec -j ACCEPT",
+                            "iptables -A INPUT -p icmp -j DROP",
+                        ],
+                        metadata=_iptables_rule_metadata(
+                            r, {"policy": policy.get(r["chain"], "")}
+                        ),
                     )
                 )
     return findings
@@ -366,7 +549,21 @@ def audit_iptables(filepath: str) -> tuple[list[dict], dict]:
     """
     data, error = parse_iptables(filepath)
     if error:
-        return [_f("HIGH", "parse", f"[HIGH] {error}")], {}
+        return [
+            _iptables_f(
+                "HIGH",
+                "parse",
+                f"[HIGH] {error}",
+                "",
+                id="CASHEL-IPTABLES-PARSE-001",
+                title="iptables ruleset could not be parsed",
+                evidence=error,
+                affected_object=filepath,
+                confidence="high",
+                verification="Confirm the file exists and contains iptables-save output, then re-run the audit.",
+                metadata={"filepath": filepath},
+            )
+        ], {}
 
     findings: list[dict] = []
     findings += check_default_policy_iptables(data)
