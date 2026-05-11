@@ -3,7 +3,7 @@ name = "cashel"
 version = "2.0.0"
 description = "Firewall configuration auditing tool"
 authors = [
-    {name = "Your Name", email = "you@example.com"}
+    {name = "Derek Lockovich", email = "Derek@cashel.app"}
 ]
 readme = "README.md"
 requires-python = ">=3.9"

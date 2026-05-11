@@ -8,6 +8,9 @@ The product direction is depth over breadth: trusted, evidence-backed, reproduci
 
 **Demo:** [demo.cashel.app](https://demo.cashel.app)
 
+[![GitHub Sponsors](https://img.shields.io/badge/Sponsor-%E2%9D%A4-ea4aaa?logo=github-sponsors&logoColor=white)](https://github.com/sponsors/Shamrock13)
+[![Ko-fi](https://img.shields.io/badge/Ko--fi-Support%20Cashel-FF5E5B?logo=ko-fi&logoColor=white)](https://ko-fi.com/shamrock13)
+
 ---
 
 ## Current State
