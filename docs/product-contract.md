@@ -4,6 +4,8 @@ Cashel's contract is simple: produce trusted, evidence-backed, reproducible fire
 
 Branch guidance: [Branch strategy](branch-strategy.md).
 
+Finding guidance: [Finding model](finding-model.md).
+
 ## Current Priority Order
 
 1. Product truth / docs cleanup
