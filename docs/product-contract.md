@@ -2,8 +2,6 @@
 
 Cashel's contract is simple: produce trusted, evidence-backed, reproducible firewall audit findings that engineers can verify and remediate. Vendor breadth is secondary to correctness, explainability, and operational safety.
 
-Branch guidance: [Branch strategy](branch-strategy.md).
-
 Finding guidance: [Finding model](finding-model.md).
 
 ## Current Priority Order
