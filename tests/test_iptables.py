@@ -555,6 +555,143 @@ def test_audit_nftables_parse_error():
     assert tables == []
 
 
+def test_nftables_audit_preserves_count_severity_and_messages():
+    path = _write(NFTABLES_RISKY)
+    try:
+        findings, _tables = audit_nftables(path)
+    finally:
+        os.unlink(path)
+
+    messages = [f["message"] for f in findings]
+
+    assert len(findings) == 7
+    assert sum(1 for f in findings if f["severity"] == "HIGH") == 5
+    assert sum(1 for f in findings if f["severity"] == "MEDIUM") == 2
+    assert any(
+        "chain 'input' (hook=input) has default policy 'accept'" in msg
+        for msg in messages
+    )
+    assert any(
+        "chain 'forward' (hook=forward) has default policy 'accept'" in msg
+        for msg in messages
+    )
+    assert any("unconditional 'accept'" in msg for msg in messages)
+    assert any(
+        "SSH (TCP/22) accepted with no source restriction" in msg for msg in messages
+    )
+    assert any(
+        "RDP (TCP/3389) accepted with no source restriction" in msg for msg in messages
+    )
+    assert any("no 'log' statement found" in msg for msg in messages)
+    assert any("ICMP accepted without rate-limiting" in msg for msg in messages)
+
+
+def test_nftables_findings_are_enriched_with_ids_evidence_and_metadata():
+    path = _write(NFTABLES_RISKY)
+    try:
+        findings, _tables = audit_nftables(path)
+    finally:
+        os.unlink(path)
+
+    assert all(validate_finding_shape(f) == [] for f in findings)
+    assert all(f["vendor"] == "nftables" for f in findings)
+    assert all(f["id"].startswith("CASHEL-NFTABLES-") for f in findings)
+    assert all(f.get("title") for f in findings)
+    assert all(f.get("evidence") for f in findings)
+    assert all(f.get("affected_object") or f.get("rule_name") for f in findings)
+    assert all(f.get("confidence") for f in findings)
+    assert all(f.get("verification") for f in findings)
+    assert all(f.get("metadata") for f in findings)
+
+    ssh = next(f for f in findings if "SSH (TCP/22)" in f["message"])
+    assert ssh["id"] == "CASHEL-NFTABLES-EXPOSURE-002"
+    assert ssh["evidence"] == "tcp dport 22 accept"
+    assert ssh["metadata"]["table"] == "filter"
+    assert ssh["metadata"]["chain"] == "input"
+    assert ssh["metadata"]["hook"] == "input"
+    assert ssh["metadata"]["policy"] == "accept"
+    assert ssh["metadata"]["protocol"] == "tcp"
+    assert ssh["metadata"]["source"] == "any"
+    assert ssh["metadata"]["destination"] == "any"
+    assert ssh["metadata"]["ports"] == "22"
+    assert ssh["metadata"]["verdict"] == "accept"
+    assert ssh["metadata"]["raw_rule"] == ssh["evidence"]
+
+
+def test_nftables_legacy_string_consumers_still_work():
+    path = _write(NFTABLES_RISKY)
+    try:
+        findings, _tables = audit_nftables(path)
+    finally:
+        os.unlink(path)
+
+    strings = _findings_to_strings(findings)
+
+    assert len(strings) == len(findings)
+    assert all(isinstance(message, str) for message in strings)
+    assert any("default policy 'accept'" in message for message in strings)
+
+
+def test_nftables_exports_preserve_enriched_fields():
+    path = _write(NFTABLES_RISKY)
+    try:
+        findings, _tables = audit_nftables(path)
+    finally:
+        os.unlink(path)
+
+    finding = next(f for f in findings if "SSH (TCP/22)" in f["message"])
+    entry = {
+        "filename": "nft.rules",
+        "vendor": "nftables",
+        "findings": [finding],
+        "summary": {"total": 1},
+    }
+
+    json_out = json.loads(to_json(entry))
+    assert json_out["findings"][0]["id"] == "CASHEL-NFTABLES-EXPOSURE-002"
+    assert json_out["findings"][0]["evidence"] == finding["evidence"]
+    assert json_out["findings"][0]["metadata"]["ports"] == "22"
+
+    csv_out = to_csv(entry)
+    assert "CASHEL-NFTABLES-EXPOSURE-002" in csv_out
+    assert "tcp dport 22 accept" in csv_out
+
+    sarif_out = json.loads(to_sarif(entry))
+    result = sarif_out["runs"][0]["results"][0]
+    rule = sarif_out["runs"][0]["tool"]["driver"]["rules"][0]
+    assert result["ruleId"] == "CASHEL-NFTABLES-EXPOSURE-002"
+    assert result["properties"]["evidence"] == finding["evidence"]
+    assert rule["id"] == "CASHEL-NFTABLES-EXPOSURE-002"
+
+
+def test_nftables_remediation_consumes_enriched_fields():
+    path = _write(NFTABLES_RISKY)
+    try:
+        findings, _tables = audit_nftables(path)
+    finally:
+        os.unlink(path)
+
+    finding = next(f for f in findings if "default policy 'accept'" in f["message"])
+    plan = generate_plan([finding], "nftables", filename="nft.rules")
+    step = plan["phases"][0]["steps"][0]
+
+    assert step["id"] == "CASHEL-NFTABLES-HYGIENE-001"
+    assert step["title"] == finding["title"]
+    assert step["evidence"] == finding["evidence"]
+    assert "policy drop" in step["suggested_commands"]
+
+
+def test_safe_nftables_sample_has_no_prioritized_false_positives():
+    path = _write(NFTABLES_SECURE)
+    try:
+        findings, tables = audit_nftables(path)
+    finally:
+        os.unlink(path)
+
+    assert tables
+    assert findings == []
+
+
 # ── Standalone runner ─────────────────────────────────────────────────────────
 
 if __name__ == "__main__":
