@@ -5,6 +5,7 @@ import os
 import tempfile
 
 from cashel.export import to_csv, to_json, to_sarif
+from cashel.audit_engine import _findings_to_strings, run_vendor_audit
 from cashel.fortinet import (
     _f,
     audit_fortinet,
@@ -21,6 +22,7 @@ from cashel.fortinet import (
     expand_services,
     parse_fortinet,
 )
+from cashel.models.findings import validate_finding_shape
 from cashel.remediation import generate_plan
 
 TESTS_DIR = os.path.dirname(__file__)
@@ -74,6 +76,16 @@ def _parse_text(config_text):
     return policies
 
 
+def _audit_text(config_text):
+    with tempfile.NamedTemporaryFile("w", suffix=".conf", delete=False) as fh:
+        fh.write(config_text)
+        path = fh.name
+    try:
+        return run_vendor_audit("fortinet", path)
+    finally:
+        os.unlink(path)
+
+
 def test_fortinet_legacy_helper_shape_still_works():
     finding = _f("LOW", "hygiene", "[LOW] Legacy Fortinet finding", "Fix it.")
 
@@ -107,6 +119,23 @@ def test_fortinet_audit_findings_include_ids_titles_and_evidence():
     assert all("id" in f and f["id"].startswith("CASHEL-FORTINET-") for f in findings)
     assert all(f.get("title") for f in findings)
     assert all(f.get("evidence") for f in findings)
+
+
+def test_fortinet_full_audit_preserves_count_severity_and_legacy_strings():
+    findings, _parse, policies = run_vendor_audit(
+        "fortinet", os.path.join(TESTS_DIR, "test_forti.txt")
+    )
+
+    assert policies
+    assert len(findings) == 12
+    assert sum(1 for f in findings if f["severity"] == "HIGH") == 5
+    assert sum(1 for f in findings if f["severity"] == "MEDIUM") == 7
+    assert all(validate_finding_shape(f) == [] for f in findings)
+
+    strings = _findings_to_strings(findings)
+    assert len(strings) == len(findings)
+    assert all(isinstance(message, str) for message in strings)
+    assert any("Overly permissive rule 'Allow-All'" in message for message in strings)
 
 
 def test_fortinet_remediation_plan_consumes_commands_and_evidence():
@@ -470,6 +499,34 @@ end
     assert insecure["metadata"]["insecure_services"] == ["TELNET"]
 
 
+def test_fortinet_shadow_findings_include_policy_evidence_and_context():
+    findings, _parse, _policies = run_vendor_audit(
+        "fortinet", os.path.join(TESTS_DIR, "test_forti.txt")
+    )
+    shadow = next(f for f in findings if f["id"] == "CASHEL-FORTINET-REDUNDANCY-001")
+
+    assert shadow["vendor"] == "fortinet"
+    assert shadow["rule_id"] == "2"
+    assert shadow["affected_object"] == "Allow-Web"
+    assert "shadowed_policy_id=2" in shadow["evidence"]
+    assert "shadowing_policy_id=1" in shadow["evidence"]
+    assert "shadowed_srcaddr=all" in shadow["evidence"]
+    assert "shadowing_service=ALL" in shadow["evidence"]
+    assert shadow["metadata"]["shadowed_policy_id"] == "2"
+    assert shadow["metadata"]["shadowed_policy_name"] == "Allow-Web"
+    assert shadow["metadata"]["shadowed_srcaddr"] == ["all"]
+    assert shadow["metadata"]["shadowed_dstaddr"] == ["WebServer"]
+    assert shadow["metadata"]["shadowed_service"] == ["HTTP", "HTTPS"]
+    assert shadow["metadata"]["shadowed_action"] == "accept"
+    assert shadow["metadata"]["shadowed_logtraffic"] == "all"
+    assert shadow["metadata"]["shadowing_policy_id"] == "1"
+    assert shadow["metadata"]["shadowing_policy_name"] == "Allow-All"
+    assert shadow["metadata"]["shadowing_srcaddr"] == ["all"]
+    assert shadow["metadata"]["shadowing_dstaddr"] == ["all"]
+    assert shadow["metadata"]["shadowing_service"] == ["ALL"]
+    assert shadow["rollback"]
+
+
 def test_duplicate_detection_includes_interfaces_schedule_and_nat():
     base = _policy(
         id="1",
@@ -578,3 +635,41 @@ end
     assert findings[0]["id"] == "CASHEL-FORTINET-REDUNDANCY-002"
     assert findings[0]["metadata"]["expanded_srcaddr"] == ["10.20.10.0 255.255.255.0"]
     assert findings[0]["metadata"]["expanded_service"] == ["tcp/8443"]
+
+
+def test_safe_fortinet_sample_has_no_prioritized_policy_findings():
+    findings, _parse, policies = _audit_text(
+        """
+config firewall policy
+    edit 10
+        set name "Specific Outbound Web"
+        set srcintf "lan"
+        set dstintf "wan1"
+        set srcaddr "TrustedUsers"
+        set dstaddr "ApprovedSaaS"
+        set action accept
+        set service "HTTPS"
+        set schedule "always"
+        set logtraffic all
+        set utm-status enable
+        set av-profile "default"
+        set ips-sensor "strict"
+        set application-list "app-control"
+        set webfilter-profile "web-default"
+    next
+    edit 999
+        set name "Explicit Deny All"
+        set srcintf "any"
+        set dstintf "any"
+        set srcaddr "all"
+        set dstaddr "all"
+        set action deny
+        set service "ALL"
+        set logtraffic all
+    next
+end
+"""
+    )
+
+    assert policies
+    assert findings == []
