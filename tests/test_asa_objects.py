@@ -15,8 +15,12 @@ from ciscoconfparse import CiscoConfParse
 from cashel.audit_engine import (
     _audit_asa,
     _check_any_any,
+    _check_deny_all,
+    _check_icmp_any_asa,
+    _check_missing_logging,
     _check_redundant_rules,
     _check_telnet_asa,
+    _findings_to_strings,
     expand_asa_address,
     expand_asa_service,
     parse_asa_network_object_groups,
@@ -171,6 +175,69 @@ def test_asa_any_any_detection_uses_expanded_object_group_scope():
     assert finding["metadata"]["expanded_source"] == ["any"]
     assert finding["metadata"]["expanded_destination"] == ["any"]
     assert finding["metadata"]["acl_name"] == "OUTSIDE_IN"
+
+
+def test_asa_prioritized_findings_keep_expected_counts_and_enriched_shape():
+    parse = _parse(
+        "\n".join(
+            [
+                "access-list OUTSIDE_IN extended permit ip any any",
+                "access-list OUTSIDE_IN extended permit tcp any host 10.0.0.1 eq 443",
+                "access-list OUTSIDE_IN extended permit tcp any host 10.0.0.1 eq 443",
+                "access-list OUTSIDE_IN extended permit icmp any any",
+                "telnet 0.0.0.0 0.0.0.0 management",
+            ]
+        )
+        + "\n"
+    )
+
+    findings = (
+        _check_any_any(parse)
+        + _check_missing_logging(parse)
+        + _check_deny_all(parse)
+        + _check_redundant_rules(parse)
+        + _check_telnet_asa(parse)
+        + _check_icmp_any_asa(parse)
+    )
+
+    assert len(_check_any_any(parse)) == 1
+    assert len(_check_missing_logging(parse)) == 4
+    assert len(_check_deny_all(parse)) == 1
+    assert len(_check_redundant_rules(parse)) == 1
+    assert len(_check_telnet_asa(parse)) == 1
+    assert len(_check_icmp_any_asa(parse)) == 1
+    assert {finding["id"] for finding in findings} >= {
+        "CASHEL-ASA-EXPOSURE-001",
+        "CASHEL-ASA-LOGGING-001",
+        "CASHEL-ASA-HYGIENE-001",
+        "CASHEL-ASA-REDUNDANCY-001",
+        "CASHEL-ASA-PROTOCOL-001",
+        "CASHEL-ASA-EXPOSURE-002",
+    }
+    assert all(validate_finding_shape(finding) == [] for finding in findings)
+    assert any(finding["severity"] == "CRITICAL" for finding in findings)
+    assert any(finding.get("evidence") for finding in findings)
+    assert any("[CRITICAL]" in message for message in _findings_to_strings(findings))
+
+
+def test_asa_safe_sample_has_no_prioritized_findings():
+    parse = _parse(
+        "\n".join(
+            [
+                "access-list OUTSIDE_IN extended permit tcp host 10.0.0.10 host 10.0.0.20 eq 443 log",
+                "access-list OUTSIDE_IN extended deny ip any any log",
+                "ssh version 2",
+            ]
+        )
+        + "\n"
+    )
+
+    assert _check_any_any(parse) == []
+    assert _check_missing_logging(parse) == []
+    assert _check_deny_all(parse) == []
+    assert _check_redundant_rules(parse) == []
+    assert _check_telnet_asa(parse) == []
+    assert _check_icmp_any_asa(parse) == []
 
 
 def test_asa_findings_include_raw_and_expanded_destination_and_service_metadata():
