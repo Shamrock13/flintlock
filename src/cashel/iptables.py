@@ -120,6 +120,99 @@ def _iptables_policy_metadata(chain: str, policy: str) -> dict:
     }
 
 
+def _nftables_f(
+    severity,
+    category,
+    message,
+    remediation="",
+    *,
+    id,
+    title,
+    evidence,
+    affected_object,
+    rule_name=None,
+    confidence="medium",
+    impact=None,
+    verification=None,
+    rollback=None,
+    suggested_commands=None,
+    metadata=None,
+):
+    return make_finding(
+        severity,
+        category,
+        message,
+        remediation,
+        id=id,
+        vendor="nftables",
+        title=title,
+        evidence=evidence,
+        affected_object=affected_object,
+        rule_name=rule_name or affected_object,
+        confidence=confidence,
+        impact=impact,
+        verification=verification,
+        rollback=rollback,
+        suggested_commands=suggested_commands,
+        metadata=metadata,
+    )
+
+
+def _nft_rule_metadata(tbl: dict, cname: str, chain: dict, rule: str) -> dict:
+    rl = rule.lower()
+    proto = ""
+    ports = ""
+    src = ""
+    dst = ""
+    if "tcp" in rl:
+        proto = "tcp"
+    elif "udp" in rl:
+        proto = "udp"
+    elif "icmpv6" in rl:
+        proto = "icmpv6"
+    elif "icmp" in rl:
+        proto = "icmp"
+
+    port_match = re.search(r"\b(?:dport|sport)\s+([0-9, -]+)", rl)
+    if port_match:
+        ports = port_match.group(1).strip()
+    src_match = re.search(r"\b(?:ip6?\s+)?saddr\s+(\S+)", rl)
+    if src_match:
+        src = src_match.group(1)
+    dst_match = re.search(r"\b(?:ip6?\s+)?daddr\s+(\S+)", rl)
+    if dst_match:
+        dst = dst_match.group(1)
+
+    verdict = "accept" if re.search(r"\baccept\b", rl) else ""
+    return {
+        "table": tbl.get("name", ""),
+        "chain": cname,
+        "hook": chain.get("hook", ""),
+        "policy": chain.get("policy", ""),
+        "protocol": proto,
+        "source": src or "any",
+        "destination": dst or "any",
+        "ports": ports,
+        "verdict": verdict,
+        "raw_rule": rule,
+    }
+
+
+def _nft_chain_metadata(chain: dict, table_name: str | None = None) -> dict:
+    return {
+        "table": table_name or chain.get("table", ""),
+        "chain": chain.get("name", ""),
+        "hook": chain.get("hook", ""),
+        "policy": chain.get("policy", ""),
+        "protocol": "",
+        "source": "",
+        "destination": "",
+        "ports": "",
+        "verdict": chain.get("policy", ""),
+        "raw_rule": "",
+    }
+
+
 def _is_any_source(src: str) -> bool:
     if not src or src in _INTERNET_SRCS:
         return True
@@ -730,13 +823,28 @@ def check_default_policy_nftables(tables: list) -> list[dict]:
                 and chain.get("policy", "").lower() == "accept"
             ):
                 findings.append(
-                    _f(
+                    _nftables_f(
                         "HIGH",
                         "hygiene",
                         f"[HIGH] nftables: chain '{chain['name']}' (hook={chain['hook']}) "
                         f"has default policy 'accept' — all unmatched traffic is permitted.",
                         f"Set 'policy drop' on the {chain['hook']} chain. "
                         "Use explicit 'accept' statements only for required traffic.",
+                        id="CASHEL-NFTABLES-HYGIENE-001",
+                        title="nftables chain has default accept policy",
+                        evidence=(
+                            f"table={chain.get('table', '')}; chain={chain.get('name', '')}; "
+                            f"hook={chain.get('hook', '')}; policy={chain.get('policy', '')}"
+                        ),
+                        affected_object=chain.get("name", ""),
+                        confidence="high",
+                        impact="Unmatched traffic is permitted by default instead of requiring explicit accept rules.",
+                        verification=f"Run 'nft list chain {chain.get('family', '<family>')} {chain.get('table', '<table>')} {chain.get('name', '<chain>')}' and confirm policy is drop.",
+                        rollback="Restore the previous chain policy if emergency access is disrupted.",
+                        suggested_commands=[
+                            f"nft chain {chain.get('family', '<family>')} {chain.get('table', '<table>')} {chain.get('name', '<chain>')} {{ policy drop; }}"
+                        ],
+                        metadata=_nft_chain_metadata(chain),
                     )
                 )
         return findings
@@ -748,13 +856,28 @@ def check_default_policy_nftables(tables: list) -> list[dict]:
                 and chain.get("policy", "").lower() == "accept"
             ):
                 findings.append(
-                    _f(
+                    _nftables_f(
                         "HIGH",
                         "hygiene",
                         f"[HIGH] nftables table '{tbl['name']}': chain '{cname}' "
                         f"(hook={chain['hook']}) has default policy 'accept'.",
                         f"Change to 'policy drop;' inside the '{cname}' chain. "
                         "Only explicitly needed traffic should be accepted.",
+                        id="CASHEL-NFTABLES-HYGIENE-001",
+                        title="nftables chain has default accept policy",
+                        evidence=(
+                            f"table={tbl.get('name', '')}; chain={cname}; "
+                            f"hook={chain.get('hook', '')}; policy={chain.get('policy', '')}"
+                        ),
+                        affected_object=cname,
+                        confidence="high",
+                        impact="Unmatched traffic is permitted by default instead of requiring explicit accept rules.",
+                        verification=f"Run 'nft list chain {tbl.get('family', '<family>')} {tbl.get('name', '<table>')} {cname}' and confirm policy is drop.",
+                        rollback="Restore the previous chain policy if emergency access is disrupted.",
+                        suggested_commands=[
+                            f"nft chain {tbl.get('family', '<family>')} {tbl.get('name', '<table>')} {cname} {{ policy drop; }}"
+                        ],
+                        metadata=_nft_chain_metadata(chain, tbl.get("name", "")),
                     )
                 )
     return findings
@@ -800,13 +923,30 @@ def check_internet_ingress_nftables(tables: list) -> list[dict]:
                 hits = _nft_rule_sensitive_ports(rule)
                 for port, svc in hits:
                     findings.append(
-                        _f(
+                        _nftables_f(
                             "HIGH",
                             "exposure",
                             f"[HIGH] nftables table '{tbl['name']}' chain '{cname}': "
                             f"{svc} (TCP/{port}) accepted with no source restriction: {rule}",
                             f"Add a source restriction: 'ip saddr <trusted-cidr> tcp dport {port} accept'. "
                             "Unrestricted access to sensitive ports exposes the host to the internet.",
+                            id="CASHEL-NFTABLES-EXPOSURE-002",
+                            title=f"nftables exposes {svc} to the internet",
+                            evidence=rule,
+                            affected_object=cname,
+                            confidence="high",
+                            impact=f"{svc} is accepted with no source restriction and may expose administrative or sensitive services.",
+                            verification=f"Run 'nft list chain {tbl.get('family', '<family>')} {tbl.get('name', '<table>')} {cname}' and confirm TCP/{port} is source-restricted.",
+                            rollback="Restore the previous accept rule from ruleset backup if approved access is interrupted.",
+                            suggested_commands=[
+                                f"nft add rule {tbl.get('family', '<family>')} {tbl.get('name', '<table>')} {cname} ip saddr <trusted-cidr> tcp dport {port} accept"
+                            ],
+                            metadata={
+                                **_nft_rule_metadata(tbl, cname, chain, rule),
+                                "service": svc,
+                                "port": port,
+                                "ports": str(port),
+                            },
                         )
                     )
     return findings
@@ -827,13 +967,25 @@ def check_any_any_accept_nftables(tables: list) -> list[dict]:
                 # bare "accept" or "counter accept" with no match expressions
                 if re.match(r"^(counter\s+)?accept\s*$", rl):
                     findings.append(
-                        _f(
+                        _nftables_f(
                             "HIGH",
                             "exposure",
                             f"[HIGH] nftables table '{tbl['name']}' chain '{cname}': "
                             f"unconditional 'accept' — all traffic is permitted: {rule}",
                             "Replace the bare 'accept' with specific match conditions. "
                             "Every accept statement should include protocol, port, and source restrictions.",
+                            id="CASHEL-NFTABLES-EXPOSURE-001",
+                            title="nftables input chain allows all traffic",
+                            evidence=rule,
+                            affected_object=cname,
+                            confidence="high",
+                            impact="A bare accept rule can permit all input traffic without protocol, port, or source controls.",
+                            verification=f"Run 'nft list chain {tbl.get('family', '<family>')} {tbl.get('name', '<table>')} {cname}' and confirm bare accept rules are removed or scoped.",
+                            rollback="Restore the previous accept rule from ruleset backup if approved traffic is interrupted.",
+                            suggested_commands=[
+                                f"nft delete rule {tbl.get('family', '<family>')} {tbl.get('name', '<table>')} {cname} <handle>"
+                            ],
+                            metadata=_nft_rule_metadata(tbl, cname, chain, rule),
                         )
                     )
     return findings
@@ -854,7 +1006,7 @@ def check_missing_logging_nftables(tables: list) -> list[dict]:
             has_accept = any("accept" in r.lower() for r in rules)
             if has_accept and not has_log:
                 findings.append(
-                    _f(
+                    _nftables_f(
                         "MEDIUM",
                         "logging",
                         f"[MEDIUM] nftables table '{tbl['name']}' chain '{cname}': "
@@ -862,6 +1014,32 @@ def check_missing_logging_nftables(tables: list) -> list[dict]:
                         "Add log statements before accept rules: "
                         "'log prefix \"[ACCEPT] \" level info'. "
                         "Without logging, accepted traffic cannot be audited.",
+                        id="CASHEL-NFTABLES-LOGGING-001",
+                        title="nftables input chain is missing logging",
+                        evidence="No log statement found before input-chain accept rules.",
+                        affected_object=cname,
+                        confidence="medium",
+                        impact="Accepted traffic may be absent from host firewall logs and audit trails.",
+                        verification=f"Run 'nft list chain {tbl.get('family', '<family>')} {tbl.get('name', '<table>')} {cname}' and confirm log statements exist before accepted traffic paths.",
+                        rollback="Remove the added log statement if log volume causes operational issues.",
+                        suggested_commands=[
+                            f'nft add rule {tbl.get("family", "<family>")} {tbl.get("name", "<table>")} {cname} log prefix "[ACCEPT] " level info'
+                        ],
+                        metadata={
+                            "table": tbl.get("name", ""),
+                            "chain": cname,
+                            "hook": chain.get("hook", ""),
+                            "policy": chain.get("policy", ""),
+                            "protocol": "",
+                            "source": "",
+                            "destination": "",
+                            "ports": "",
+                            "verdict": "log",
+                            "raw_rule": "",
+                            "accept_rule_count": sum(
+                                1 for r in rules if "accept" in r.lower()
+                            ),
+                        },
                     )
                 )
     return findings
@@ -886,13 +1064,25 @@ def check_icmp_unrestricted_nftables(tables: list) -> list[dict]:
                     and not re.search(r"saddr", rl)
                 ):
                     findings.append(
-                        _f(
+                        _nftables_f(
                             "MEDIUM",
                             "exposure",
                             f"[MEDIUM] nftables table '{tbl['name']}' chain '{cname}': "
                             f"ICMP accepted without rate-limiting or source restriction: {rule}",
                             "Add rate-limiting: 'icmp type echo-request limit rate 10/second accept'. "
                             "Unrestricted ICMP can facilitate reconnaissance and flood attacks.",
+                            id="CASHEL-NFTABLES-EXPOSURE-003",
+                            title="nftables allows unrestricted ICMP",
+                            evidence=rule,
+                            affected_object=cname,
+                            confidence="medium",
+                            impact="Unrestricted ICMP can support reconnaissance or contribute to flood traffic.",
+                            verification=f"Run 'nft list chain {tbl.get('family', '<family>')} {tbl.get('name', '<table>')} {cname}' and confirm ICMP accepts are rate-limited or source-scoped.",
+                            rollback="Restore the previous ICMP rule from ruleset backup if troubleshooting traffic is interrupted.",
+                            suggested_commands=[
+                                f"nft add rule {tbl.get('family', '<family>')} {tbl.get('name', '<table>')} {cname} icmp type echo-request limit rate 10/second accept"
+                            ],
+                            metadata=_nft_rule_metadata(tbl, cname, chain, rule),
                         )
                     )
     return findings
@@ -905,7 +1095,21 @@ def audit_nftables(filepath: str) -> tuple[list[dict], list]:
     """
     tables, error = parse_nftables(filepath)
     if error:
-        return [_f("HIGH", "parse", f"[HIGH] {error}")], []
+        return [
+            _nftables_f(
+                "HIGH",
+                "parse",
+                f"[HIGH] {error}",
+                "",
+                id="CASHEL-NFTABLES-PARSE-001",
+                title="nftables ruleset could not be parsed",
+                evidence=error,
+                affected_object=filepath,
+                confidence="high",
+                verification="Confirm the file exists and contains nft list ruleset text or nft -j list ruleset JSON, then re-run the audit.",
+                metadata={"filepath": filepath},
+            )
+        ], []
 
     findings: list[dict] = []
     findings += check_default_policy_nftables(tables)
