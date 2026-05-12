@@ -1,4 +1,5 @@
 import typer
+from pathlib import Path
 from .license import activate_license, check_license, deactivate_license
 from .reporter import generate_report
 from .audit_engine import (
@@ -74,6 +75,10 @@ def audit(
         typer.echo(
             f"Unknown framework: {compliance}. Use: {', '.join(_VALID_FRAMEWORKS)}"
         )
+        raise typer.Exit(1)
+
+    if not Path(file).is_file():
+        typer.echo(f"File not found: {file}", err=True)
         raise typer.Exit(1)
 
     typer.echo(f"\nCashel v2.0.0 — Starting audit of {file} ({vendor})\n")

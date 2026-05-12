@@ -53,6 +53,9 @@ jobs:
               exit(1)
           "
 
+      - name: CLI smoke tests
+        run: pytest tests/test_cli_smoke.py -v
+
       - name: Run tests
         run: pytest tests/ -v
 
