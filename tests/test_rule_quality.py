@@ -222,6 +222,23 @@ def test_shadow_metadata_for_pfsense_azure_and_juniper():
         ]
     )
     _assert_shadow_metadata(azure[0], "AllowWeb", "AllowAny")
+    azure_finding = azure[0]
+    azure_metadata = azure_finding["metadata"]
+    assert azure_finding["id"].startswith("CASHEL-AZURE-REDUNDANCY-")
+    assert azure_finding["vendor"] == "azure"
+    assert azure_finding["evidence"]
+    assert azure_finding["rollback"]
+    assert azure_metadata["nsg_name"] == "edge-nsg"
+    assert azure_metadata["rule_name"] == "AllowWeb"
+    assert azure_metadata["direction"] == "Inbound"
+    assert azure_metadata["priority"] == 200
+    assert azure_metadata["protocol"] == "Tcp"
+    assert azure_metadata["source_address_prefixes"] == ["10.0.0.0/24"]
+    assert azure_metadata["destination_port_ranges"] == ["443"]
+    assert azure_metadata["flow_log_state"] == "unknown"
+    assert azure_metadata["shadowing_rule_name"] == "AllowAny"
+    assert azure_metadata["shadowing_priority"] == 100
+    assert azure_metadata["raw_rule_context"]["name"] == "AllowWeb"
 
     juniper = check_shadow_rules_juniper(
         [

@@ -11,6 +11,8 @@ order (all matching rules apply, most-permissive wins), so shadow analysis
 does not apply.
 """
 
+import hashlib
+import json
 import re
 
 from .models.findings import make_finding
@@ -190,6 +192,7 @@ def check_shadow_rules_pa(rules):
                         rule_name=name,
                         confidence="medium",
                         verification="Review rule order and traffic logs, then re-run the audit after removing, narrowing, or moving the shadowed rule.",
+                        rollback="Restore the previous Palo Alto rule order from configuration backup if reordering or removal affects approved traffic.",
                         metadata=_shadow_metadata(
                             name,
                             e_name,
@@ -318,6 +321,7 @@ def check_shadow_rules_pfsense(rules):
                             rule_name=name,
                             confidence="medium",
                             verification="Review interface rule order, then re-run the audit after removing, narrowing, or moving the shadowed rule.",
+                            rollback="Restore the previous pfSense interface rule order from backup if reordering or removal affects approved traffic.",
                             metadata=_shadow_metadata(
                                 name,
                                 e_name,
@@ -414,6 +418,7 @@ def check_shadow_rules_asa(parse, vendor: str = "asa"):
                             rule_name=shadowed["acl_line"],
                             confidence="high",
                             verification="Review ACL order and hit counts, then re-run the audit after moving, narrowing, or removing unreachable rules.",
+                            rollback="Restore the previous ACL order from backup if moving or removing the shadowed rule affects approved traffic.",
                             metadata=_shadow_metadata(
                                 shadowed["acl_line"],
                                 rule["acl_line"],
@@ -439,6 +444,26 @@ def check_shadow_rules_asa(parse, vendor: str = "asa"):
 _AZURE_ANY = {"*", "internet", "any", "0.0.0.0/0", "::/0"}
 
 
+def _azure_shadow_id(
+    nsg_name, direction, name, priority, shadowing_name, shadowing_priority
+):
+    payload = json.dumps(
+        [
+            "azure_shadow_rule",
+            nsg_name,
+            direction,
+            name,
+            priority,
+            shadowing_name,
+            shadowing_priority,
+        ],
+        sort_keys=True,
+        default=str,
+    )
+    digest = hashlib.sha1(payload.encode("utf-8")).hexdigest()[:10].upper()
+    return f"CASHEL-AZURE-REDUNDANCY-{digest}"
+
+
 def _azure_src_any(props):
     return props.get("sourceAddressPrefix", "").lower() in _AZURE_ANY
 
@@ -447,6 +472,92 @@ def _azure_port_any(props):
     port = props.get("destinationPortRange", "")
     multi = props.get("destinationPortRanges", [])
     return port == "*" or (not port and not multi)
+
+
+def _azure_list_or_single(props, single_key, multi_key):
+    multi = props.get(multi_key, [])
+    if multi:
+        return list(multi)
+    single = props.get(single_key, "")
+    if single:
+        return [single]
+    return []
+
+
+def _azure_port_ranges(props):
+    return _azure_list_or_single(props, "destinationPortRange", "destinationPortRanges")
+
+
+def _azure_flow_log_state(nsg):
+    if "flowLogs" in nsg:
+        return nsg.get("flowLogs")
+    if "diagnosticSettings" in nsg:
+        return nsg.get("diagnosticSettings")
+    return "unknown"
+
+
+def _azure_shadow_rule_context(rule):
+    props = rule.get("properties", rule)
+    return {
+        "rule_name": rule.get("name", "unnamed"),
+        "direction": props.get("direction", ""),
+        "priority": props.get("priority", "?"),
+        "protocol": props.get("protocol", ""),
+        "source_address_prefixes": _azure_list_or_single(
+            props, "sourceAddressPrefix", "sourceAddressPrefixes"
+        ),
+        "destination_address_prefixes": _azure_list_or_single(
+            props, "destinationAddressPrefix", "destinationAddressPrefixes"
+        ),
+        "source_port_ranges": _azure_list_or_single(
+            props, "sourcePortRange", "sourcePortRanges"
+        ),
+        "destination_port_ranges": _azure_port_ranges(props),
+        "action": props.get("access", ""),
+    }
+
+
+def _azure_shadow_metadata(nsg, direction, shadowed_rule, shadowing_rule):
+    shadowed = _azure_shadow_rule_context(shadowed_rule)
+    shadowing = _azure_shadow_rule_context(shadowing_rule)
+    return _shadow_metadata(
+        shadowed["rule_name"],
+        shadowing["rule_name"],
+        nsg_name=nsg.get("name", "unnamed"),
+        rule_name=shadowed["rule_name"],
+        direction=direction,
+        priority=shadowed["priority"],
+        protocol=shadowed["protocol"],
+        source_address_prefixes=shadowed["source_address_prefixes"],
+        destination_address_prefixes=shadowed["destination_address_prefixes"],
+        source_port_ranges=shadowed["source_port_ranges"],
+        destination_port_ranges=shadowed["destination_port_ranges"],
+        action=shadowed["action"],
+        flow_log_state=_azure_flow_log_state(nsg),
+        shadowing_rule_name=shadowing["rule_name"],
+        shadowing_direction=shadowing["direction"],
+        shadowing_priority=shadowing["priority"],
+        shadowing_protocol=shadowing["protocol"],
+        shadowing_source_address_prefixes=shadowing["source_address_prefixes"],
+        shadowing_destination_address_prefixes=shadowing[
+            "destination_address_prefixes"
+        ],
+        shadowing_source_port_ranges=shadowing["source_port_ranges"],
+        shadowing_destination_port_ranges=shadowing["destination_port_ranges"],
+        shadowing_action=shadowing["action"],
+        raw_rule_context=shadowed_rule,
+        raw_shadowing_rule_context=shadowing_rule,
+    )
+
+
+def _azure_shadow_evidence(
+    nsg_name, direction, name, priority, shadowing_name, shadowing_priority
+):
+    return (
+        f"nsg={nsg_name}; direction={direction}; "
+        f"shadowing_rule={shadowing_name}; shadowing_priority={shadowing_priority}; "
+        f"shadowed_rule={name}; shadowed_priority={priority}"
+    )
 
 
 def check_shadow_rules_azure(nsgs):
@@ -473,7 +584,7 @@ def check_shadow_rules_azure(nsgs):
                 key=lambda r: int((r.get("properties", r)).get("priority", 999)),
             )
 
-            active = []  # (name, priority, src_any, port_any, proto)
+            active = []  # (name, priority, src_any, port_any, proto, rule)
 
             for rule in sorted_rules:
                 props = rule.get("properties", rule)
@@ -483,7 +594,14 @@ def check_shadow_rules_azure(nsgs):
                 port_any = _azure_port_any(props)
                 proto = props.get("protocol", "*")
 
-                for e_name, e_prio, e_src_any, e_port_any, e_proto in active:
+                for (
+                    e_name,
+                    e_prio,
+                    e_src_any,
+                    e_port_any,
+                    e_proto,
+                    earlier_rule,
+                ) in active:
                     proto_covered = e_proto in ("*", proto)
                     # broad rule covers narrow if it is at least as permissive in every dimension
                     if (
@@ -500,29 +618,33 @@ def check_shadow_rules_azure(nsgs):
                                 f"Rule '{e_name}' has a higher priority (lower number) and covers the "
                                 f"same or broader scope. Remove '{name}' if it is redundant, or adjust "
                                 f"its scope to handle traffic not already processed by '{e_name}'.",
-                                id="CASHEL-AZURE-REDUNDANCY-001",
+                                id=_azure_shadow_id(
+                                    nsg_name, direction, name, priority, e_name, e_prio
+                                ),
                                 vendor="azure",
                                 title="Azure NSG rule is shadowed",
-                                evidence=f"NSG '{nsg_name}' {direction}: priority {e_prio} rule '{e_name}' covers priority {priority} rule '{name}'",
+                                evidence=_azure_shadow_evidence(
+                                    nsg_name, direction, name, priority, e_name, e_prio
+                                ),
                                 affected_object=name,
                                 rule_id=str(priority),
                                 rule_name=name,
                                 confidence="medium",
                                 verification="Review NSG effective security rules, then re-run the audit after removing, narrowing, or reprioritizing the shadowed rule.",
-                                metadata=_shadow_metadata(
-                                    name,
-                                    e_name,
-                                    nsg=nsg_name,
-                                    direction=direction,
-                                    priority=priority,
-                                    shadowing_priority=e_prio,
-                                    protocol=proto,
+                                rollback=(
+                                    "Restore the previous NSG rule priority or scope "
+                                    "from Azure activity logs, IaC, or a saved NSG "
+                                    "export if removing or reprioritizing the rule "
+                                    "blocks approved traffic."
+                                ),
+                                metadata=_azure_shadow_metadata(
+                                    nsg, direction, rule, earlier_rule
                                 ),
                             )
                         )
                         break
 
-                active.append((name, priority, src_any, port_any, proto))
+                active.append((name, priority, src_any, port_any, proto, rule))
 
     return findings
 
