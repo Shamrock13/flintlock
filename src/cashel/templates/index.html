@@ -2289,10 +2289,12 @@
         </div>
       </div>`;
     }).join("");
-    el.querySelectorAll("[data-report]").forEach(row => {
-      row.addEventListener("click", () => window.open(`/reports/${encodeURIComponent(row.dataset.report)}/view`, "_blank"));
-    });
   }
+  document.getElementById("sideRecentRuns")?.addEventListener("click", function (e) {
+    const row = e.target.closest("[data-report]");
+    if (!row || !this.contains(row)) return;
+    window.open(`/reports/${encodeURIComponent(row.dataset.report)}/view`, "_blank");
+  });
   function addRecentRun(run) {
     const normalized = {
       filename: run.filename || "Audit run",
@@ -2491,6 +2493,7 @@
   let currentPage  = 1;
   let pageSize     = 10;
   let compactView  = false;
+  let findingsRenderQueued = false;
 
   // Return findings matching the active filter (uses findingClass which is defined below)
   function getFilteredFindings() {
@@ -2507,8 +2510,17 @@
     });
   }
 
-  // Single render entry point — call any time state changes
   function renderFindingsUI() {
+    if (findingsRenderQueued) return;
+    findingsRenderQueued = true;
+    requestAnimationFrame(() => {
+      findingsRenderQueued = false;
+      renderFindingsNow();
+    });
+  }
+
+  // Single render entry point — call any time state changes
+  function renderFindingsNow() {
     const filtered   = getFilteredFindings();
     const total      = filtered.length;
     const totalPages = Math.max(1, Math.ceil(total / pageSize));
@@ -3170,6 +3182,10 @@
   let compareSelections = [];
 
   async function loadHistory() {
+    const historyList = document.getElementById("historyList");
+    if (historyList) {
+      historyList.innerHTML = `<p class="text-muted">Loading audit history&hellip;</p>`;
+    }
     try {
       const res  = await fetch("/archive");
       historyData = await res.json();
@@ -3201,11 +3217,8 @@
   ["historyVendorFilter", "historySort"].forEach(id =>
     document.getElementById(id)?.addEventListener("change", applyHistoryFilters)
   );
-  let _historyDebounce;
-  document.getElementById("historySearch")?.addEventListener("input", () => {
-    clearTimeout(_historyDebounce);
-    _historyDebounce = setTimeout(applyHistoryFilters, 300);
-  });
+  const applyHistoryFiltersDebounced = debounce(applyHistoryFilters, 250);
+  document.getElementById("historySearch")?.addEventListener("input", applyHistoryFiltersDebounced);
 
   function renderHistory(entries) {
     const el = document.getElementById("historyList");
@@ -3473,14 +3486,13 @@
         </div>
       </div>`;
     }).join("");
-
-    el.querySelectorAll("[data-delete-activity]").forEach(btn => {
-      btn.addEventListener("click", async function () {
-        await fetch("/activity/" + this.dataset.deleteActivity, { method: "DELETE" });
-        await loadActivity();
-      });
-    });
   }
+  document.getElementById("activityList")?.addEventListener("click", async function (e) {
+    const btn = e.target.closest("[data-delete-activity]");
+    if (!btn || !this.contains(btn)) return;
+    await fetch("/activity/" + btn.dataset.deleteActivity, { method: "DELETE" });
+    await loadActivity();
+  });
 
   const _refreshActivityBtn = document.getElementById("refreshActivityBtn");
   if (_refreshActivityBtn) _refreshActivityBtn.addEventListener("click", loadActivity);
@@ -3756,6 +3768,14 @@
 
   function escHtml(s) {
     return String(s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;");
+  }
+
+  function debounce(fn, delay = 200) {
+    let timer;
+    return function (...args) {
+      clearTimeout(timer);
+      timer = setTimeout(() => fn.apply(this, args), delay);
+    };
   }
 
   // ══════════════════════════════════════════════════════ BULK AUDIT ══
@@ -4498,23 +4518,24 @@
             </tr>`).join("")}
         </tbody>
       </table>`;
-    container.querySelectorAll(".wh-delete-btn").forEach(btn => {
-      btn.addEventListener("click", async () => {
-        if (!confirm("Delete this webhook?")) return;
-        await fetch(`/settings/webhooks/${btn.dataset.id}`, { method: "DELETE" });
-        loadWebhooks();
-      });
-    });
-    container.querySelectorAll(".wh-test-btn").forEach(btn => {
-      btn.addEventListener("click", async () => {
-        btn.disabled = true; btn.textContent = "Sending…";
-        const r = await fetch(`/settings/webhooks/${btn.dataset.id}/test`, { method: "POST" });
-        const j = await r.json();
-        btn.textContent = j.ok ? "✓ Sent" : "✗ Failed";
-        setTimeout(() => { btn.textContent = "Test"; btn.disabled = false; }, 2500);
-      });
-    });
   }
+  document.getElementById("webhooksTable")?.addEventListener("click", async function (e) {
+    const deleteBtn = e.target.closest(".wh-delete-btn");
+    if (deleteBtn && this.contains(deleteBtn)) {
+      if (!confirm("Delete this webhook?")) return;
+      await fetch(`/settings/webhooks/${deleteBtn.dataset.id}`, { method: "DELETE" });
+      loadWebhooks();
+      return;
+    }
+    const testBtn = e.target.closest(".wh-test-btn");
+    if (!testBtn || !this.contains(testBtn)) return;
+    testBtn.disabled = true;
+    testBtn.textContent = "Sending…";
+    const r = await fetch(`/settings/webhooks/${testBtn.dataset.id}/test`, { method: "POST" });
+    const j = await r.json();
+    testBtn.textContent = j.ok ? "✓ Sent" : "✗ Failed";
+    setTimeout(() => { testBtn.textContent = "Test"; testBtn.disabled = false; }, 2500);
+  });
 
   function resetWebhookModal() {
     document.getElementById("whName").value = "";
