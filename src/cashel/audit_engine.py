@@ -645,8 +645,35 @@ def _check_deny_all(parse):
             verification="Confirm each ACL terminates with an explicit deny ip any any log entry, then re-run the audit.",
             rollback="Remove the added explicit deny entry if it creates unexpected logging or policy behavior.",
             suggested_commands=["access-list <ACL_NAME> deny ip any any log"],
+            metadata={
+                "acl": "",
+                "action": "deny",
+                "protocol": "ip",
+                "raw_rule": "",
+                "source": "any",
+                "destination": "any",
+                "service": "any",
+                "scope": "global ACL posture",
+            },
         )
     ]
+
+
+def _asa_telnet_metadata(line: str) -> dict:
+    parts = line.split()
+    source = parts[1] if len(parts) > 1 else ""
+    mask = parts[2] if len(parts) > 2 else ""
+    interface = parts[3] if len(parts) > 3 else ""
+    return {
+        "acl": "",
+        "action": "management-access",
+        "protocol": "telnet",
+        "raw_rule": line,
+        "source": source,
+        "source_mask": mask,
+        "destination": interface,
+        "service": "telnet",
+    }
 
 
 def _check_redundant_rules(parse):
@@ -715,11 +742,13 @@ def _check_telnet_asa(parse):
             title="Telnet management access enabled",
             evidence=r.text.strip(),
             affected_object="management access",
+            rule_name=r.text.strip(),
             confidence="high",
             impact="Telnet sends management credentials and session data in cleartext.",
             verification="Confirm no telnet lines remain and SSH management access is available from approved networks.",
             rollback="Restore the removed telnet line only if emergency access is required and compensating controls are approved.",
             suggested_commands=[f"no {r.text.strip()}"],
+            metadata=_asa_telnet_metadata(r.text.strip()),
         )
         for r in parse.find_objects(r"^telnet\s")
     ]
