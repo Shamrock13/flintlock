@@ -22,16 +22,15 @@ Status terms:
 | iptables | Default ACCEPT policy, any/any INPUT accepts, internet-exposed sensitive ports, unrestricted FORWARD, missing INPUT logging, unrestricted ICMP | Fully enriched | Current checks include stable IDs, vendor, evidence, affected object/rule name, confidence, verification, rollback, and chain/rule metadata. | Use as the host-firewall reference pattern when converting nftables. | Low |
 | nftables | Default accept policy, any/any accepts, internet-exposed sensitive ports, missing logging before accept, unrestricted ICMP | Fully enriched | Current checks include stable IDs, vendor, evidence, affected object/rule name, confidence, verification, rollback, and table/chain/rule metadata. | Use as the nft host-firewall reference pattern when converting remaining cloud firewall checks. | Low |
 | AWS Security Groups | Wide-open ingress, unrestricted egress, missing descriptions, default security group ingress, large port ranges | Fully enriched | Current checks include stable IDs, vendor, evidence, affected object/rule name where applicable, confidence, verification, rollback, and security group/rule metadata. | Keep enrichment aligned if new AWS check families are added. | Low |
-| Azure NSG | Inbound any-source exposure, missing flow log confirmation, high-priority allow-all, broad port ranges | Mixed | Base Azure checks are legacy dict only; Azure NSG shadow checks are enriched but have lighter metadata and no rollback guidance. | Normalize base Azure checks first, then enrich shadow metadata with priority/direction/source/destination/service context and rollback guidance. | High |
+| Azure NSG | Inbound any-source exposure, unrestricted management access, missing flow log confirmation, high-priority allow-all, broad port ranges, Azure NSG shadow checks | Partially enriched | Base Azure checks now include stable IDs, evidence, verification, rollback, and NSG/rule metadata; Azure NSG shadow checks remain enriched but have lighter metadata and no rollback guidance. | Enrich Azure shadow metadata with priority/direction/source/destination/service context and rollback guidance when touching rule-quality checks. | Medium |
 | GCP VPC Firewall | Internet ingress, unrestricted egress, default network rules, missing descriptions, disabled rules, broad target scope, unrestricted ICMP | Legacy dict only | Missing stable ID, vendor, title, evidence, affected object/rule name, confidence, verification, rollback, and metadata. | Convert GCP checks to normalized findings with firewall rule name, network, direction, priority, target tags/service accounts, protocols, ports, ranges, and disabled state metadata. | High |
 
 ## Summary
 
 The strongest evidence-backed coverage is currently ASA/FTD, Fortinet, Palo Alto, Juniper SRX, and pfSense. These vendors already emit normalized dictionaries through `make_finding(...)`, though shadow-rule findings still need richer metadata and rollback guidance on several platforms.
 
-The main remaining normalization gap is the cloud group:
+The main remaining legacy normalization gap is the cloud group:
 
-- Azure NSG base checks
 - GCP VPC Firewall
 
-Those paths still produce legacy dictionaries with the old severity/category/message/remediation shape. They should be converted one vendor at a time, with focused tests that preserve current counts/severities and verify stable IDs, evidence, metadata, legacy string conversion, remediation, JSON/CSV/SARIF exports, and safe samples.
+GCP still produces legacy dictionaries with the old severity/category/message/remediation shape. It should be converted with focused tests that preserve current counts/severities and verify stable IDs, evidence, metadata, legacy string conversion, remediation, JSON/CSV/SARIF exports, and safe samples. Azure no longer has legacy base findings, but its shadow-rule metadata remains a follow-up enrichment gap.
