@@ -21,6 +21,9 @@ from cashel.gcp import (
     check_icmp_unrestricted_gcp,
     audit_gcp_firewall,
 )
+from cashel.export import to_csv, to_json, to_sarif
+from cashel.models.findings import validate_finding_shape
+from cashel.remediation import generate_plan
 
 # ── Fixtures ──────────────────────────────────────────────────────────────────
 
@@ -331,8 +334,7 @@ def test_audit_gcp_clean():
         findings, rules = audit_gcp_firewall(path)
         assert isinstance(findings, list)
         assert len(rules) == len(RULES_CLEAN)
-        high = [f for f in findings if f["severity"] == "HIGH"]
-        assert len(high) == 0
+        assert findings == []
     finally:
         os.unlink(path)
 
@@ -341,6 +343,128 @@ def test_audit_gcp_parse_error():
     findings, rules = audit_gcp_firewall("/nonexistent/file.json")
     assert len(findings) == 1
     assert rules == []
+
+
+def test_gcp_findings_preserve_count_and_severity_expectations():
+    path = _write_json(RULES_RISKY)
+    try:
+        findings, rules = audit_gcp_firewall(path)
+    finally:
+        os.unlink(path)
+
+    assert len(rules) == len(RULES_RISKY)
+    assert len(findings) == 15
+    assert [f["severity"] for f in findings].count("HIGH") == 4
+    assert [f["severity"] for f in findings].count("MEDIUM") == 11
+    assert any("SSH (TCP/22) open to 0.0.0.0/0" in f["message"] for f in findings)
+    assert any("unrestricted egress to 0.0.0.0/0" in f["message"] for f in findings)
+    assert any(
+        "Firewall rules exist on the 'default' VPC" in f["message"] for f in findings
+    )
+    assert any("no description set" in f["message"] for f in findings)
+    assert any("disabled firewall rule" in f["message"] for f in findings)
+    assert any("applies to ALL instances" in f["message"] for f in findings)
+    assert any("ICMP allowed inbound" in f["message"] for f in findings)
+
+
+def test_gcp_findings_are_enriched_with_stable_ids_and_rule_evidence():
+    path = _write_json(RULES_RISKY)
+    try:
+        findings, _rules = audit_gcp_firewall(path)
+        second_run_ids = [f["id"] for f in audit_gcp_firewall(path)[0]]
+    finally:
+        os.unlink(path)
+
+    assert second_run_ids == [f["id"] for f in findings]
+    for finding in findings:
+        assert finding["id"].startswith("CASHEL-GCP-")
+        assert finding["vendor"] == "gcp"
+        assert finding["title"]
+        assert finding["evidence"]
+        assert finding["affected_object"] or finding["rule_name"]
+        assert finding["confidence"]
+        assert finding["verification"]
+        assert finding["metadata"]["raw_rule_context"]
+        assert "logging_state" in finding["metadata"]
+        assert validate_finding_shape(finding) == []
+
+    rule_backed = [
+        f for f in findings if isinstance(f["metadata"].get("raw_rule_context"), dict)
+    ]
+    assert rule_backed
+    for finding in rule_backed:
+        metadata = finding["metadata"]
+        assert metadata["firewall_rule_name"]
+        assert metadata["network"]
+        assert metadata["direction"] in {"INGRESS", "EGRESS"}
+        assert "priority" in metadata
+        assert metadata["protocols"]
+        assert "source_ranges" in metadata
+        assert "destination_ranges" in metadata
+        assert "target_tags" in metadata
+        assert "target_service_accounts" in metadata
+        assert "disabled" in metadata
+        assert "firewall_rule=" in finding["evidence"]
+
+
+def test_gcp_exports_preserve_enriched_fields():
+    path = _write_json(RULES_RISKY)
+    try:
+        findings, _rules = audit_gcp_firewall(path)
+    finally:
+        os.unlink(path)
+
+    finding = findings[0]
+    entry = {
+        "filename": "gcp-firewall.json",
+        "vendor": "gcp",
+        "summary": {"total": 1},
+        "findings": [finding],
+    }
+
+    json_out = json.loads(to_json(entry))
+    exported = json_out["findings"][0]
+    assert exported["id"] == finding["id"]
+    assert exported["metadata"]["firewall_rule_name"] == "default-allow-ssh"
+    assert exported["evidence"] == finding["evidence"]
+
+    import csv
+    import io
+
+    csv_row = next(csv.DictReader(io.StringIO(to_csv(entry))))
+    assert csv_row["id"] == finding["id"]
+    assert csv_row["vendor"] == "gcp"
+    assert csv_row["evidence"] == finding["evidence"]
+    assert csv_row["affected_object"] == finding["affected_object"]
+    assert csv_row["rule_name"] == finding["rule_name"]
+
+    sarif = json.loads(to_sarif(entry))
+    result = sarif["runs"][0]["results"][0]
+    rule = sarif["runs"][0]["tool"]["driver"]["rules"][0]
+    assert result["ruleId"] == finding["id"]
+    assert rule["id"] == finding["id"]
+    assert result["properties"]["vendor"] == "gcp"
+    assert result["properties"]["evidence"] == finding["evidence"]
+    assert result["properties"]["rule_name"] == finding["rule_name"]
+
+
+def test_gcp_remediation_consumes_enriched_fields():
+    path = _write_json(RULES_RISKY)
+    try:
+        findings, _rules = audit_gcp_firewall(path)
+    finally:
+        os.unlink(path)
+
+    finding = findings[0]
+    plan = generate_plan([finding], "gcp", filename="gcp-firewall.json")
+    step = plan["phases"][0]["steps"][0]
+
+    assert step["title"] == finding["title"]
+    assert step["evidence"] == finding["evidence"]
+    assert step["verification"] == finding["verification"]
+    assert step["rollback"] == finding["rollback"]
+    assert step["affected_object"] == finding["affected_object"]
+    assert "suggested_commands" not in step
 
 
 # ── Standalone runner ─────────────────────────────────────────────────────────

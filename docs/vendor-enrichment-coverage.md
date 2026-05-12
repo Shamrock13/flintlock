@@ -23,14 +23,10 @@ Status terms:
 | nftables | Default accept policy, any/any accepts, internet-exposed sensitive ports, missing logging before accept, unrestricted ICMP | Fully enriched | Current checks include stable IDs, vendor, evidence, affected object/rule name, confidence, verification, rollback, and table/chain/rule metadata. | Use as the nft host-firewall reference pattern when converting remaining cloud firewall checks. | Low |
 | AWS Security Groups | Wide-open ingress, unrestricted egress, missing descriptions, default security group ingress, large port ranges | Fully enriched | Current checks include stable IDs, vendor, evidence, affected object/rule name where applicable, confidence, verification, rollback, and security group/rule metadata. | Keep enrichment aligned if new AWS check families are added. | Low |
 | Azure NSG | Inbound any-source exposure, unrestricted management access, missing flow log confirmation, high-priority allow-all, broad port ranges, Azure NSG shadow checks | Fully enriched | Current checks include stable IDs, vendor, evidence, affected object/rule name, confidence, verification, rollback, and NSG/rule metadata. | Keep enrichment aligned if new Azure NSG check families are added. | Low |
-| GCP VPC Firewall | Internet ingress, unrestricted egress, default network rules, missing descriptions, disabled rules, broad target scope, unrestricted ICMP | Legacy dict only | Missing stable ID, vendor, title, evidence, affected object/rule name, confidence, verification, rollback, and metadata. | Convert GCP checks to normalized findings with firewall rule name, network, direction, priority, target tags/service accounts, protocols, ports, ranges, and disabled state metadata. | High |
+| GCP VPC Firewall | Internet ingress, unrestricted egress, default network rules, missing descriptions, disabled rules, broad target scope, unrestricted ICMP, high-risk management ports | Fully enriched | Current checks include stable IDs, vendor, evidence, affected object/rule name, confidence, verification, rollback, and firewall rule metadata. | Keep enrichment aligned if new GCP VPC firewall check families are added. | Low |
 
 ## Summary
 
 The strongest evidence-backed coverage is currently ASA/FTD, Fortinet, Palo Alto, Juniper SRX, and pfSense. These vendors already emit normalized dictionaries through `make_finding(...)`, though shadow-rule findings still need richer metadata and rollback guidance on several platforms.
 
-The main remaining legacy normalization gap is the cloud group:
-
-- GCP VPC Firewall
-
-GCP still produces legacy dictionaries with the old severity/category/message/remediation shape. It should be converted with focused tests that preserve current counts/severities and verify stable IDs, evidence, metadata, legacy string conversion, remediation, JSON/CSV/SARIF exports, and safe samples.
+The major cloud firewall paths now emit normalized findings for their current check families. Future vendor work should keep new checks aligned with the evidence-backed finding model and preserve legacy finding consumers.
