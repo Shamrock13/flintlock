@@ -192,6 +192,7 @@ def check_shadow_rules_pa(rules):
                         rule_name=name,
                         confidence="medium",
                         verification="Review rule order and traffic logs, then re-run the audit after removing, narrowing, or moving the shadowed rule.",
+                        rollback="Restore the previous Palo Alto rule order from configuration backup if reordering or removal affects approved traffic.",
                         metadata=_shadow_metadata(
                             name,
                             e_name,
@@ -320,6 +321,7 @@ def check_shadow_rules_pfsense(rules):
                             rule_name=name,
                             confidence="medium",
                             verification="Review interface rule order, then re-run the audit after removing, narrowing, or moving the shadowed rule.",
+                            rollback="Restore the previous pfSense interface rule order from backup if reordering or removal affects approved traffic.",
                             metadata=_shadow_metadata(
                                 name,
                                 e_name,
@@ -416,6 +418,7 @@ def check_shadow_rules_asa(parse, vendor: str = "asa"):
                             rule_name=shadowed["acl_line"],
                             confidence="high",
                             verification="Review ACL order and hit counts, then re-run the audit after moving, narrowing, or removing unreachable rules.",
+                            rollback="Restore the previous ACL order from backup if moving or removing the shadowed rule affects approved traffic.",
                             metadata=_shadow_metadata(
                                 shadowed["acl_line"],
                                 rule["acl_line"],
