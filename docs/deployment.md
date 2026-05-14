@@ -334,9 +334,20 @@ Use this endpoint for container health checks, load balancer probes, and uptime 
 
 ---
 
+## API Documentation Access
+
+`GET /api/docs` and `GET /apispec.json` require authenticated access by default.
+
+Set `CASHEL_PUBLIC_API_DOCS=true` only when you intentionally want the Swagger UI
+and OpenAPI spec to remain public, such as for a controlled demo environment.
+Truthy values include `true`, `1`, `yes`, and `on`. The default is `false`.
+
+---
+
 ## Hardening Checklist
 
 - [ ] `CASHEL_SECRET` is set and not the default
+- [ ] `CASHEL_PUBLIC_API_DOCS` is unset or `false` unless public API docs are intentional
 - [ ] `CASHEL_KEY_FILE` points to a persistent, backed-up location
 - [ ] `CASHEL_SECURE_COOKIES=true` when behind HTTPS
 - [ ] TLS 1.2+ only on the proxy (TLS 1.3 preferred)
