@@ -212,6 +212,18 @@ def test_index_template_batches_frontend_redraws_and_delegates_list_actions():
     assert "let findingsRenderQueued = false;" in body
     assert "requestAnimationFrame(() => {" in body
     assert "function renderFindingsNow()" in body
+    assert "const FINDING_PAGE_SIZE_OPTIONS = [10, 25, 50, 75, 100];" in body
+    assert "function renderPagedFindingList(findings, listEl, pagerEl, state, emptyHTML)" in body
+    assert '<div id="connFindingsPagination" class="findings-pagination hidden"></div>' in body
+    assert 'wireFindingPager("connFindingsPagination", connFindingPager, renderConnectFindingsPage)' in body
+    assert 'id="bulkDetailFindingsPagination"' in body
+    assert "let filteredHistoryData = [];" in body
+    assert "const historyPager = { page: 1, pageSize: 25 };" in body
+    assert "filteredHistoryData = entries;" in body
+    assert "const pageEntries = entries.slice(startIndex, startIndex + historyPager.pageSize);" in body
+    assert "function renderHistoryPagination(total, totalPages, startIndex)" in body
+    assert 'document.getElementById("historyList")?.addEventListener("click", async function(e)' in body
+    assert 'document.getElementById("historyList")?.addEventListener("change", function(e)' in body
     assert "function debounce(fn, delay = 200)" in body
     assert (
         'document.getElementById("historySearch")?.addEventListener("input", '
