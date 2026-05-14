@@ -49,9 +49,22 @@ _AUTH_EXEMPT_ENDPOINTS = {
     "audit.demo_sample_report",
 }
 
-# Path prefixes that bypass auth (Swagger UI and spec JSON — public API docs)
-# Path prefixes exempt from auth — Swagger UI + spec JSON are always public
-_AUTH_EXEMPT_PATH_PREFIXES = ("/api/docs", "/flasgger_static/", "/apispec")
+_TRUTHY_ENV_VALUES = {"1", "true", "yes", "on"}
+
+# Swagger UI static assets can stay public; the docs UI/spec routes are gated below.
+_AUTH_EXEMPT_PATH_PREFIXES = ("/flasgger_static/",)
+_API_DOCS_PATH_PREFIXES = ("/api/docs", "/apispec")
+
+
+def api_docs_public_enabled() -> bool:
+    """Return whether API docs/spec routes should remain public."""
+    return os.environ.get("CASHEL_PUBLIC_API_DOCS", "false").strip().lower() in (
+        _TRUTHY_ENV_VALUES
+    )
+
+
+def _is_api_docs_path() -> bool:
+    return request.path.startswith(_API_DOCS_PATH_PREFIXES)
 
 
 def _require_auth_impl(demo_mode: bool):
@@ -59,6 +72,9 @@ def _require_auth_impl(demo_mode: bool):
     if demo_mode:
         g.auth_method = "demo"
         g.current_user = None
+        return
+
+    if _is_api_docs_path() and api_docs_public_enabled():
         return
 
     settings = get_settings()
