@@ -365,6 +365,122 @@ class TestWebAuth(unittest.TestCase):
         finally:
             self._teardown(tmp, orig, orig_conn)
 
+    def test_health_remains_public_when_auth_enabled(self):
+        client, tmp, orig, orig_conn = self._setup()
+        try:
+            us.create_user("healthadmin", "supersecretpass1", "admin")
+            from cashel.settings import save_settings, get_settings
+
+            save_settings({**get_settings(), "auth_enabled": True})
+
+            resp = client.get("/health")
+
+            self.assertEqual(resp.status_code, 200)
+            self.assertTrue(resp.get_json()["ok"])
+        finally:
+            self._teardown(tmp, orig, orig_conn)
+
+    def test_api_docs_require_auth_by_default(self):
+        client, tmp, orig, orig_conn = self._setup()
+        try:
+            us.create_user("docsadmin", "supersecretpass1", "admin")
+            from cashel.settings import save_settings, get_settings
+
+            save_settings({**get_settings(), "auth_enabled": True})
+            os.environ.pop("CASHEL_PUBLIC_API_DOCS", None)
+
+            resp = client.get("/api/docs", follow_redirects=False)
+
+            self.assertEqual(resp.status_code, 401)
+            self.assertEqual(resp.get_json()["error"], "Authentication required.")
+        finally:
+            self._teardown(tmp, orig, orig_conn)
+
+    def test_apispec_requires_auth_by_default(self):
+        client, tmp, orig, orig_conn = self._setup()
+        try:
+            us.create_user("specadmin", "supersecretpass1", "admin")
+            from cashel.settings import save_settings, get_settings
+
+            save_settings({**get_settings(), "auth_enabled": True})
+            os.environ.pop("CASHEL_PUBLIC_API_DOCS", None)
+
+            resp = client.get("/apispec.json", follow_redirects=False)
+
+            self.assertEqual(resp.status_code, 302)
+            self.assertIn("/login", resp.headers["Location"])
+        finally:
+            self._teardown(tmp, orig, orig_conn)
+
+    def test_public_api_docs_env_keeps_docs_public(self):
+        client, tmp, orig, orig_conn = self._setup()
+        orig_public_docs = os.environ.get("CASHEL_PUBLIC_API_DOCS")
+        try:
+            us.create_user("publicdocs", "supersecretpass1", "admin")
+            from cashel.settings import save_settings, get_settings
+
+            save_settings({**get_settings(), "auth_enabled": True})
+            os.environ["CASHEL_PUBLIC_API_DOCS"] = "true"
+
+            resp = client.get("/api/docs")
+
+            self.assertEqual(resp.status_code, 200)
+            self.assertIn(b"swagger", resp.data.lower())
+        finally:
+            if orig_public_docs is None:
+                os.environ.pop("CASHEL_PUBLIC_API_DOCS", None)
+            else:
+                os.environ["CASHEL_PUBLIC_API_DOCS"] = orig_public_docs
+            self._teardown(tmp, orig, orig_conn)
+
+    def test_public_api_docs_env_keeps_apispec_public(self):
+        client, tmp, orig, orig_conn = self._setup()
+        orig_public_docs = os.environ.get("CASHEL_PUBLIC_API_DOCS")
+        try:
+            us.create_user("publicspec", "supersecretpass1", "admin")
+            from cashel.settings import save_settings, get_settings
+
+            save_settings({**get_settings(), "auth_enabled": True})
+            os.environ["CASHEL_PUBLIC_API_DOCS"] = "yes"
+
+            resp = client.get("/apispec.json")
+
+            self.assertEqual(resp.status_code, 200)
+            self.assertEqual(resp.get_json()["info"]["title"], "Cashel API")
+        finally:
+            if orig_public_docs is None:
+                os.environ.pop("CASHEL_PUBLIC_API_DOCS", None)
+            else:
+                os.environ["CASHEL_PUBLIC_API_DOCS"] = orig_public_docs
+            self._teardown(tmp, orig, orig_conn)
+
+    def test_authenticated_users_can_access_private_api_docs_and_spec(self):
+        client, tmp, orig, orig_conn = self._setup()
+        try:
+            os.environ.pop("CASHEL_PUBLIC_API_DOCS", None)
+            us.create_user("privatedocs", "supersecretpass1", "admin")
+            from cashel.settings import save_settings, get_settings
+
+            save_settings({**get_settings(), "auth_enabled": True})
+            login_resp = client.post(
+                "/login",
+                data={
+                    "username": "privatedocs",
+                    "password": "supersecretpass1",
+                },
+                follow_redirects=False,
+            )
+            self.assertEqual(login_resp.status_code, 302)
+
+            docs_resp = client.get("/api/docs")
+            spec_resp = client.get("/apispec.json")
+
+            self.assertEqual(docs_resp.status_code, 200)
+            self.assertEqual(spec_resp.status_code, 200)
+            self.assertEqual(spec_resp.get_json()["info"]["title"], "Cashel API")
+        finally:
+            self._teardown(tmp, orig, orig_conn)
+
     def test_schedule_routes_create_update_run_delete(self):
         client, tmp, orig, orig_conn = self._setup()
         try:
