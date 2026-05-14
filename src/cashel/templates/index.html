@@ -771,6 +771,7 @@
         </div>
         <div class="summary-grid" id="connSummaryGrid"></div>
         <div id="connFindingsList"></div>
+        <div id="connFindingsPagination" class="findings-pagination hidden"></div>
         <div class="remediation-row hidden" id="connRemediationRow">
           <button id="connRemediationPlanBtn" class="btn-primary btn-remediation">View Remediation Plan</button>
         </div>
@@ -2289,10 +2290,12 @@
         </div>
       </div>`;
     }).join("");
-    el.querySelectorAll("[data-report]").forEach(row => {
-      row.addEventListener("click", () => window.open(`/reports/${encodeURIComponent(row.dataset.report)}/view`, "_blank"));
-    });
   }
+  document.getElementById("sideRecentRuns")?.addEventListener("click", function (e) {
+    const row = e.target.closest("[data-report]");
+    if (!row || !this.contains(row)) return;
+    window.open(`/reports/${encodeURIComponent(row.dataset.report)}/view`, "_blank");
+  });
   function addRecentRun(run) {
     const normalized = {
       filename: run.filename || "Audit run",
@@ -2491,6 +2494,7 @@
   let currentPage  = 1;
   let pageSize     = 10;
   let compactView  = false;
+  let findingsRenderQueued = false;
 
   // Return findings matching the active filter (uses findingClass which is defined below)
   function getFilteredFindings() {
@@ -2507,8 +2511,17 @@
     });
   }
 
-  // Single render entry point — call any time state changes
   function renderFindingsUI() {
+    if (findingsRenderQueued) return;
+    findingsRenderQueued = true;
+    requestAnimationFrame(() => {
+      findingsRenderQueued = false;
+      renderFindingsNow();
+    });
+  }
+
+  // Single render entry point — call any time state changes
+  function renderFindingsNow() {
     const filtered   = getFilteredFindings();
     const total      = filtered.length;
     const totalPages = Math.max(1, Math.ceil(total / pageSize));
@@ -2535,7 +2548,7 @@
 
     const start = (currentPage - 1) * pageSize + 1;
     const end   = Math.min(currentPage * pageSize, total);
-    const pageSizeOpts = [10, 25, 50, 75, 100].map(n =>
+    const pageSizeOpts = FINDING_PAGE_SIZE_OPTIONS.map(n =>
       `<option value="${n}"${n === pageSize ? " selected" : ""}>${n} per page</option>`
     ).join("");
 
@@ -2553,11 +2566,13 @@
       <select class="page-size-select" id="pageSizeSelect">${pageSizeOpts}</select>`;
   }
 
-  function buildPageButtons(totalPages) {
+  const FINDING_PAGE_SIZE_OPTIONS = [10, 25, 50, 75, 100];
+
+  function buildPageButtons(totalPages, activePage = currentPage) {
     const btns = [];
     for (let p = 1; p <= totalPages; p++) {
-      if (p === 1 || p === totalPages || Math.abs(p - currentPage) <= 1) {
-        btns.push(`<button class="btn-page${p === currentPage ? " btn-page-active" : ""}" data-page="${p}">${p}</button>`);
+      if (p === 1 || p === totalPages || Math.abs(p - activePage) <= 1) {
+        btns.push(`<button class="btn-page${p === activePage ? " btn-page-active" : ""}" data-page="${p}">${p}</button>`);
       } else if (btns[btns.length - 1] !== "…") {
         btns.push("…");
       }
@@ -2588,6 +2603,67 @@
       });
     }
   })();
+
+  function renderPagedFindingList(findings, listEl, pagerEl, state, emptyHTML) {
+    if (!listEl) return;
+    const total = findings.length;
+    const totalPages = Math.max(1, Math.ceil(total / state.pageSize));
+    state.page = Math.max(1, Math.min(state.page, totalPages));
+
+    const startIndex = (state.page - 1) * state.pageSize;
+    const pageItems = findings.slice(startIndex, startIndex + state.pageSize);
+    listEl.innerHTML = pageItems.length
+      ? pageItems.map(f => typeof buildFindingHTML === "function"
+          ? buildFindingHTML(f)
+          : `<div class="finding finding-info">${escHtml(typeof f === "string" ? f : (f.message || ""))}</div>`).join("")
+      : emptyHTML;
+
+    if (!pagerEl) return;
+    if (total <= FINDING_PAGE_SIZE_OPTIONS[0]) {
+      pagerEl.classList.add("hidden");
+      pagerEl.innerHTML = "";
+      return;
+    }
+    pagerEl.classList.remove("hidden");
+
+    const first = startIndex + 1;
+    const last = Math.min(startIndex + state.pageSize, total);
+    const pageSizeOpts = FINDING_PAGE_SIZE_OPTIONS.map(n =>
+      `<option value="${n}"${n === state.pageSize ? " selected" : ""}>${n} per page</option>`
+    ).join("");
+    const navHTML = totalPages > 1 ? `
+      <div class="pagination-controls">
+        <button class="btn-page" data-page="${state.page - 1}"${state.page === 1 ? " disabled" : ""}>&#8592;</button>
+        ${buildPageButtons(totalPages, state.page)}
+        <button class="btn-page" data-page="${state.page + 1}"${state.page === totalPages ? " disabled" : ""}>&#8594;</button>
+      </div>
+      <span class="pagination-info">Showing ${first}–${last} of ${total}</span>` : `
+      <span class="pagination-info">${total} findings</span>`;
+
+    pagerEl.innerHTML = `${navHTML}
+      <select class="page-size-select">${pageSizeOpts}</select>`;
+  }
+
+  function wireFindingPager(pagerId, state, renderFn) {
+    const pagerEl = document.getElementById(pagerId);
+    if (!pagerEl) return;
+    pagerEl.addEventListener("click", function (e) {
+      const btn = e.target.closest(".btn-page");
+      if (!btn || btn.disabled) return;
+      const page = parseInt(btn.dataset.page, 10);
+      if (!Number.isNaN(page)) {
+        state.page = page;
+        renderFn();
+      }
+    });
+    pagerEl.addEventListener("change", function (e) {
+      const sel = e.target.closest(".page-size-select");
+      if (!sel) return;
+      state.pageSize = parseInt(sel.value, 10) || FINDING_PAGE_SIZE_OPTIONS[0];
+      state.page = 1;
+      renderFn();
+    });
+  }
   window.setFindingsView = function(mode) {
     compactView = mode === "compact";
     document.getElementById("viewDetailed")?.setAttribute("aria-pressed", String(!compactView));
@@ -3142,16 +3218,29 @@
     }
   });
 
+  let connFindings = [];
+  const connFindingPager = { page: 1, pageSize: 25 };
+
+  function renderConnectFindingsPage() {
+    renderPagedFindingList(
+      connFindings,
+      document.getElementById("connFindingsList"),
+      document.getElementById("connFindingsPagination"),
+      connFindingPager,
+      `<div class="finding finding-pass">[PASS] No issues found</div>`
+    );
+  }
+  wireFindingPager("connFindingsPagination", connFindingPager, renderConnectFindingsPage);
+
   function renderConnectResults(data) {
     document.getElementById("connectResults").classList.remove("hidden");
     const tag = document.getElementById("connVendorTag");
     tag.textContent = (VENDOR_LABELS[data.detected_vendor] || data.detected_vendor) + " @ " + data.host;
     tag.classList.remove("hidden");
     document.getElementById("connSummaryGrid").innerHTML = buildSummaryHTML(data.summary);
-    const enriched = data.enriched_findings || data.findings.map(f => ({ message: f, category: null, remediation: null }));
-    document.getElementById("connFindingsList").innerHTML = enriched.length
-      ? enriched.map(f => buildFindingHTML(f)).join("")
-      : `<div class="finding finding-pass">[PASS] No issues found</div>`;
+    connFindings = data.enriched_findings || (data.findings || []).map(f => ({ message: f, category: null, remediation: null }));
+    connFindingPager.page = 1;
+    renderConnectFindingsPage();
     const connArchiveRow = document.getElementById("connArchiveRow");
     if (data.archive_id) connArchiveRow.classList.remove("hidden");
     else connArchiveRow.classList.add("hidden");
@@ -3159,7 +3248,7 @@
     /* Show remediation plan button for connect results */
     if (window._setLastConnectData) window._setLastConnectData(data);
     const connRemRow = document.getElementById("connRemediationRow");
-    const connHasFindings = (data.enriched_findings || data.findings || []).length > 0;
+    const connHasFindings = connFindings.length > 0;
     if (connHasFindings) { connRemRow.classList.remove("hidden"); }
     else { connRemRow.classList.add("hidden"); }
   }
@@ -3167,9 +3256,15 @@
 
   // ════════════════════════════════════════════════ AUDIT HISTORY ══════
   let historyData = [];
+  let filteredHistoryData = [];
   let compareSelections = [];
+  const historyPager = { page: 1, pageSize: 25 };
 
   async function loadHistory() {
+    const historyList = document.getElementById("historyList");
+    if (historyList) {
+      historyList.innerHTML = `<p class="text-muted">Loading audit history&hellip;</p>`;
+    }
     try {
       const res  = await fetch("/archive");
       historyData = await res.json();
@@ -3195,17 +3290,16 @@
     if (sortMode === "most")    entries.sort((a, b) => (b.summary?.total || 0) - (a.summary?.total || 0));
     if (sortMode === "least")   entries.sort((a, b) => (a.summary?.total || 0) - (b.summary?.total || 0));
 
+    filteredHistoryData = entries;
+    historyPager.page = 1;
     renderHistory(entries);
   }
 
   ["historyVendorFilter", "historySort"].forEach(id =>
     document.getElementById(id)?.addEventListener("change", applyHistoryFilters)
   );
-  let _historyDebounce;
-  document.getElementById("historySearch")?.addEventListener("input", () => {
-    clearTimeout(_historyDebounce);
-    _historyDebounce = setTimeout(applyHistoryFilters, 300);
-  });
+  const applyHistoryFiltersDebounced = debounce(applyHistoryFilters, 250);
+  document.getElementById("historySearch")?.addEventListener("input", applyHistoryFiltersDebounced);
 
   function renderHistory(entries) {
     const el = document.getElementById("historyList");
@@ -3213,15 +3307,22 @@
       el.innerHTML = `<p class="text-muted">No audit history yet. Run an audit and check &ldquo;Save to Audit History&rdquo;.</p>`;
       return;
     }
-    el.innerHTML = entries.map(e => {
+    const total = entries.length;
+    const totalPages = Math.max(1, Math.ceil(total / historyPager.pageSize));
+    historyPager.page = Math.max(1, Math.min(historyPager.page, totalPages));
+    const startIndex = (historyPager.page - 1) * historyPager.pageSize;
+    const pageEntries = entries.slice(startIndex, startIndex + historyPager.pageSize);
+
+    el.innerHTML = pageEntries.map(e => {
       const ts     = e.timestamp ? new Date(e.timestamp).toLocaleString() : "—";
       const vendor = VENDOR_LABELS[e.vendor] || e.vendor;
       const crit = e.summary?.critical || 0, hi = e.summary?.high || 0, med = e.summary?.medium || 0, tot = e.summary?.total || 0;
       const primaryName = e.tag ? escHtml(e.tag) + " <span style='font-weight:400;color:var(--ink-3)'>v" + (e.version || 1) + "</span>" : escHtml(e.filename);
       const secondaryMeta = e.tag ? escHtml(e.filename) + " &bull; " + escHtml(vendor) + " &bull; " + escHtml(ts) : escHtml(vendor) + " &bull; " + escHtml(ts);
+      const selected = compareSelections.includes(String(e.id));
       return `<div class="list-row" data-id="${escHtml(e.id)}">
-        <label class="check" title="Select to compare">
-          <input type="checkbox" class="history-check" data-id="${escHtml(e.id)}" style="display:none" />
+        <label class="check${selected ? " on" : ""}" title="Select to compare">
+          <input type="checkbox" class="history-check" data-id="${escHtml(e.id)}" style="display:none"${selected ? " checked" : ""} />
           <svg viewBox="0 0 10 8"><polyline points="1,4 4,7 9,1" fill="none" stroke="currentColor" stroke-width="1.5"/></svg>
         </label>
         <div>
@@ -3251,79 +3352,123 @@
     <div class="history-compare-bar" id="compareBar">
       <span id="compareBarText">Select two entries to compare</span>
       <button class="btn-primary btn-sm" id="compareBtn" disabled>Compare selected</button>
-    </div>`;
-
-    el.querySelectorAll(".history-check").forEach(cb => {
-      cb.addEventListener("change", function () {
-        if (this.checked) {
-          if (compareSelections.length >= 2) {
-            const old = compareSelections.shift();
-            const oldCb = el.querySelector(`.history-check[data-id="${old}"]`);
-            if (oldCb) { oldCb.checked = false; oldCb.closest(".check")?.classList.remove("on"); }
-          }
-          compareSelections.push(this.dataset.id);
-          this.closest(".check")?.classList.add("on");
-        } else {
-          compareSelections = compareSelections.filter(id => id !== this.dataset.id);
-          this.closest(".check")?.classList.remove("on");
-        }
-        updateCompareBar();
-      });
-    });
-
-    el.querySelectorAll("[data-delete]").forEach(btn => {
-      btn.addEventListener("click", async function () {
-        await fetch("/archive/" + this.dataset.delete, { method: "DELETE" });
-        await loadHistory();
-      });
-    });
-
-    /* Remediation plan buttons for archived entries */
-    el.querySelectorAll("[data-rem-archive]").forEach(btn => {
-      btn.addEventListener("click", async function () {
-        const archiveId = this.dataset.remArchive;
-        if (window._openArchiveRemediation) await window._openArchiveRemediation(archiveId);
-        else alert("Remediation viewer is still loading. Please try again.");
-      });
-    });
-
-    /* Evidence bundle download buttons */
-    el.querySelectorAll("[data-evidence-bundle]").forEach(btn => {
-      btn.addEventListener("click", async function () {
-        const entryId = this.dataset.evidenceBundle;
-        const origText = this.textContent;
-        this.disabled = true;
-        this.textContent = "Generating…";
-        try {
-          const res = await fetch(`/reports/${entryId}/evidence-bundle`, { method: "POST" });
-          if (!res.ok) {
-            const err = await res.json().catch(() => ({ error: `HTTP ${res.status}` }));
-            alert("Evidence bundle failed: " + (err.error || res.status));
-            return;
-          }
-          const blob = await res.blob();
-          const disposition = res.headers.get("Content-Disposition") || "";
-          const fnMatch = disposition.match(/filename="?([^"]+)"?/);
-          const filename = fnMatch ? fnMatch[1] : `cashel_evidence_${entryId}.zip`;
-          const url = URL.createObjectURL(blob);
-          const a = document.createElement("a");
-          a.href = url;
-          a.download = filename;
-          document.body.appendChild(a);
-          a.click();
-          document.body.removeChild(a);
-          URL.revokeObjectURL(url);
-        } catch (err) {
-          alert("Evidence bundle failed: " + err.message);
-        } finally {
-          this.disabled = false;
-          this.textContent = origText;
-        }
-      });
-    });
-
-    document.getElementById("compareBtn")?.addEventListener("click", runCompare);
+    </div>
+    ${renderHistoryPagination(total, totalPages, startIndex)}`;
+    updateCompareBar();
   }
+
+  function renderHistoryPagination(total, totalPages, startIndex) {
+    if (total <= FINDING_PAGE_SIZE_OPTIONS[0]) return "";
+    const first = startIndex + 1;
+    const last = Math.min(startIndex + historyPager.pageSize, total);
+    const pageSizeOpts = FINDING_PAGE_SIZE_OPTIONS.map(n =>
+      `<option value="${n}"${n === historyPager.pageSize ? " selected" : ""}>${n} per page</option>`
+    ).join("");
+    const navHTML = totalPages > 1 ? `
+      <div class="pagination-controls">
+        <button class="btn-page" data-history-page="${historyPager.page - 1}"${historyPager.page === 1 ? " disabled" : ""}>&#8592;</button>
+        ${buildPageButtons(totalPages, historyPager.page).replaceAll("data-page=", "data-history-page=")}
+        <button class="btn-page" data-history-page="${historyPager.page + 1}"${historyPager.page === totalPages ? " disabled" : ""}>&#8594;</button>
+      </div>
+      <span class="pagination-info">Showing ${first}–${last} of ${total}</span>` : `
+      <span class="pagination-info">${total} history entries</span>`;
+
+    return `<div class="findings-pagination" id="historyPagination">
+      ${navHTML}
+      <select class="page-size-select" id="historyPageSize">${pageSizeOpts}</select>
+    </div>`;
+  }
+
+  document.getElementById("historyList")?.addEventListener("change", function(e) {
+    const cb = e.target.closest(".history-check");
+    if (!cb || !this.contains(cb)) return;
+    if (cb.checked) {
+      if (compareSelections.length >= 2) {
+        const old = compareSelections.shift();
+        const oldCb = this.querySelector(`.history-check[data-id="${old}"]`);
+        if (oldCb) { oldCb.checked = false; oldCb.closest(".check")?.classList.remove("on"); }
+      }
+      compareSelections.push(cb.dataset.id);
+      cb.closest(".check")?.classList.add("on");
+    } else {
+      compareSelections = compareSelections.filter(id => id !== cb.dataset.id);
+      cb.closest(".check")?.classList.remove("on");
+    }
+    updateCompareBar();
+  });
+
+  document.getElementById("historyList")?.addEventListener("click", async function(e) {
+    const pageBtn = e.target.closest("[data-history-page]");
+    if (pageBtn && !pageBtn.disabled) {
+      const page = parseInt(pageBtn.dataset.historyPage, 10);
+      if (!Number.isNaN(page)) {
+        historyPager.page = page;
+        renderHistory(filteredHistoryData);
+      }
+      return;
+    }
+
+    const compareBtn = e.target.closest("#compareBtn");
+    if (compareBtn) {
+      runCompare();
+      return;
+    }
+
+    const deleteBtn = e.target.closest("[data-delete]");
+    if (deleteBtn) {
+      await fetch("/archive/" + deleteBtn.dataset.delete, { method: "DELETE" });
+      await loadHistory();
+      return;
+    }
+
+    const remBtn = e.target.closest("[data-rem-archive]");
+    if (remBtn) {
+      const archiveId = remBtn.dataset.remArchive;
+      if (window._openArchiveRemediation) await window._openArchiveRemediation(archiveId);
+      else alert("Remediation viewer is still loading. Please try again.");
+      return;
+    }
+
+    const bundleBtn = e.target.closest("[data-evidence-bundle]");
+    if (!bundleBtn) return;
+    const entryId = bundleBtn.dataset.evidenceBundle;
+    const origText = bundleBtn.textContent;
+    bundleBtn.disabled = true;
+    bundleBtn.textContent = "Generating…";
+    try {
+      const res = await fetch(`/reports/${entryId}/evidence-bundle`, { method: "POST" });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({ error: `HTTP ${res.status}` }));
+        alert("Evidence bundle failed: " + (err.error || res.status));
+        return;
+      }
+      const blob = await res.blob();
+      const disposition = res.headers.get("Content-Disposition") || "";
+      const fnMatch = disposition.match(/filename="?([^"]+)"?/);
+      const filename = fnMatch ? fnMatch[1] : `cashel_evidence_${entryId}.zip`;
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = filename;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    } catch (err) {
+      alert("Evidence bundle failed: " + err.message);
+    } finally {
+      bundleBtn.disabled = false;
+      bundleBtn.textContent = origText;
+    }
+  });
+
+  document.getElementById("historyList")?.addEventListener("change", function(e) {
+    const sel = e.target.closest("#historyPageSize");
+    if (!sel || !this.contains(sel)) return;
+    historyPager.pageSize = parseInt(sel.value, 10) || FINDING_PAGE_SIZE_OPTIONS[0];
+    historyPager.page = 1;
+    renderHistory(filteredHistoryData);
+  });
 
   function updateCompareBar() {
     const btn  = document.getElementById("compareBtn");
@@ -3473,14 +3618,13 @@
         </div>
       </div>`;
     }).join("");
-
-    el.querySelectorAll("[data-delete-activity]").forEach(btn => {
-      btn.addEventListener("click", async function () {
-        await fetch("/activity/" + this.dataset.deleteActivity, { method: "DELETE" });
-        await loadActivity();
-      });
-    });
   }
+  document.getElementById("activityList")?.addEventListener("click", async function (e) {
+    const btn = e.target.closest("[data-delete-activity]");
+    if (!btn || !this.contains(btn)) return;
+    await fetch("/activity/" + btn.dataset.deleteActivity, { method: "DELETE" });
+    await loadActivity();
+  });
 
   const _refreshActivityBtn = document.getElementById("refreshActivityBtn");
   if (_refreshActivityBtn) _refreshActivityBtn.addEventListener("click", loadActivity);
@@ -3756,6 +3900,14 @@
 
   function escHtml(s) {
     return String(s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;");
+  }
+
+  function debounce(fn, delay = 200) {
+    let timer;
+    return function (...args) {
+      clearTimeout(timer);
+      timer = setTimeout(() => fn.apply(this, args), delay);
+    };
   }
 
   // ══════════════════════════════════════════════════════ BULK AUDIT ══
@@ -4498,23 +4650,24 @@
             </tr>`).join("")}
         </tbody>
       </table>`;
-    container.querySelectorAll(".wh-delete-btn").forEach(btn => {
-      btn.addEventListener("click", async () => {
-        if (!confirm("Delete this webhook?")) return;
-        await fetch(`/settings/webhooks/${btn.dataset.id}`, { method: "DELETE" });
-        loadWebhooks();
-      });
-    });
-    container.querySelectorAll(".wh-test-btn").forEach(btn => {
-      btn.addEventListener("click", async () => {
-        btn.disabled = true; btn.textContent = "Sending…";
-        const r = await fetch(`/settings/webhooks/${btn.dataset.id}/test`, { method: "POST" });
-        const j = await r.json();
-        btn.textContent = j.ok ? "✓ Sent" : "✗ Failed";
-        setTimeout(() => { btn.textContent = "Test"; btn.disabled = false; }, 2500);
-      });
-    });
   }
+  document.getElementById("webhooksTable")?.addEventListener("click", async function (e) {
+    const deleteBtn = e.target.closest(".wh-delete-btn");
+    if (deleteBtn && this.contains(deleteBtn)) {
+      if (!confirm("Delete this webhook?")) return;
+      await fetch(`/settings/webhooks/${deleteBtn.dataset.id}`, { method: "DELETE" });
+      loadWebhooks();
+      return;
+    }
+    const testBtn = e.target.closest(".wh-test-btn");
+    if (!testBtn || !this.contains(testBtn)) return;
+    testBtn.disabled = true;
+    testBtn.textContent = "Sending…";
+    const r = await fetch(`/settings/webhooks/${testBtn.dataset.id}/test`, { method: "POST" });
+    const j = await r.json();
+    testBtn.textContent = j.ok ? "✓ Sent" : "✗ Failed";
+    setTimeout(() => { testBtn.textContent = "Test"; testBtn.disabled = false; }, 2500);
+  });
 
   function resetWebhookModal() {
     document.getElementById("whName").value = "";
@@ -5228,6 +5381,8 @@
       const s = result.summary || {};
       const vendor = (typeof VENDOR_LABELS !== "undefined" && VENDOR_LABELS[result.vendor]) || result.vendor || "Unknown";
       const findings = result.enriched_findings || result.findings || [];
+      window._bulkDetailFindings = findings;
+      window._bulkDetailPager = { page: 1, pageSize: 25 };
       bulkBody.innerHTML = `
         <div class="bulk-detail">
           <div class="rem-summary-bar">
@@ -5242,16 +5397,39 @@
             <div><span>Status</span><b>${escH(result.status || 'ok')}</b></div>
             <div><span>Total findings</span><b>${s.total || findings.length || 0}</b></div>
           </div>
-          <div class="bulk-detail-findings">
-            ${findings.length
-              ? findings.map(f => typeof buildFindingHTML === "function"
-                  ? buildFindingHTML(f)
-                  : `<div class="finding finding-info">${escH(typeof f === "string" ? f : (f.message || ""))}</div>`).join("")
-              : `<div class="finding finding-pass">[PASS] No issues found</div>`}
-          </div>
+          <div class="bulk-detail-findings" id="bulkDetailFindings"></div>
+          <div class="findings-pagination hidden" id="bulkDetailFindingsPagination"></div>
         </div>`;
+      window._renderBulkDetailFindings();
       openBulkResultModal();
     };
+    window._renderBulkDetailFindings = function() {
+      renderPagedFindingList(
+        window._bulkDetailFindings || [],
+        document.getElementById("bulkDetailFindings"),
+        document.getElementById("bulkDetailFindingsPagination"),
+        window._bulkDetailPager || { page: 1, pageSize: 25 },
+        `<div class="finding finding-pass">[PASS] No issues found</div>`
+      );
+    };
+    document.addEventListener("click", function(e) {
+      const pager = e.target.closest("#bulkDetailFindingsPagination");
+      if (!pager) return;
+      const btn = e.target.closest(".btn-page");
+      if (!btn || btn.disabled) return;
+      const page = parseInt(btn.dataset.page, 10);
+      if (!Number.isNaN(page)) {
+        window._bulkDetailPager.page = page;
+        window._renderBulkDetailFindings();
+      }
+    });
+    document.addEventListener("change", function(e) {
+      const sel = e.target.closest("#bulkDetailFindingsPagination .page-size-select");
+      if (!sel) return;
+      window._bulkDetailPager.pageSize = parseInt(sel.value, 10) || FINDING_PAGE_SIZE_OPTIONS[0];
+      window._bulkDetailPager.page = 1;
+      window._renderBulkDetailFindings();
+    });
 
     /* Wire up buttons — connect (SSH) audit */
     let lastConnectData = null;
