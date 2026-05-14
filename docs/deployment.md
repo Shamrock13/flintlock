@@ -342,12 +342,25 @@ Set `CASHEL_PUBLIC_API_DOCS=true` only when you intentionally want the Swagger U
 and OpenAPI spec to remain public, such as for a controlled demo environment.
 Truthy values include `true`, `1`, `yes`, and `on`. The default is `false`.
 
+## API Key Transport
+
+Use the `X-API-Key` header for API-key authentication. The legacy
+`?api_key=` query-string transport is deprecated because URLs can appear in
+application logs, browser history, proxy logs, monitoring systems, and referrer
+headers.
+
+`CASHEL_ALLOW_QUERY_API_KEY` defaults to `true` for backward compatibility. Set
+`CASHEL_ALLOW_QUERY_API_KEY=false` to reject query-string API keys while keeping
+`X-API-Key` authentication enabled. False values include `false`, `0`, `no`, and
+`off`.
+
 ---
 
 ## Hardening Checklist
 
 - [ ] `CASHEL_SECRET` is set and not the default
 - [ ] `CASHEL_PUBLIC_API_DOCS` is unset or `false` unless public API docs are intentional
+- [ ] `CASHEL_ALLOW_QUERY_API_KEY=false` after clients have migrated to `X-API-Key`
 - [ ] `CASHEL_KEY_FILE` points to a persistent, backed-up location
 - [ ] `CASHEL_SECURE_COOKIES=true` when behind HTTPS
 - [ ] TLS 1.2+ only on the proxy (TLS 1.3 preferred)

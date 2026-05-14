@@ -50,6 +50,7 @@ _AUTH_EXEMPT_ENDPOINTS = {
 }
 
 _TRUTHY_ENV_VALUES = {"1", "true", "yes", "on"}
+_FALSEY_ENV_VALUES = {"0", "false", "no", "off"}
 
 # Swagger UI static assets can stay public; the docs UI/spec routes are gated below.
 _AUTH_EXEMPT_PATH_PREFIXES = ("/flasgger_static/",)
@@ -60,6 +61,14 @@ def api_docs_public_enabled() -> bool:
     """Return whether API docs/spec routes should remain public."""
     return os.environ.get("CASHEL_PUBLIC_API_DOCS", "false").strip().lower() in (
         _TRUTHY_ENV_VALUES
+    )
+
+
+def query_api_key_allowed() -> bool:
+    """Return whether deprecated ?api_key= authentication is still accepted."""
+    return (
+        os.environ.get("CASHEL_ALLOW_QUERY_API_KEY", "true").strip().lower()
+        not in _FALSEY_ENV_VALUES
     )
 
 
@@ -96,8 +105,8 @@ def _require_auth_impl(demo_mode: bool):
     if request.path.startswith(_AUTH_EXEMPT_PATH_PREFIXES):
         return
 
-    # API key auth (X-API-Key header or ?api_key= param) — CI/CLI
-    api_key_header = request.headers.get("X-API-Key") or request.args.get("api_key")
+    # API key auth (X-API-Key header preferred; ?api_key= is deprecated).
+    api_key_header = request.headers.get("X-API-Key")
     if api_key_header:
         from .user_store import get_user_by_api_key
 
@@ -116,6 +125,69 @@ def _require_auth_impl(demo_mode: bool):
                 {"ok": False, "data": None, "error": "Invalid API key."}
             ), 401
         return jsonify({"error": "Invalid API key."}), 401
+
+    query_api_key = request.args.get("api_key")
+    if query_api_key:
+        from .auth_audit import (
+            AUTH_INVALID_API_KEY,
+            AUTH_QUERY_API_KEY_DISABLED,
+            AUTH_QUERY_API_KEY_USED,
+            log_auth_event,
+        )
+
+        if not query_api_key_allowed():
+            _logger.warning(
+                "Rejected deprecated query-string API key auth for path %s",
+                request.path,
+            )
+            log_auth_event(
+                AUTH_QUERY_API_KEY_DISABLED,
+                success=False,
+                details={"endpoint": request.path, "auth_source": "query"},
+            )
+            if request.path.startswith("/api/"):
+                return jsonify(
+                    {
+                        "ok": False,
+                        "data": None,
+                        "error": (
+                            "Query-string API keys are disabled. "
+                            "Use the X-API-Key header."
+                        ),
+                    }
+                ), 401
+        else:
+            _logger.warning(
+                "Deprecated query-string API key auth used for path %s",
+                request.path,
+            )
+            from .user_store import get_user_by_api_key
+
+            user = get_user_by_api_key(query_api_key)
+            if user:
+                log_auth_event(
+                    AUTH_QUERY_API_KEY_USED,
+                    success=True,
+                    details={"endpoint": request.path, "auth_source": "query"},
+                )
+                g.auth_method = "api_key"
+                g.current_user = user
+                return
+            log_auth_event(
+                AUTH_QUERY_API_KEY_USED,
+                success=False,
+                details={"endpoint": request.path, "auth_source": "query"},
+            )
+            log_auth_event(
+                AUTH_INVALID_API_KEY,
+                success=False,
+                details={"endpoint": request.path},
+            )
+            if request.path.startswith("/api/"):
+                return jsonify(
+                    {"ok": False, "data": None, "error": "Invalid API key."}
+                ), 401
+            return jsonify({"error": "Invalid API key."}), 401
 
     # Session auth (browser)
     if session.get("authenticated") and session.get("user_id"):
