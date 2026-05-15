@@ -70,7 +70,8 @@ _swagger = Swagger(
             "title": "Cashel API",
             "description": (
                 "Cashel firewall auditing REST API. "
-                "Authenticate with an `X-API-Key` header or `?api_key=` query parameter."
+                "Authenticate with an `X-API-Key` header. "
+                "`?api_key=` query-string authentication is deprecated."
             ),
             "version": "1",
         },

@@ -365,6 +365,132 @@ class TestWebAuth(unittest.TestCase):
         finally:
             self._teardown(tmp, orig, orig_conn)
 
+    def test_query_api_key_auth_still_grants_access_by_default_and_audits(self):
+        client, tmp, orig, orig_conn = self._setup()
+        orig_allow_query = os.environ.get("CASHEL_ALLOW_QUERY_API_KEY")
+        try:
+            us.create_user("queryapiuser", "supersecretpass1", "auditor")
+            users = us.list_users()
+            api_key = us.generate_api_key(users[0]["id"])
+            from cashel.auth_audit import AUTH_QUERY_API_KEY_USED, list_auth_events
+            from cashel.settings import save_settings, get_settings
+
+            save_settings({**get_settings(), "auth_enabled": True})
+            os.environ.pop("CASHEL_ALLOW_QUERY_API_KEY", None)
+
+            with self.assertLogs("cashel._helpers", level="WARNING") as logs:
+                resp = client.get(f"/schedules?api_key={api_key}")
+
+            self.assertNotEqual(resp.status_code, 302)
+            self.assertIn(resp.status_code, (200, 404))
+            log_output = "\n".join(logs.output)
+            self.assertIn("Deprecated query-string API key auth used", log_output)
+            self.assertNotIn(api_key, log_output)
+            events = [
+                event
+                for event in list_auth_events()
+                if event["event"] == AUTH_QUERY_API_KEY_USED
+            ]
+            self.assertTrue(events)
+            self.assertTrue(events[0]["success"])
+            self.assertEqual(events[0]["details"]["auth_source"], "query")
+        finally:
+            if orig_allow_query is None:
+                os.environ.pop("CASHEL_ALLOW_QUERY_API_KEY", None)
+            else:
+                os.environ["CASHEL_ALLOW_QUERY_API_KEY"] = orig_allow_query
+            self._teardown(tmp, orig, orig_conn)
+
+    def test_query_api_key_disabled_rejects_api_routes(self):
+        client, tmp, orig, orig_conn = self._setup()
+        orig_allow_query = os.environ.get("CASHEL_ALLOW_QUERY_API_KEY")
+        try:
+            us.create_user("disabledquery", "supersecretpass1", "auditor")
+            users = us.list_users()
+            api_key = us.generate_api_key(users[0]["id"])
+            from cashel.auth_audit import (
+                AUTH_QUERY_API_KEY_DISABLED,
+                list_auth_events,
+            )
+            from cashel.settings import save_settings, get_settings
+
+            save_settings({**get_settings(), "auth_enabled": True})
+            os.environ["CASHEL_ALLOW_QUERY_API_KEY"] = "false"
+
+            with self.assertLogs("cashel._helpers", level="WARNING") as logs:
+                resp = client.get(f"/api/v1/audit?api_key={api_key}")
+
+            self.assertEqual(resp.status_code, 401)
+            self.assertEqual(
+                resp.get_json()["error"],
+                "Query-string API keys are disabled. Use the X-API-Key header.",
+            )
+            log_output = "\n".join(logs.output)
+            self.assertIn("Rejected deprecated query-string API key auth", log_output)
+            self.assertNotIn(api_key, log_output)
+            events = [
+                event
+                for event in list_auth_events()
+                if event["event"] == AUTH_QUERY_API_KEY_DISABLED
+            ]
+            self.assertTrue(events)
+            self.assertFalse(events[0]["success"])
+            self.assertEqual(events[0]["details"]["auth_source"], "query")
+        finally:
+            if orig_allow_query is None:
+                os.environ.pop("CASHEL_ALLOW_QUERY_API_KEY", None)
+            else:
+                os.environ["CASHEL_ALLOW_QUERY_API_KEY"] = orig_allow_query
+            self._teardown(tmp, orig, orig_conn)
+
+    def test_query_api_key_disabled_keeps_header_api_key_working(self):
+        client, tmp, orig, orig_conn = self._setup()
+        orig_allow_query = os.environ.get("CASHEL_ALLOW_QUERY_API_KEY")
+        try:
+            us.create_user("headerstillworks", "supersecretpass1", "auditor")
+            users = us.list_users()
+            api_key = us.generate_api_key(users[0]["id"])
+            from cashel.settings import save_settings, get_settings
+
+            save_settings({**get_settings(), "auth_enabled": True})
+            os.environ["CASHEL_ALLOW_QUERY_API_KEY"] = "off"
+
+            resp = client.get("/schedules", headers={"X-API-Key": api_key})
+
+            self.assertNotEqual(resp.status_code, 302)
+            self.assertIn(resp.status_code, (200, 404))
+        finally:
+            if orig_allow_query is None:
+                os.environ.pop("CASHEL_ALLOW_QUERY_API_KEY", None)
+            else:
+                os.environ["CASHEL_ALLOW_QUERY_API_KEY"] = orig_allow_query
+            self._teardown(tmp, orig, orig_conn)
+
+    def test_invalid_query_api_key_does_not_leak_key_material(self):
+        client, tmp, orig, orig_conn = self._setup()
+        orig_allow_query = os.environ.get("CASHEL_ALLOW_QUERY_API_KEY")
+        try:
+            us.create_user("invalidquery", "supersecretpass1", "auditor")
+            secret_key = "csh_super_secret_query_key"
+            from cashel.settings import save_settings, get_settings
+
+            save_settings({**get_settings(), "auth_enabled": True})
+            os.environ.pop("CASHEL_ALLOW_QUERY_API_KEY", None)
+
+            with self.assertLogs("cashel._helpers", level="WARNING") as logs:
+                resp = client.get(f"/api/v1/audit?api_key={secret_key}")
+
+            self.assertEqual(resp.status_code, 401)
+            self.assertEqual(resp.get_json()["error"], "Invalid API key.")
+            self.assertNotIn(secret_key, resp.get_data(as_text=True))
+            self.assertNotIn(secret_key, "\n".join(logs.output))
+        finally:
+            if orig_allow_query is None:
+                os.environ.pop("CASHEL_ALLOW_QUERY_API_KEY", None)
+            else:
+                os.environ["CASHEL_ALLOW_QUERY_API_KEY"] = orig_allow_query
+            self._teardown(tmp, orig, orig_conn)
+
     def test_health_remains_public_when_auth_enabled(self):
         client, tmp, orig, orig_conn = self._setup()
         try:
